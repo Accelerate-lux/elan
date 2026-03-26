@@ -46,7 +46,7 @@ async def test_run_workflow_two_tasks(mock_task_factory):
 
     workflow = Workflow(
         "greet_world",
-        start=Node(run=prepare, output=["name"], next="greet"),
+        start=Node(run=prepare, output="name", next="greet"),
         greet=greet,
     )
 

@@ -1,8 +1,9 @@
-import asyncio
+﻿import asyncio
 import inspect
 from typing import Any, Callable
 
 from .node import Node
+from .result import WorkflowRun
 
 
 def task(fn: Callable[..., Any]) -> Callable[..., Any]:
@@ -22,19 +23,68 @@ class Workflow:
         self.start = start
         self.nodes = nodes
 
-    async def run(self, **input: Any) -> Any:
-        target = self.start.run if isinstance(self.start, Node) else self.start
-        task_name = getattr(target, "__name__", repr(target))
+    async def run(self, **input: Any) -> WorkflowRun:
+        current = self.start
+        current_input: Any = input
+        result: dict[str, list[Any]] = {}
 
-        if getattr(target, "__elan_task__", False) is not True:
-            raise TypeError(
-                f"Workflow '{self.name}' expects tasks decorated with @task; "
-                f"got '{task_name}'."
+        while True:
+            node = current if isinstance(current, Node) else Node(run=current)
+            target = node.run
+            task_name = getattr(target, "__name__", repr(target))
+
+            if getattr(target, "__elan_task__", False) is not True:
+                raise TypeError(
+                    f"Workflow '{self.name}' expects tasks decorated with @task; "
+                    f"got '{task_name}'."
+                )
+
+            if inspect.iscoroutinefunction(target):
+                task = target(**self._bind_input(target, current_input))
+            else:
+                task = asyncio.to_thread(target, **self._bind_input(target, current_input))
+
+            output = await task
+            result.setdefault(task_name, []).append(output)
+
+            if node.next is None:
+                return WorkflowRun(result=result)
+
+            if not isinstance(node.next, str):
+                raise NotImplementedError(
+                    "Only single-string routing is implemented in the initial scaffold."
+                )
+
+            if node.next not in self.nodes:
+                raise KeyError(
+                    f"Workflow '{self.name}' references unknown node '{node.next}'."
+                )
+
+            current = self.nodes[node.next]
+            current_input = output
+
+    def _bind_input(self, target: Callable[..., Any], value: Any) -> dict[str, Any]:
+        if isinstance(value, dict):
+            return value
+
+        parameters = [
+            parameter
+            for parameter in inspect.signature(target).parameters.values()
+            if parameter.kind
+            in (
+                inspect.Parameter.POSITIONAL_ONLY,
+                inspect.Parameter.POSITIONAL_OR_KEYWORD,
+                inspect.Parameter.KEYWORD_ONLY,
             )
+        ]
 
-        if inspect.iscoroutinefunction(target):
-            task = target(**input)
-        else:
-            task = asyncio.to_thread(target, **input)
+        if not parameters:
+            return {}
 
-        return await task
+        if len(parameters) == 1:
+            return {parameters[0].name: value}
+
+        raise TypeError(
+            f"Cannot bind input of type {type(value).__name__} to "
+            f"task '{target.__name__}' automatically."
+        )

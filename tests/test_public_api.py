@@ -1,6 +1,6 @@
-import pytest
+﻿import pytest
 
-from elan import Workflow
+from elan import Node, Workflow
 
 
 @pytest.mark.asyncio
@@ -12,10 +12,10 @@ async def test_run_workflow_one_async_task(mock_task_factory):
 
     workflow = Workflow("hello_world", start=hello)
 
-    result = await workflow.run()
+    run = await workflow.run()
 
     hello.mock.assert_called_once_with()
-    assert result == "Hello, world!"
+    assert run.result == {"_hello": ["Hello, world!"]}
 
 
 @pytest.mark.asyncio
@@ -27,7 +27,34 @@ async def test_run_workflow_one_sync_task(mock_task_factory):
 
     workflow = Workflow("hello_world", start=hello)
 
-    result = await workflow.run()
+    run = await workflow.run()
 
     hello.mock.assert_called_once_with()
-    assert result == "Hello, world!"
+    assert run.result == {"_hello": ["Hello, world!"]}
+
+
+@pytest.mark.asyncio
+async def test_run_workflow_two_tasks(mock_task_factory):
+    def _prepare():
+        return {"name": "world"}
+
+    async def _greet(name):
+        return f"Hello, {name}!"
+
+    prepare = mock_task_factory(_prepare)
+    greet = mock_task_factory(_greet)
+
+    workflow = Workflow(
+        "greet_world",
+        start=Node(run=prepare, next="greet"),
+        greet=greet,
+    )
+
+    run = await workflow.run()
+
+    prepare.mock.assert_called_once_with()
+    greet.mock.assert_called_once_with(name="world")
+    assert run.result == {
+        "_prepare": [{"name": "world"}],
+        "_greet": ["Hello, world!"],
+    }

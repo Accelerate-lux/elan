@@ -36,7 +36,7 @@ async def test_run_workflow_one_sync_task(mock_task_factory):
 @pytest.mark.asyncio
 async def test_run_workflow_two_tasks(mock_task_factory):
     def _prepare():
-        return {"name": "world"}
+        return "world"
 
     async def _greet(name):
         return f"Hello, {name}!"
@@ -46,7 +46,7 @@ async def test_run_workflow_two_tasks(mock_task_factory):
 
     workflow = Workflow(
         "greet_world",
-        start=Node(run=prepare, next="greet"),
+        start=Node(run=prepare, output=["name"], next="greet"),
         greet=greet,
     )
 
@@ -55,6 +55,6 @@ async def test_run_workflow_two_tasks(mock_task_factory):
     prepare.mock.assert_called_once_with()
     greet.mock.assert_called_once_with(name="world")
     assert run.result == {
-        "_prepare": [{"name": "world"}],
+        "_prepare": ["world"],
         "_greet": ["Hello, world!"],
     }

@@ -61,7 +61,7 @@ class Workflow:
                 )
 
             current = self.nodes[node.next]
-            current_input = output
+            current_input = self._map_output(node, output)
 
     def _bind_input(self, target: Callable[..., Any], value: Any) -> dict[str, Any]:
         if isinstance(value, dict):
@@ -88,3 +88,17 @@ class Workflow:
             f"Cannot bind input of type {type(value).__name__} to "
             f"task '{target.__name__}' automatically."
         )
+
+    def _map_output(self, node: Node, output: Any) -> Any:
+        if node.output is None:
+            return output
+
+        values = output if isinstance(output, (tuple, list)) else (output,)
+        mapped: dict[str, Any] = {}
+        for index, name in enumerate(node.output):
+            if index >= len(values):
+                break
+            if name in (None, Ellipsis):
+                continue
+            mapped[str(name)] = values[index]
+        return mapped

@@ -1,5 +1,7 @@
 ﻿# Elan
 
+![Elan](elan-pic.webp)
+
 Elan is a graph-native orchestration engine for dynamic agent and data workflows.
 
 Built to be flexible and workload-agnostic, it can handle everything from simple scripts to complex workflows whose structure emerges during execution.
@@ -9,3 +11,5 @@ Traditional DAG-based orchestrators handle scheduling, retries, and structured w
 Elan also aims to avoid the heavy boilerplate and rigid execution patterns common in many agent frameworks. It is designed to provide a simpler and more coherent orchestration model for multi-step, mixed-workload workflows.
 
 Designed with developer experience in mind, Elan is simple to learn, predictable to operate, and easily moves from local setup to production without over-engineering your codebase. Whether you are coordinating standard Python data tasks or agent loops, Elan provides a consistent interface that scales from a basic script to complex execution graphs.
+
+The name comes from the French word "élan", pronounced "ay-lan" which mean both momentum and moose.

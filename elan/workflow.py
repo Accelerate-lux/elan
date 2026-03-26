@@ -93,9 +93,10 @@ class Workflow:
         if node.output is None:
             return output
 
+        names = [node.output] if isinstance(node.output, str) else node.output
         values = output if isinstance(output, (tuple, list)) else (output,)
         mapped: dict[str, Any] = {}
-        for index, name in enumerate(node.output):
+        for index, name in enumerate(names):
             if index >= len(values):
                 break
             if name in (None, Ellipsis):

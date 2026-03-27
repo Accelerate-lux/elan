@@ -4,13 +4,55 @@
 
 Elan is a graph-native orchestration engine for dynamic agent and data workflows.
 
-Built to be flexible and workload-agnostic, it can handle everything from simple scripts to complex workflows whose structure emerges during execution.
+While traditional DAG-based orchestrators excel at static scheduling, they struggle when a workflow's structure isn't fully known ahead of time. Conversely, many agent frameworks offer dynamic execution but introduce heavy boilerplate, rigid patterns, and unpredictable behaviors. 
 
-Traditional DAG-based orchestrators handle scheduling, retries, and structured workflows well, but offer limited dynamic execution capabilities when the full graph topology is not known ahead of time. Elan takes a different approach: its core model is a dynamic execution graph where branches can expand, recurse, and synchronize as the workflow runs.
+Designed with developer experience in mind, Elan bridges this gap by offering a simple, predictable orchestration model:
 
-Elan also aims to avoid the heavy boilerplate and rigid execution patterns common in many agent frameworks. It is designed to provide a simpler and more coherent orchestration model for multi-step, mixed-workload workflows.
-
-Designed with developer experience in mind, Elan is simple to learn, predictable to operate, and easily moves from local setup to production without over-engineering your codebase. Whether you are coordinating standard Python data tasks or agent loops, Elan provides a consistent interface that scales from a basic script to complex execution graphs.
+- **Dynamic Execution:** A core model where branches can expand, recurse, and synchronize at runtime as your workflow emerges.
+- **Simple Mental Model:** A declarative API that strictly separates pure business logic (Tasks) from routing and orchestration (Workflows).
+- **Fully Type-Safe:** Built to give your IDE and type checkers maximum context. With built-in integration for Pydantic models, Elan catches routing and data-binding errors at write-time rather than runtime.
+- **Framework Agnostic:** Elan doesn't lock you into a proprietary LLM ecosystem. Because tasks are just Python functions, you can easily orchestrate any model, API, or custom logic without fighting the framework.
+- **Testable by Design:** Because tasks are just plain Python functions that know nothing about the graph, you can unit test your business logic without mocking the orchestrator.
+- **Workload Agnostic:** Whether you are coordinating standard Python data tasks or complex agent loops, Elan provides a consistent interface.
+- **Easily Extensible:** The core architecture is built around standard Python primitives, making it trivial to write custom adapters, integrate third-party tools, or extend the orchestrator's capabilities to fit your specific needs.
+- **Low Boilerplate:** Designed to get out of your way, it is simple to learn and easily moves from local setup to production without over-engineering your codebase.
 
 The name—pronounced "ay-lan"—comes from the French word "élan" which mean both momentum and moose.
 
+## Quickstart
+
+Elan separates the work you want to do (Tasks) from how that work is routed (Nodes) and orchestrated (Workflows).
+
+Here is how you define a simple linear workflow where the output of one task automatically flows into the next:
+
+```python
+import asyncio
+from elan import Node, Workflow, task
+
+# 1. Define your pure business logic as tasks
+@task
+def prepare():
+    return "World"
+
+@task
+async def greet(name: str):
+    return f"Hello, {name}!"
+
+# 2. Orchestrate them into a workflow graph
+workflow = Workflow(
+    "greet_world",
+    # Wrap tasks in Nodes to define routing edges
+    start=Node(run=prepare, next="greet"),
+    greet=greet,
+)
+
+# 3. Execute the graph
+run = asyncio.run(workflow.run())
+
+print(run.result)
+# {'prepare': ['World'], 'greet': ['Hello, World!']}
+```
+
+## Documentation
+
+For a complete introduction to Elan's mental model, graph topology, and data binding rules, read the [Basics Guide](docs/basics.md).

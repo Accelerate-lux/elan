@@ -1,4 +1,4 @@
-﻿# Elan
+# Elan
 
 ![Elan](elan-pic.webp)
 
@@ -12,5 +12,5 @@ Elan also aims to avoid the heavy boilerplate and rigid execution patterns commo
 
 Designed with developer experience in mind, Elan is simple to learn, predictable to operate, and easily moves from local setup to production without over-engineering your codebase. Whether you are coordinating standard Python data tasks or agent loops, Elan provides a consistent interface that scales from a basic script to complex execution graphs.
 
-The name — pronounced "ay-lan" — comes from the French word "élan" which mean both momentum and moose.
+The name—pronounced "ay-lan"—comes from the French word "élan" which mean both momentum and moose.
 

@@ -1,19 +1,25 @@
-﻿# Basics
+# Basics
 
-This document explains the basic concepts and usage of Elan.
+This guide introduces the core concepts and usage of Elan.
 
-Elan is built around a small workflow model:
+Elan is a workflow orchestrator designed around a graph-based execution model. You build workflows by defining discrete tasks as nodes and establishing the execution paths between them. 
 
-- `task` defines executable logic
-- `Workflow` defines orchestration
-- `Node` adds workflow behavior around a task when needed
-- `WorkflowRun` is the object returned by execution
+To make orchestration intuitive, Elan relies on a few core design principles:
 
-The easiest way to understand Elan is to start with one task, then add one more task, then look at how data moves between them.
+* **Coupled Transitions:** Rather than defining nodes and edges in separate configurations, Elan uses transitory nodes. A node's definition inherently dictates its routing logic to the next step, meaning workflows naturally form a **directed graph**. This keeps the flow of execution localized and declarative.
+* **Direct Data Passing:** While Elan supports a distributed shared state for complex requirements, the canonical approach is for nodes to pass data directly to one another. This keeps data dependencies explicit, predictable, and easy to test.
+* **Sensible Defaults:** The API is designed to get out of your way. Elan provides default behaviors for standard routing, ensuring that simple workflows require minimal boilerplate to get running.
 
-## Tasks
 
-A `task` is a Python callable decorated with `@task`.
+To build these directed graphs, Elan separates the execution of work from its orchestration using three core concepts:
+
+* **Task:** The fundamental unit of work. A task represents a discrete unit of business logic, kept entirely independent of the orchestration layer.
+* **Node:** The routing wrapper for a task. In a graph, a task alone is insufficient because it lacks routing information. A node encapsulates both the task to be executed and the routing logic (the edges) that determines the next step.
+* **Workflow:** The orchestrator. It manages the execution state of the nodes and coordinates the flow of data across the graph.
+
+## Defining Tasks
+
+A task is the basic unit of execution in Elan. It is defined as a standard Python function—either synchronous or asynchronous—and registered with the Elan runtime by applying Elan's `@task` decorator. 
 
 ```python
 from elan import task
@@ -23,109 +29,110 @@ async def hello():
     return "Hello, world!"
 ```
 
-The decorator marks the function as something Elan is allowed to execute. Without it, the runtime refuses to run the callable.
+The decorator does not alter the core behavior of your function. A task's only responsibility is to describe the work it performs. It intentionally knows nothing about what runs before it, what runs after it, or how its output is used. That separation ensures tasks remain highly reusable and easy to test in isolation.
 
-Tasks may be:
+The workflow runtime itself is fully asynchronous (`await workflow.run()`). When executing your graph, Elan awaits asynchronous tasks directly, and automatically executes synchronous tasks in a separate thread (`asyncio.to_thread`). This keeps the orchestrator non-blocking without forcing you to write every task asynchronously.
 
-- synchronous functions
-- asynchronous functions
+## Task Identity and Registration
 
-A task only describes work. It does not describe when it runs, what comes before it, or what comes after it. That is the job of the workflow.
+When you decorate a function, Elan automatically registers it using a canonical identity derived from its import path (e.g., `my_project.tasks.hello`). 
 
-## Workflows
+This is to prevents name collisions. In large projects, you might have multiple tasks named `process_data` in different modules. By using the import path as the canonical key, Elan guarantees that every task is uniquely identifiable without requiring manual namespace management.
 
-A `Workflow` defines how tasks are orchestrated.
+If the canonical import path is too long or cumbersome to reference in your workflows, you can define an explicit alias:
 
-A workflow is a graph of nodes with one node designated as the start node. In the simplest case, a node is just a task. 
+```python
+@task(alias="bonjour")
+async def hello():
+    return "Hello, world!"
+```
 
-The smallest workflow is a single task used as the start node:
+Aliases provide a convenient shorthand for workflow definitions, but the canonical key always remains the stable underlying identity.
+
+## Orchestrating with Workflows
+
+A `Workflow` acts as the blueprint for your execution graph. It defines the topology of your nodes and coordinates the flow of data between them.
+
+Every workflow requires a designated `start` node, which serves as the entry point for execution. In the simplest scenario, the start node can just be a bare task, making the smallest possible workflow a single-step execution:
 
 ```python
 from elan import Workflow, task
+
 
 @task
 async def hello():
     return "Hello, world!"
 
+
 workflow = Workflow("hello_world", start=hello)
 run = await workflow.run()
 ```
 
-In the single-task case, the workflow does one thing: execute the start node and stop.
+When constructing the graph, the workflow needs to reference the tasks it will orchestrate. Elan supports three referencing methods to balance strict and loose coupling depending on your project's architecture:
 
-## Runs
+* **Directly:** Passing the `Task` object itself. This is straightforward for small scripts and single-file projects.
+* **By canonical key:** Using the task's import path string. This enables loose coupling and helps prevent circular imports in larger, multi-module codebases.
+* **By explicit alias:** Using the custom string alias defined on the task. This keeps workflow definitions concise and highly readable.
 
-Calling `workflow.run()` creates a workflow run.
+## Executing Runs
 
-A run is the concrete execution of a workflow definition with a specific set of inputs. The workflow tells Elan what should happen; the run is the record of what actually happened for one execution.
+While a `Workflow` acts as a reusable blueprint, a **Run** is a single, concrete execution of that blueprint with a specific set of inputs.
 
-This distinction matters because a workflow is reusable, while runs are not. You may define one workflow and execute it many times with different inputs, timings, and outcomes.
+Calling `await workflow.run()` executes the graph and returns a `WorkflowRun` object. This object serves as a full report of the execution. 
 
-`workflow.run()` returns a `WorkflowRun` object.
-
-`WorkflowRun` is meant to represent execution, not just output. Even in the simple form it has today, it already establishes the idea that running a workflow gives you a run object rather than a raw return value.
-
-Right now, `WorkflowRun` stores:
-
-- `result`: a mapping of task name to the list of outputs produced during the run
-
-So the one-task workflow above produces:
+The primary data it contains is the `result`—a dictionary mapping each executed task's name to a list of its outputs. For the single-task workflow above, the run produces:
 
 ```python
 {"hello": ["Hello, world!"]}
 ```
 
-Over time, a run is expected to become the place where execution data lives: task results, graph state, context, logs, and other run-level information.
+## Configuring Nodes
 
-## Nodes
+While a task defines *what* work happens, a `Node` defines *where* that work sits within the execution graph. It acts as a wrapper that attaches routing and data-shaping instructions to an underlying task.
 
-A `Node` is the configured form of a task inside a workflow. It s used when a task needs to carry workflow-specific behavior such as sequencing, routing or output mapping. 
+If a task is the final step in a workflow—or the only step—you can pass the bare task directly to the workflow for convenience. However, the moment your workflow needs to dictate what happens after the task completes, you must wrap it in a `Node`.
 
-You can use a bare task when no extra configuration is needed.
+A `Node` uses three primary fields to establish its context within the graph:
 
-The runtime uses these fields:
+* **`run`**: Specifies the task to execute.
+* **`next`**: Defines the directed edge to the next node in the workflow.
+* **`output`**: Acts as a data adapter, reshaping the task's result before it moves downstream.
 
-- `run`
-- `next`
-- `output`
+By keeping these routing concerns on the `Node` rather than the task itself, Elan ensures your core business logic remains entirely decoupled from the workflow's topology.
 
-Conceptually:
+## Building a Linear Flow
 
-- `run` chooses the task to execute
-- `next` chooses the next named node
-- `output` reshapes the task result before passing it forward
+The most common graph topology is a simple linear chain. In Elan, you build this by defining directed edges using the `next` field on your nodes.
 
-## Linear Flow
-
-Elan supports linear chaining through `next="..."`.
-
-A two-task workflow is defined by:
-
-- choosing a start node
-- naming the downstream task in `next`
-- registering that downstream task on the workflow
+To create a two-task workflow, you need to:
+1. Designate a starting node.
+2. Tell that start node where to go by setting `next` to the name of the downstream node.
+3. Register the downstream node on the workflow.
 
 ```python
 from elan import Node, Workflow, task
+
 
 @task
 def prepare():
     return "world"
 
+
 @task
-async def greet(name):
+async def greet(name: str):
     return f"Hello, {name}!"
+
 
 workflow = Workflow(
     "greet_world",
-    start=Node(run=prepare, output="name", next="greet"),
+    start=Node(run=prepare, next="greet"),
     greet=greet,
 )
 
 run = await workflow.run()
 ```
 
-This produces:
+This execution produces:
 
 ```python
 {
@@ -134,97 +141,235 @@ This produces:
 }
 ```
 
-Two things happen here:
+Notice how `prepare` is wrapped in a `Node`. Because it is not the final step, it requires the `next` field to point the graph toward `greet`. The raw string returned by `prepare` is automatically passed as the first positional argument to `greet`.
 
-- `prepare` is wrapped in a `Node` so the workflow can declare what comes next
-- the output of `prepare` is mapped before `greet` receives it
+## Task Resolution By Name
 
-## Output Mapping
+Because tasks are globally registered, a workflow does not need to import the `Task` object directly. It can reference tasks by their canonical key or alias. This is particularly useful for keeping workflow definitions clean and avoiding circular dependencies.
 
-A node may map its task output before passing it to the next node.
-
-For a single mapped value:
+Here is the same linear flow, but using string aliases:
 
 ```python
-output="name"
+from elan import Node, Workflow, task
+
+
+@task(alias="prepare")
+def build_name():
+    return "world"
+
+
+@task(alias="greet")
+async def say_hello(name: str):
+    return f"Hello, {name}!"
+
+
+workflow = Workflow(
+    "greet_world",
+    start=Node(run="prepare", next="greet_node"),
+    greet_node="greet",
+)
 ```
 
-If `prepare()` returns:
+It is important to distinguish between *task names* and *node names*. The `run` field resolves tasks from the global registry. The `next` field, however, always refers to the local node names defined within the `Workflow` itself (in this case, `"greet_node"`).
+
+## Data Binding
+
+Binding is the mechanism by which the output of one node becomes the input of the next node. 
+
+Elan uses a small set of default binding rules designed to keep common workflows concise, while preserving the natural behavior of ordinary Python values. The overarching philosophy is straightforward:
+
+* **Fixed-shape outputs** (like scalars and tuples) move positionally.
+* **Structured payloads** (like Pydantic models) move by named fields.
+* **Plain Python containers** (like lists and dicts) remain opaque values and are not automatically unpacked.
+
+Understanding how data flows through your graph comes down to five specific binding cases.
+
+### 1. Workflow Entrypoint Binding
+
+The first binding case happens before the graph even starts executing. When you call `workflow.run(**kwargs)`, Elan binds those named keyword arguments directly to the parameters of the `start` node's task.
 
 ```python
-"world"
+from elan import Workflow, task
+
+
+@task
+async def greet(name: str):
+    return f"Hello, {name}!"
+
+
+workflow = Workflow("hello_world", start=greet)
+run = await workflow.run(name="world")
 ```
 
-then Elan turns that into:
+By following standard Python keyword invocation, the entrypoint stays familiar and explicit.
+
+### 2. Positional Argument Passing
+
+When a task returns a fixed-shape output, Elan binds that data to the downstream task positionally. There are exactly two cases where this happens: scalar values and tuples.
+
+**Scalar Output:** If a node returns a single value (like a string, integer, or custom object) and the next task expects exactly one parameter, Elan passes that value through directly. No extra configuration is needed.
 
 ```python
-{"name": "world"}
+from elan import Node, Workflow, task
+
+
+@task
+def prepare():
+    return "world"
+
+
+@task
+async def greet(name: str):
+    return f"Hello, {name}!"
+
+
+workflow = Workflow(
+    "greet_world",
+    start=Node(run=prepare, next="greet"),
+    greet=greet,
+)
 ```
 
-That mapped value becomes the input for the next task.
-
-Multi-value mappings are also supported:
+**Tuple Output:** If a node returns a tuple, Elan unpacks it and binds the elements positionally to the next task's parameters. Because this relies on strict ordering, the length of the tuple must exactly match the number of parameters expected downstream.
 
 ```python
-output=["name", "style"]
-output=[..., "style"]
+from elan import Node, Workflow, task
+
+
+@task
+def prepare():
+    return "hello", "world"
+
+
+@task
+async def greet(prefix: str, name: str):
+    return f"{prefix.title()}, {name}!"
+
+
+workflow = Workflow(
+    "greet_world",
+    start=Node(run=prepare, next="greet"),
+    greet=greet,
+)
 ```
 
-The second form ignores positions you do not want to pass forward.
+Here, `"hello"` binds to `prefix` and `"world"` binds to `name`.
 
-## Input Binding
+Tuple binding is reserved for fixed-shape data. That keeps positional flow simple and predictable.
 
-Elan binds task inputs automatically.
+### 3. Opaque Container Passing
 
-There are two binding modes.
+Plain Python collections, like lists and raw dictionaries, are treated as opaque values. Elan does not attempt to automatically unpack them or guess their internal structure.
 
-### Dict binding
-
-If the current input is a dictionary, task parameters are matched by key.
-
-So this works naturally:
+If a task returns a list or a dict, that entire collection is passed as a single positional argument to the next task.
 
 ```python
-{"name": "world"}
+from elan import Node, Workflow, task
+
+
+@task
+def prepare():
+    return {"name": "world"}
+
+
+@task
+async def greet(payload: dict[str, str]):
+    return f"Hello, {payload['name']}!"
+
+
+workflow = Workflow(
+    "greet_world",
+    start=Node(run=prepare, next="greet"),
+    greet=greet,
+)
 ```
 
-for:
+In this example, the dictionary is passed as one value to the `payload` parameter. Raw dictionaries are ordinary Python values and are **not** automatically unpacked into keyword arguments.
+
+### 4. Structured Payload Auto-Unpacking
+
+While raw dictionaries are opaque, Elan natively supports structured payloads through Pydantic models. 
+
+When a task returns a Pydantic model, Elan inspects the signature of the downstream task to determine how to bind the data. It uses one of two behaviors:
+
+**Auto-Unpack Fields:** If the downstream task expects specific fields that match the model's attributes, Elan automatically unpacks the model and binds those fields by name.
 
 ```python
-async def greet(name):
-    ...
+from pydantic import BaseModel
+from elan import Node, Workflow, task
+
+
+class UserPayload(BaseModel):
+    name: str
+    age: int
+
+
+@task
+def prepare() -> UserPayload:
+    return UserPayload(name="world", age=32)
+
+
+@task
+async def greet(name: str):
+    return f"Hello, {name}!"
+
+
+workflow = Workflow(
+    "greet_world",
+    start=Node(run=prepare, next="greet"),
+    greet=greet,
+)
 ```
+In this example, `greet` automatically receives `name="world"`.
 
-### Single-value binding
-
-If the current input is a single value and the task has exactly one parameter, that value is bound to that parameter automatically.
-
-For example:
+**Pass Through The Model:** If the downstream task explicitly expects the Pydantic model type itself, Elan bypasses unpacking and passes the model instance through as a single positional argument.
 
 ```python
 @task
-def double(x):
-    return x * 2
+async def greet(user: UserPayload):
+    return f"Hello, {user.name}!"
 ```
 
-can receive `21`, and Elan binds it as:
+By using type hints on the receiving task, you have full control over which of these two behaviors Elan applies.
+
+### 5. Explicit Output Adaptation
+
+While automatic binding handles the most natural cases, sometimes the output of one task doesn't perfectly match the input signature of the next. Instead of writing boilerplate "adapter tasks," Elan lets you reshape the data directly on the `Node` using the `output` parameter.
 
 ```python
-{"x": 21}
+from elan import Node, Workflow, task
+
+
+@task
+def prepare():
+    return "world"
+
+
+@task
+async def greet(name: str):
+    return f"Hello, {name}!"
+
+
+workflow = Workflow(
+    "greet_world",
+    start=Node(run=prepare, output="name", next="greet"),
+    greet=greet,
+)
 ```
 
-This keeps the common case simple while still letting nodes reshape outputs explicitly when needed.
+By setting `output="name"`, you explicitly wrap the raw string returned by `prepare` into a named payload (`{"name": "world"}`). The downstream `greet` task then binds to it by parameter name.
 
-## Sync and Async Tasks
+This mechanism also supports multi-value mappings for tuples:
 
-`Workflow.run()` is asynchronous.
+```python
+# Maps a 2-tuple to two named parameters
+output=["name", "style"]
 
-Execution works like this:
+# Discards the first value of a 2-tuple, maps the second to "style"
+output=[..., "style"]
+```
 
-- async tasks are awaited directly
-- sync tasks are executed with `asyncio.to_thread(...)`
-
-That means synchronous tasks do not block the event loop even though the workflow runtime itself is async.
+The `output` field acts as a lightweight adapter layer, ensuring your tasks remain decoupled even when their interfaces don't align perfectly.
 
 ## Unsupported Features
 
@@ -238,3 +383,4 @@ These features are not supported by the runtime:
 - routing through `route_on`
 - sub-workflows
 - barriers and joins
+

@@ -8,6 +8,9 @@ version = "0.1.0"
 description = "Graph-native orchestration for dynamic agent and data workflows."
 readme = "README.md"
 requires-python = ">=3.11"
+dependencies = [
+  "pydantic>=2.11",
+]
 license = { text = "MIT" }
 authors = [
   { name = "Hugo" },

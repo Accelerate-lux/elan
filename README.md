@@ -10,7 +10,7 @@ Designed with developer experience in mind, Elan bridges this gap by offering a 
 
 - **Dynamic Execution:** A core model where branches can expand, recurse, and synchronize at runtime as your workflow emerges.
 - **Simple Mental Model:** A declarative API that strictly separates pure business logic (Tasks) from routing and orchestration (Workflows).
-- **Fully Type-Safe:** Built to give your IDE and type checkers maximum context. With built-in integration for Pydantic models, Elan catches routing and data-binding errors at write-time rather than runtime.
+- **Native Pydantic Integration:** Built around standard Python type hints and Pydantic models. This gives your IDE maximum context and automatically validates data as it flows between nodes.
 - **Framework Agnostic:** Elan doesn't lock you into a proprietary LLM ecosystem. Because tasks are just Python functions, you can easily orchestrate any model, API, or custom logic without fighting the framework.
 - **Testable by Design:** Because tasks are just plain Python functions that know nothing about the graph, you can unit test your business logic without mocking the orchestrator.
 - **Workload Agnostic:** Whether you are coordinating standard Python data tasks or complex agent loops, Elan provides a consistent interface.

@@ -11,7 +11,7 @@ Elan uses a small top-level vocabulary:
 - `Workflow`: orchestration definition
 - `task`: registered executable callable
 - `Node`: configured use of a task inside a workflow
-- `WorkflowRun`: execution of a workflow
+- `WorkflowRun`: execution of a workflow, including its exported `result` value when defined
 - `Context`: scoped execution state declared by the workflow
 
 The split is intentional:
@@ -28,6 +28,7 @@ The smallest workflow is a single task:
 
 ```python
 import elan as el
+from elan import Workflow
 
 
 @el.task
@@ -35,13 +36,66 @@ def hello():
     return "Hello, world!"
 
 
-workflow = el.Workflow(
+workflow = Workflow(
     "hello_world",
     start=hello,
 )
 ```
 
 That is the baseline shape Elan should preserve.
+
+## Workflows
+
+Elan workflows have two reserved graph entry points:
+
+- `start`: the first node to execute
+- `result`: the terminal node whose exposed value becomes the workflow export
+
+`result` is a normal node in the graph. It is still configured with `Node(...)`.
+
+In the Python API, `result=` is the reserved keyword node.
+
+In config and API payloads, `result` is the reserved node id.
+
+What makes it special is its role in the workflow contract:
+
+- it is the outward-facing result of the workflow
+- its exposed value is stored on `WorkflowRun.result`
+- when a workflow is used inside `Node(run=child_workflow)`, that exported value is what the parent receives as the child node output
+
+That keeps sub-workflow composition explicit. A child workflow does not silently expose its last value or its full `WorkflowRun`.
+
+Intended shape:
+
+```python
+import elan as el
+from elan import Node, Workflow
+
+
+@el.task
+def prepare():
+    return 2, 3
+
+
+@el.task
+def add(left: int, right: int):
+    return left + right
+
+
+workflow = Workflow(
+    "sum_ab",
+    start=Node(run=prepare, next="result"),
+    result=Node(run=add),
+)
+```
+
+`Workflow.run(...)` still returns `WorkflowRun`.
+
+If the workflow defines `result`, the exported value is available on `WorkflowRun.result`.
+
+`result` is terminal. It does not route further through `next`.
+
+For a single-node workflow, `start` may point directly to `result`.
 
 ## Workflow Context
 
@@ -60,6 +114,7 @@ Intended shape:
 ```python
 import elan as el
 from pydantic import BaseModel
+from elan import Workflow
 
 
 @el.ref
@@ -69,7 +124,7 @@ class RunContext(BaseModel):
     surname: str | None = None
 
 
-workflow = el.Workflow(
+workflow = Workflow(
     "example",
     context=RunContext,
     start=...,
@@ -95,12 +150,13 @@ That ref concept is used for:
 
 - workflow context model ids
 - structured return-model field references in `When(...)`
-- structured return-model field references in `After(...)`
+- structured return-model field references in `after`
 
 Intended shape:
 
 ```python
 import elan as el
+from elan import Node, Workflow
 from pydantic import BaseModel
 
 
@@ -145,6 +201,10 @@ The intended `Node` surface is:
 - `next`
 - `route_on`
 
+`run` may execute either a task or another workflow.
+
+When `run` executes a child workflow, the node receives the child workflow's exported `result` value, not the full `WorkflowRun`.
+
 Minimal linear workflow:
 
 ```python
@@ -161,9 +221,9 @@ def greet(name: str):
     return f"Hello, {name}!"
 
 
-workflow = el.Workflow(
+workflow = Workflow(
     "greet_world",
-    start=el.Node(
+    start=Node(
         run=normalize_name,
         output="name",
         next="greet",
@@ -268,7 +328,7 @@ The Python API should use reference objects:
 
 ```python
 import elan as el
-from elan import Context, Input, Upstream
+from elan import Context, Input, Node, Upstream, Workflow
 
 
 @el.task
@@ -276,9 +336,9 @@ def build_profile(name: str, surname: str, locale: str, formal: bool):
     return f"{name} {surname} ({locale}) formal={formal}"
 
 
-workflow = el.Workflow(
+workflow = Workflow(
     "profile",
-    start=el.Node(
+    start=Node(
         run=build_profile,
         input={
             "name": Upstream.name,
@@ -326,7 +386,7 @@ Intended shape:
 ```python
 import elan as el
 from pydantic import BaseModel
-from elan import Context, Input, Upstream
+from elan import Context, Input, Node, Upstream, Workflow
 
 
 @el.ref
@@ -341,10 +401,10 @@ def build_profile(name: str, surname: str, locale: str, formal: bool):
     return f"{name} {surname} ({locale}) formal={formal}"
 
 
-workflow = el.Workflow(
+workflow = Workflow(
     "profile",
     context=RunContext,
-    start=el.Node(
+    start=Node(
         run=build_profile,
         input={
             "name": Upstream.name,
@@ -393,7 +453,7 @@ Intended shape:
 ```python
 import elan as el
 from pydantic import BaseModel
-from elan import Context, When
+from elan import Context, Node, When, Workflow
 
 
 @el.ref
@@ -416,10 +476,10 @@ def classify(name: str) -> RoutePayload:
         key="abc123",
     )
 
-workflow = el.Workflow(
+workflow = Workflow(
     "conditional_routes",
     context=RunContext,
-    start=el.Node(
+    start=Node(
         run=classify,
         after={
             "context": {
@@ -442,6 +502,58 @@ workflow = el.Workflow(
 
 The important distinction is that `after` is declarative in the core design. Callback-style hooks are deferred.
 
+## Workflow Composition
+
+Sub-workflows compose through ordinary nodes.
+
+That is the public composition model:
+
+- a node is the execution site
+- `run` is the executable
+- the executable may be a task or a workflow
+
+Intended shape:
+
+```python
+import elan as el
+from elan import Node, Workflow
+
+
+@el.task
+def prepare():
+    return 2, 3
+
+
+@el.task
+def add(left: int, right: int):
+    return left + right
+
+
+@el.task
+def identity(value: int):
+    return value
+
+
+sum_ab = Workflow(
+    "sum_ab",
+    start=Node(run=prepare, next="result"),
+    result=Node(run=add),
+)
+
+
+workflow = Workflow(
+    "use_child",
+    start=Node(run=sum_ab, next="result"),
+    result=Node(run=identity),
+)
+```
+
+This makes composition graph-native.
+
+The child workflow remains reusable because its outward contract is declared once, through `result`.
+
+The parent does not bind against the child's full execution object. It binds against the child's exported value.
+
 ## Structured Payloads
 
 Elan supports native structured payloads through Pydantic models.
@@ -455,6 +567,7 @@ Example:
 ```python
 import elan as el
 from pydantic import BaseModel
+from elan import Node, Workflow
 
 
 @el.ref
@@ -473,9 +586,9 @@ def greet(name: str):
     return f"Hello, {name}!"
 
 
-workflow = el.Workflow(
+workflow = Workflow(
     "greet_user",
-    start=el.Node(run=build_user, next="greet"),
+    start=Node(run=build_user, next="greet"),
     greet=greet,
 )
 ```
@@ -521,6 +634,7 @@ Intended shape:
 
 ```python
 import elan as el
+from elan import Node, Workflow
 
 
 @el.task
@@ -540,9 +654,9 @@ def greet_casual(name: str):
     return f"Hey {name}!"
 
 
-workflow = el.Workflow(
+workflow = Workflow(
     "branching_greet",
-    start=el.Node(
+    start=Node(
         run=choose_greeting,
         output=["name", "style"],
         route_on="style",
@@ -580,7 +694,7 @@ Intended shape:
 ```python
 import elan as el
 from pydantic import BaseModel
-from elan import When
+from elan import Node, When, Workflow
 
 
 @el.ref
@@ -599,9 +713,9 @@ def classify(name: str) -> RoutePayload:
     )
 
 
-workflow = el.Workflow(
+workflow = Workflow(
     "conditional_routes",
-    start=el.Node(
+    start=Node(
         run=classify,
         next=[
             When(RoutePayload.should_email, "send_email"),
@@ -641,6 +755,7 @@ Intended shape:
 
 ```python
 import elan as el
+from elan import Node, Workflow
 
 
 @el.task
@@ -658,9 +773,9 @@ def build_badge(name: str):
     return f"badge:{name.lower()}"
 
 
-workflow = el.Workflow(
+workflow = Workflow(
     "fan_out_profile",
-    start=el.Node(
+    start=Node(
         run=prepare_profile,
         output="name",
         next=["build_greeting", "build_badge"],
@@ -680,6 +795,7 @@ Intended shape:
 
 ```python
 import elan as el
+from elan import Node, Workflow
 
 
 @el.task
@@ -693,9 +809,9 @@ def greet(name: str):
     return f"Hello, {name}!"
 
 
-workflow = el.Workflow(
+workflow = Workflow(
     "yield_fan_out",
-    start=el.Node(
+    start=Node(
         run=split_names,
         output="name",
         next="greet",
@@ -724,6 +840,9 @@ nodes:
     next: greet
   greet:
     run: greet
+    next: result
+  result:
+    run: identity
 ```
 
 The important points are:
@@ -731,6 +850,7 @@ The important points are:
 - `run` points to a registered task id
 - workflow invocation carries an explicit `input` object
 - workflows may declare a context model
+- workflows may declare a reserved `result` node
 - nodes may declare `input`, `output`, `context`, `after`, and `next`
 
 Config references should follow the same model as the Python API:
@@ -785,9 +905,9 @@ Minimal create-run request:
   "workflow": {
     "name": "hello_world",
     "context": "RunContext",
-    "start": "hello",
+    "start": "result",
     "nodes": {
-      "hello": {
+      "result": {
         "run": "hello"
       }
     }
@@ -846,7 +966,7 @@ Run response:
   "run_id": "run_123",
   "workflow": "hello_world",
   "status": "succeeded",
-  "output": "Hello, world!"
+  "result": "Hello, world!"
 }
 ```
 

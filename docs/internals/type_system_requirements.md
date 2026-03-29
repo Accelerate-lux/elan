@@ -87,6 +87,7 @@ The static type system must reason over these surfaces:
 - `after.context`
 - `route_on`
 - `When(...)`
+- `Expand(...)`
 - `Node(run=child_workflow)`
 - `result=Join(...)`
 
@@ -133,6 +134,31 @@ The validator must verify:
 - that a child workflow exposes a valid `result`
 - that the child workflow's result type is compatible with the parent node that consumes it
 
+### Dynamic Continuation Contracts
+
+The validator must verify:
+
+- that `Expand(...)` is used in a valid continuation position
+- that `then`, when present, refers to a valid existing node in the current known graph
+- that the expansion builder input is compatible with the current node's exposed output when that can be known statically
+
+If the expansion builder returns a fully materialized structure, Elan must validate that current structure as inserted:
+
+- returned `Node`
+- returned workflow-shaped fragment
+- returned `Workflow`
+
+That validation must check, when possible:
+
+- graph integrity of the materialized structure
+- internal references inside the returned structure
+- compatibility of any direct references from the returned structure into the existing static graph
+- correct use of `then` when the returned structure relies on it as a continuation anchor
+
+The validator must not require every returned fragment to use `then`.
+
+A returned fragment is valid if it already routes correctly into the existing graph, or if `then` supplies the required continuation anchor.
+
 ### Join Contracts
 
 The validator must verify:
@@ -160,8 +186,16 @@ The runtime validator must verify:
 
 - that yielded packets are compatible with the downstream receiving contract
 - that dynamically materialized workflows still satisfy graph integrity rules
+- that dynamically materialized nodes and fragments satisfy graph integrity rules in their current materialized form
 - that runtime branch contributions to `Join` are compatible with the join reducer
 - that runtime child workflow boundaries still satisfy the parent contract
+
+If a returned node or fragment itself contains `Expand(...)`, Elan must validate:
+
+- the current materialized graph immediately
+- the nested dynamic continuation later, when that nested expansion materializes
+
+Semi-static runtime validation must validate the known current graph, not speculative future expansions.
 
 Semi-static runtime validation should fail clearly and at the narrowest possible boundary.
 
@@ -267,6 +301,7 @@ The validation system must cover:
 - input adaptation
 - context reads and writes
 - routing correctness
+- dynamic continuation correctness
 - join correctness
 - sub-workflow boundaries
 - runtime-materialized graph segments

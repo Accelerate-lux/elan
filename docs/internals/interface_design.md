@@ -711,12 +711,6 @@ The design direction is:
 
 That direction keeps dynamic branch cardinality compatible with joins without forcing a statically paired split-and-join model.
 
-The first future extension is a simple concatenation join:
-
-- the join waits for the resolved branch family
-- it collects the contributed packets into one list
-- any actual reduction still happens in an ordinary node after the join
-
 Nested or repeated fan-out before a join still needs a more complete family-resolution rule.
 
 That work stays out of the first implementation.

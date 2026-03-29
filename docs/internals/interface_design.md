@@ -696,6 +696,74 @@ This also fits the yield placement rules:
 - `yield -> sub_workflow(...)` creates several independent child workflow executions
 - `sub_workflow(yield -> ...)` creates coupled internal branches that may converge through `Join`
 
+## Dynamic Execution
+
+Dynamic execution extends the graph at runtime.
+
+The graph evolution model is append-only.
+
+That means Elan may materialize new continuation steps at runtime, but it does not rewrite already-materialized nodes or reroute already-scheduled execution.
+
+Dynamic expansion belongs to `next`.
+
+Static continuation still looks like:
+
+```python
+next="revalidate"
+```
+
+Dynamic continuation uses `Expand(...)`:
+
+```python
+import elan as el
+from elan import Expand, Node, Workflow
+
+
+@el.task
+def validate():
+    ...
+
+
+def build_dependencies(...) -> Workflow | dict[str, Node] | Node | None:
+    ...
+
+
+workflow = Workflow(
+    "dynamic_example",
+    start=Node(
+        run=validate,
+        next=Expand(build_dependencies, then="revalidate"),
+    ),
+    revalidate=Node(run=validate),
+)
+```
+
+`Expand(...)` keeps `next` clean while making the dynamic case explicit.
+
+The builder may return:
+
+- `None`
+- `Node`
+- a workflow-shaped node fragment
+- `Workflow`
+
+`then` is the static continuation anchor.
+
+That solves the insertion case cleanly:
+
+- the expansion may append nodes before an already-declared continuation
+- the continuation node is not stray, because it is referenced statically through `then`
+- the runtime appends the materialized continuation fragment and wires its terminal continuation to `then`
+
+This allows both:
+
+- whole workflow generation
+- direct expansion of the current local workflow scope without forcing a sub-workflow boundary every time
+
+The current design only locks the expansion mechanism itself.
+
+Validation rules, guardrails, recursion limits, and other runtime boundaries are deferred to later work.
+
 ## Structured Payloads
 
 Elan supports native structured payloads through Pydantic models.
@@ -1119,9 +1187,9 @@ The final run response shape still needs to be updated once the execution and re
 These topics are part of the broader interface design and should be addressed explicitly later:
 
 - Dynamic execution
-  - dynamic workflows
-  - expansion behavior
-  - self-writing workflows
+  - validation rules for `Expand(...)`
+  - guardrails and recursion limits
+  - boundaries for self-writing workflows
   - loop and cycle safety
 - State
   - context write authorization

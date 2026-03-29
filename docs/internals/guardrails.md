@@ -325,8 +325,6 @@ This default policy keeps the runtime strict enough for production use while sti
 
 ### Enforcement Model
 
-Runtime guardrails are enforced through admission control.
-
 Elan checks an expansion before materializing it:
 
 - whether it exceeds the current live graph budgets
@@ -334,6 +332,10 @@ Elan checks an expansion before materializing it:
 - whether it violates a time budget or policy toggle
 
 If any answer is yes, the expansion is rejected before it is appended to the graph.
+
+The handling behavior is part of policy.
+
+Policy controls how Elan reacts when an expansion, cycle step, or task would exceed a budget or violate a boundary rule.
 
 ## Relationship To Validation
 
@@ -367,3 +369,7 @@ The runtime guardrail policy surface still needs a detailed design. Its categori
 - graph budgets
 - time budgets
 - expansion policy toggles
+
+Error definitions and handling behavior remain a later topic.
+
+A draft note for that surface lives in [error_handling_draft.md](/C:/Users/Hugod/Workspace/elan/docs/internals/error_handling_draft.md).

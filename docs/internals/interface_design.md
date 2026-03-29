@@ -42,7 +42,7 @@ workflow = Workflow(
 )
 ```
 
-That is the baseline shape Elan should preserve.
+That is the baseline shape Elan preserves.
 
 ## Workflows
 
@@ -309,7 +309,7 @@ Static type validation checks known workflow contracts such as:
 
 Semi-static runtime validation covers graph structure and packets that are only knowable at execution time, especially for `yield`, dynamic expansion, and runtime join contributions.
 
-This validation system should remain strong when type information is available, and degrade gracefully when tasks are only partially typed.
+This validation system remains strong when type information is available and degrades gracefully when tasks are only partially typed.
 
 The full requirements are captured in [type_system_requirements.md](/C:/Users/Hugod/Workspace/elan/docs/internals/type_system_requirements.md).
 
@@ -378,7 +378,7 @@ It is used when a node must consume:
 - values from the workflow context
 - literals
 
-The Python API should use reference objects:
+The Python API uses reference objects:
 
 ```python
 import elan as el
@@ -404,7 +404,7 @@ workflow = Workflow(
 )
 ```
 
-The config form should use the serialized reference syntax:
+The config form uses the serialized reference syntax:
 
 ```yaml
 input:
@@ -475,7 +475,7 @@ workflow = Workflow(
 
 The `context` field on a node declares the context values that are prepared before task execution.
 
-The config form should use the same reference model:
+The config form uses the same reference model:
 
 ```yaml
 context: RunContext
@@ -689,7 +689,7 @@ The first-pass contract is intentionally strict:
 
 - `Join` is terminal
 - `Join` waits on workflow completion, not on selected internal nodes
-- if finer-grained synchronization is needed, the workflow should be factored into smaller sub-workflows
+- finer-grained synchronization uses smaller sub-workflows
 
 This also fits the yield placement rules:
 
@@ -703,6 +703,26 @@ Dynamic execution extends the graph at runtime.
 The graph evolution model is append-only.
 
 That means Elan may materialize new continuation steps at runtime, but it does not rewrite already-materialized nodes or reroute already-scheduled execution.
+
+Expansion is also controlled at the workflow level.
+
+A workflow may explicitly allow or forbid dynamic expansion inside its own scope.
+
+Intended shape:
+
+```python
+Workflow(
+    "static_child",
+    allow_expansion=False,
+    start=...,
+    result=...,
+)
+```
+
+This matters for both execution and validation:
+
+- it gives users a clean way to disable expansion in sub-workflows
+- it lets Elan reject `Expand(...)` and callable `next` statically when expansion is not allowed in that workflow
 
 Dynamic expansion belongs to `next`.
 
@@ -785,9 +805,19 @@ So the validator does not try to prove the entire future graph upfront.
 
 It validates the known current graph and defers only the parts that are still genuinely dynamic.
 
-The current design only locks the expansion mechanism itself.
+The structural guardrails for dynamic execution are:
 
-Validation rules, guardrails, recursion limits, and other runtime boundaries are deferred to later work.
+- append-only materialization
+- no rewriting of already materialized nodes or routes
+- valid current graph after each expansion
+- `then` must exist when it is used
+- returned structures are validated as currently materialized
+- `Join` remains restricted to `result`
+- dynamic fragments may reference existing static nodes, but may not mutate them
+
+The current design defines the expansion mechanism itself.
+
+Validation rules, guardrails, recursion limits, and other runtime boundaries remain in later work.
 
 ## Structured Payloads
 
@@ -964,7 +994,7 @@ workflow = Workflow(
 )
 ```
 
-The config form should serialize the same idea explicitly:
+The config form serializes the same idea explicitly:
 
 ```yaml
 next:
@@ -1057,7 +1087,7 @@ workflow = Workflow(
 
 ## Config Shape
 
-Code, config files, and API payloads should share the same workflow model.
+Code, config files, and API payloads share the same workflow model.
 
 Minimal YAML shape:
 
@@ -1088,7 +1118,7 @@ The important points are:
 - workflows may declare a reserved `result` node
 - nodes may declare `input`, `output`, `context`, `after`, and `next`
 
-Config references should follow the same model as the Python API:
+Config references follow the same model as the Python API:
 
 - `$input.foo`
 - `$upstream.foo`
@@ -1124,9 +1154,9 @@ after:
 
 ## API Shape
 
-The HTTP API should accept the same workflow spec directly.
+The HTTP API accepts the same workflow spec directly.
 
-The API should expose the same workflow model instead of introducing a different orchestration format for HTTP clients.
+The API exposes the same workflow model instead of introducing a different orchestration format for HTTP clients.
 
 Suggested endpoints:
 
@@ -1209,7 +1239,7 @@ The final run response shape still needs to be updated once the execution and re
 
 ## Later Topics
 
-These topics are part of the broader interface design and should be addressed explicitly later:
+These topics are part of the broader interface design and remain for later work:
 
 - Dynamic execution
   - validation rules for `Expand(...)`

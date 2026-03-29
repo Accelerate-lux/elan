@@ -37,7 +37,7 @@ Each node may define:
 - how its outputs are exposed
 - where it routes next
 
-The same model should be representable in:
+The same model is representable in:
 
 - Python
 - YAML
@@ -108,7 +108,7 @@ This means:
 
 ## Design Direction
 
-The design should stay centered on a small number of consistent primitives.
+The design stays centered on a small number of consistent primitives.
 
 The intent is to let simple workflows stay simple, while allowing more advanced
 behavior such as branching, fan-out, recursive barriers, and dynamic graph

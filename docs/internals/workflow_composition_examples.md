@@ -268,7 +268,7 @@ expr = Workflow(
 
 That payload becomes the current packet, and the child workflow consumes it directly through its own normal binding rules.
 
-This is the low-friction case. Composition should not require extra syntax when the interfaces already line up.
+This is the low-friction case. Composition does not require extra syntax when the interfaces already line up.
 
 ## 5. Explicit Boundary Adaptation
 
@@ -294,7 +294,7 @@ sum_pair = Workflow(
 )
 ```
 
-The parent may still want to expose `a` and `b`.
+The parent may instead expose `a` and `b`.
 
 ```python
 expr = Workflow(
@@ -485,7 +485,7 @@ That means:
 - `audit` branches are still awaited
 - `audit` branches do not contribute values because they never route to `result`
 
-This is important because it keeps synchronization and contribution separate.
+This keeps synchronization and contribution separate.
 
 ## 9. Yield Placement Controls Independence Versus Coupling
 

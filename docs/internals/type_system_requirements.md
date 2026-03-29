@@ -38,7 +38,7 @@ The validation system must have three layers:
 2. static type validation
 3. semi-static runtime validation
 
-These layers serve different purposes and should stay conceptually separate.
+These layers serve different purposes and stay conceptually separate.
 
 ## 1. Static Graph Validation
 
@@ -55,17 +55,18 @@ The system must detect at least:
 - stray nodes that are never reachable
 - invalid routing targets
 - invalid use of `Join` outside the reserved `result` node
+- invalid use of `Expand(...)` or callable `next` in workflows where expansion is not allowed
 - `result` nodes that are not terminal
 - child workflows that do not define a valid `result`
 - cycles in graph regions where cycles are not allowed
 
-The validator should also catch shape mismatches in workflow structure, for example:
+The validator also catches shape mismatches in workflow structure, for example:
 
 - `route_on` used with an incompatible `next` form
 - `When(...)` used where conditional multi-routing is not valid
 - reserved workflow node ids used incorrectly
 
-Static graph validation should fail fast and produce explicit errors.
+Static graph validation fails fast and produces explicit errors.
 
 ## 2. Static Type Validation
 
@@ -139,6 +140,7 @@ The validator must verify:
 The validator must verify:
 
 - that `Expand(...)` is used in a valid continuation position
+- that `Expand(...)` and callable `next` are only used in workflows that allow expansion
 - that `then`, when present, refers to a valid existing node in the current known graph
 - that the expansion builder input is compatible with the current node's exposed output when that can be known statically
 
@@ -168,7 +170,7 @@ The validator must verify:
 - that `Join(run=reducer)` receives a reducer whose input type is compatible with the collected contribution type
 - that the reducer return type becomes the workflow result type
 
-If `Join()` is used without a reducer, the workflow result type should be inferred as `list[T]`, where `T` is the contribution type when that type is known.
+If `Join()` is used without a reducer, the workflow result type is inferred as `list[T]`, where `T` is the contribution type when that type is known.
 
 ## 3. Semi-Static Runtime Validation
 
@@ -197,7 +199,7 @@ If a returned node or fragment itself contains `Expand(...)`, Elan must validate
 
 Semi-static runtime validation must validate the known current graph, not speculative future expansions.
 
-Semi-static runtime validation should fail clearly and at the narrowest possible boundary.
+Semi-static runtime validation fails clearly and at the narrowest possible boundary.
 
 ## Strongly Typed And Weakly Typed Tasks
 
@@ -214,7 +216,7 @@ Strongly typed tasks have:
 - return annotations
 - structured payloads declared through registered ref classes when needed
 
-These tasks should receive the strongest static validation.
+These tasks receive the strongest static validation.
 
 ### Weakly Typed Tasks
 
@@ -230,8 +232,8 @@ However, missing type information must reduce the strength of validation rather 
 
 That means:
 
-- static validation should degrade when information is missing
-- runtime validation should remain active at the workflow boundaries Elan can still observe
+- static validation degrades when information is missing
+- runtime validation remains active at the workflow boundaries Elan can still observe
 
 ## Inference Requirements
 
@@ -271,7 +273,7 @@ Validation failures must be:
 - local
 - actionable
 
-Error reporting should identify:
+Error reporting identifies:
 
 - the workflow
 - the node or graph element involved
@@ -289,7 +291,7 @@ The validation/type system is not required to:
 - replace runtime checks entirely
 - require full typing for all workflows
 
-The system should improve safety and clarity without making Elan unusable for partially typed codebases.
+The system improves safety and clarity without making Elan unusable for partially typed codebases.
 
 ## Summary Of Required Coverage
 

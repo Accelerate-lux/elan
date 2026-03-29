@@ -259,6 +259,60 @@ This ordering also makes the phase boundaries explicit:
 - `output` and `after` are post-execution
 - `next` routes the execution that remains after those phases have completed
 
+## Type System
+
+Elan's type system is part of a broader workflow validation system.
+
+It validates:
+
+- graph integrity
+- workflow contracts
+- type compatibility
+- runtime-materialized graph structure
+
+The type system is designed around workflow surfaces Elan can reason about:
+
+- task signatures
+- task return annotations
+- yielded item types
+- context schema
+- `input`
+- `output`
+- `context`
+- `after.context`
+- routing
+- composition boundaries
+- `Join(...)`
+
+The validation model has three layers:
+
+1. static graph validation
+2. static type validation
+3. semi-static runtime validation
+
+Static graph validation catches structural problems such as:
+
+- missing `start` or `result`
+- unknown routing targets
+- stray unreachable nodes
+- invalid `Join` placement
+- invalid routing shapes
+
+Static type validation checks known workflow contracts such as:
+
+- input compatibility
+- output adaptation
+- context reads and writes
+- routing fields
+- child workflow result boundaries
+- join reducers
+
+Semi-static runtime validation covers graph structure and packets that are only knowable at execution time, especially for `yield`, dynamic expansion, and runtime join contributions.
+
+This validation system should remain strong when type information is available, and degrade gracefully when tasks are only partially typed.
+
+The full requirements are captured in [type_system_requirements.md](/C:/Users/Hugod/Workspace/elan/docs/internals/type_system_requirements.md).
+
 ## Binding and Adaptation
 
 Elan keeps automatic binding narrow.
@@ -1064,24 +1118,18 @@ The final run response shape still needs to be updated once the execution and re
 
 These topics are part of the broader interface design and should be addressed explicitly later:
 
-- Type system
-  - static type validation
-  - binding validation
 - Dynamic execution
   - dynamic workflows
   - expansion behavior
   - self-writing workflows
-  - semi-static runtime validation
   - loop and cycle safety
-- Composition
-  - sub-workflows
-  - branching
-  - fan-out
-  - barriers and joins
 - State
-  - scoped context behavior
   - context write authorization
   - merge and promotion rules
+- Validation system rollout
+  - implementation strategy for static graph validation
+  - implementation strategy for static type validation
+  - implementation strategy for semi-static runtime validation
 - Model surface
   - `After.callback` as an advanced escape hatch
   - whether `after` should later become a dedicated object instead of a plain field

@@ -88,6 +88,21 @@ The runtime guardrail categories are:
 
 These categories define the runtime policy surface.
 
+### Policy Object
+
+Runtime guardrails live in a workflow-level `Policy` object.
+
+The policy object groups:
+
+- budgets
+- validation
+- boundaries
+
+Toggle naming follows one rule:
+
+- `allow_...` for capabilities and boundary permissions
+- `enable_...` for validation, tracing, and runtime checks
+
 ### Point-In-Time Graph Budgets
 
 These budgets limit how large and complex the graph may be at one moment.
@@ -224,16 +239,28 @@ Workflow(
     "dynamic_pipeline",
     start=...,
     result=...,
-    policy=RuntimePolicy(
+    policy=Policy(
+        budgets=BudgetPolicy(
+            max_active_branches=128,
+            max_materialized_nodes_live=512,
+            max_materialized_nodes_total=10000,
+            max_expansion_depth=16,
+            max_cycle_iterations=1000,
+            max_task_executions_total=50000,
+            task_timeout=30,
+            workflow_timeout=300,
+            subworkflow_timeout=300,
+            run_ttl=3600,
+        ),
         validation=ValidationPolicy(
             mode="strict",
-            validate_static_graph=True,
-            validate_static_types=True,
-            validate_dynamic_graph=True,
-            validate_dynamic_types=True,
+            enable_static_graph_validation=True,
+            enable_static_type_validation=True,
+            enable_dynamic_graph_validation=True,
+            enable_dynamic_type_validation=True,
             allow_untyped_dynamic_expansion=False,
-            require_homogeneous_join_contributions=True,
-            require_typed_join_reducer=True,
+            allow_heterogeneous_join_contributions=False,
+            allow_untyped_join_reducer=False,
         ),
         boundaries=BoundaryPolicy(
             allow_expansion=True,
@@ -252,25 +279,49 @@ Workflow(
 
 This policy shape keeps structural validity, execution budgets, validation strictness, and dynamic boundary rules separate.
 
-### Default Direction
+### Default Policy
 
-The default direction is:
+The default policy is:
 
-- static graph validation on
-- static type validation on
-- dynamic graph validation on
-- dynamic type validation on
-- untyped dynamic expansion off
-- direct node expansion on
-- fragment expansion on
-- workflow expansion on
-- direct static references from expansion on
-- `then` anchors on
-- cycles off
-- nested expansion off
-- recursive expansion off
+```python
+DEFAULT_POLICY = Policy(
+    budgets=BudgetPolicy(
+        max_active_branches=128,
+        max_materialized_nodes_live=512,
+        max_materialized_nodes_total=10000,
+        max_expansion_depth=16,
+        max_cycle_iterations=1000,
+        max_task_executions_total=50000,
+        task_timeout=30,
+        workflow_timeout=300,
+        subworkflow_timeout=300,
+        run_ttl=3600,
+    ),
+    validation=ValidationPolicy(
+        mode="strict",
+        enable_static_graph_validation=True,
+        enable_static_type_validation=True,
+        enable_dynamic_graph_validation=True,
+        enable_dynamic_type_validation=True,
+        allow_untyped_dynamic_expansion=False,
+        allow_heterogeneous_join_contributions=False,
+        allow_untyped_join_reducer=False,
+    ),
+    boundaries=BoundaryPolicy(
+        allow_expansion=True,
+        allow_cycles=False,
+        allow_expand_node=True,
+        allow_expand_fragment=True,
+        allow_expand_workflow=True,
+        allow_direct_static_references_from_expansion=True,
+        allow_then_anchor=True,
+        allow_nested_expand=False,
+        allow_recursive_expand=False,
+    ),
+)
+```
 
-This keeps the default runtime strict enough for production use while still allowing the main dynamic execution forms.
+This default policy keeps the runtime strict enough for production use while still allowing the main dynamic execution forms.
 
 ### Enforcement Model
 

@@ -711,9 +711,16 @@ A workflow may explicitly allow or forbid dynamic expansion inside its own scope
 Intended shape:
 
 ```python
+from elan import BoundaryPolicy, Policy, Workflow
+
+
 Workflow(
     "static_child",
-    allow_expansion=False,
+    policy=Policy(
+        boundaries=BoundaryPolicy(
+            allow_expansion=False,
+        ),
+    ),
     start=...,
     result=...,
 )
@@ -835,12 +842,17 @@ Cycle use is controlled through workflow policy.
 Intended shape:
 
 ```python
+from elan import BoundaryPolicy, Policy, Workflow
+
+
 Workflow(
     "agent_loop",
     start=...,
     result=...,
-    policy=RuntimePolicy(
-        allow_cycles=True,
+    policy=Policy(
+        boundaries=BoundaryPolicy(
+            allow_cycles=True,
+        ),
     ),
 )
 ```
@@ -857,6 +869,10 @@ The runtime policy surface for cycle safety includes:
 - point-in-time graph budgets
 - cumulative graph budgets
 - time budgets
+
+Policies are objects so they can be reused across workflow boundaries.
+
+That allows one workflow to carry a top-level policy while a sub-workflow reuses the same policy object or applies a narrower one.
 
 Static cycles and dynamic expansion use the same guardrail system, but they remain separate graph features.
 
@@ -1283,8 +1299,8 @@ The final run response shape still needs to be updated once the execution and re
 These topics are part of the broader interface design and remain for later work:
 
 - Dynamic execution
-  - validation rules for `Expand(...)`
-  - guardrails and recursion limits
+  - detailed policy defaults and budget values
+  - admission-control behavior
   - boundaries for self-writing workflows
 - State
   - context write authorization

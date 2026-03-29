@@ -56,15 +56,17 @@ The system must detect at least:
 - invalid routing targets
 - invalid use of `Join` outside the reserved `result` node
 - invalid use of `Expand(...)` or callable `next` in workflows where expansion is not allowed
+- cycles in workflows where cycles are not allowed
 - `result` nodes that are not terminal
 - child workflows that do not define a valid `result`
-- cycles in graph regions where cycles are not allowed
 
 The validator also catches shape mismatches in workflow structure, for example:
 
 - `route_on` used with an incompatible `next` form
 - `When(...)` used where conditional multi-routing is not valid
 - reserved workflow node ids used incorrectly
+
+When cycles are allowed by workflow policy, static graph validation detects them and validates the graph as a cyclic workflow instead of rejecting the graph automatically.
 
 Static graph validation fails fast and produces explicit errors.
 
@@ -141,6 +143,7 @@ The validator must verify:
 
 - that `Expand(...)` is used in a valid continuation position
 - that `Expand(...)` and callable `next` are only used in workflows that allow expansion
+- that cycles are only used in workflows that allow cycles
 - that `then`, when present, refers to a valid existing node in the current known graph
 - that the expansion builder input is compatible with the current node's exposed output when that can be known statically
 
@@ -181,6 +184,7 @@ This is required for:
 - `yield`-based fan-out
 - dynamic workflow expansion
 - self-writing workflows
+- static workflows with allowed cycles
 - runtime materialization of child workflows
 - join contributions that are not fully knowable statically
 
@@ -189,6 +193,7 @@ The runtime validator must verify:
 - that yielded packets are compatible with the downstream receiving contract
 - that dynamically materialized workflows still satisfy graph integrity rules
 - that dynamically materialized nodes and fragments satisfy graph integrity rules in their current materialized form
+- that allowed cycles remain within the active cycle budgets
 - that runtime branch contributions to `Join` are compatible with the join reducer
 - that runtime child workflow boundaries still satisfy the parent contract
 

@@ -97,6 +97,7 @@ Core examples:
 - maximum active branches
 - maximum materialized nodes live
 - maximum expansion depth
+- maximum cycle iterations or node visits when cycles are allowed
 
 These are directly correlated to current graph shape, which makes them easier to reason about than more speculative engine-level counters.
 
@@ -134,6 +135,7 @@ Elan also needs explicit controls for what kinds of dynamic execution are allowe
 Core toggles:
 
 - whether a given workflow scope allows `Expand(...)` or callable `next`
+- whether a given workflow scope allows static cycles
 - whether nested `Expand(...)` is allowed
 - whether recursive dynamic expansion is allowed
 - whether direct fragment insertion is allowed
@@ -145,6 +147,12 @@ The workflow-level expansion toggle is especially important because it enables s
 - parent workflows can disable expansion in child scopes without removing dynamic execution globally
 
 This controls graph evolution in sub-workflows without disabling dynamic execution everywhere.
+
+The cycle toggle controls whether a workflow may contain declared recurrence in its static graph.
+
+If cycles are disabled, any static cycle is invalid.
+
+If cycles are enabled, recurrence is controlled by the same budget system that constrains dynamic execution.
 
 These are not structural rules.
 
@@ -229,6 +237,7 @@ Workflow(
         ),
         boundaries=BoundaryPolicy(
             allow_expansion=True,
+            allow_cycles=False,
             allow_expand_node=True,
             allow_expand_fragment=True,
             allow_expand_workflow=True,
@@ -257,6 +266,7 @@ The default direction is:
 - workflow expansion on
 - direct static references from expansion on
 - `then` anchors on
+- cycles off
 - nested expansion off
 - recursive expansion off
 
@@ -299,6 +309,7 @@ The following guardrails are already part of the interface design:
 - `Join` remains restricted to `result`
 - dynamic fragments may reference existing static nodes, but may not mutate them
 - workflows may explicitly disable dynamic expansion in their own scope
+- workflows may explicitly disable static cycles in their own scope
 
 The runtime guardrail policy surface still needs a detailed design. Its categories are:
 

@@ -819,6 +819,47 @@ The current design defines the expansion mechanism itself.
 
 Validation rules, guardrails, recursion limits, and other runtime boundaries remain in later work.
 
+## Cycles
+
+Static cycles are part of the graph language.
+
+They model declared recurrence.
+
+Dynamic expansion and static cycles solve different problems:
+
+- static cycles express recurrence in the declared graph
+- dynamic expansion expresses graph growth at runtime
+
+Cycle use is controlled through workflow policy.
+
+Intended shape:
+
+```python
+Workflow(
+    "agent_loop",
+    start=...,
+    result=...,
+    policy=RuntimePolicy(
+        allow_cycles=True,
+    ),
+)
+```
+
+Cycle rules:
+
+- cycles are invalid unless the workflow policy allows them
+- when cycles are allowed, they remain subject to graph validation and type validation
+- cycle safety is enforced through runtime policy rather than by forbidding recurrence
+
+The runtime policy surface for cycle safety includes:
+
+- cycle opt-in
+- point-in-time graph budgets
+- cumulative graph budgets
+- time budgets
+
+Static cycles and dynamic expansion use the same guardrail system, but they remain separate graph features.
+
 ## Structured Payloads
 
 Elan supports native structured payloads through Pydantic models.
@@ -1245,7 +1286,6 @@ These topics are part of the broader interface design and remain for later work:
   - validation rules for `Expand(...)`
   - guardrails and recursion limits
   - boundaries for self-writing workflows
-  - loop and cycle safety
 - State
   - context write authorization
   - merge and promotion rules

@@ -22,12 +22,12 @@ part of the core model.
 ## Principles
 
 - Workflows are first-class
-- Graph structure should stay explicit
-- Dynamic branching, fan-out, and synchronization should be natural
-- Execution units should compose cleanly across different kinds of workloads
-- Code, config, and API submission should share the same model
-- The local development experience should be straightforward
-- The interface should stay small, stable, and easy to reason about
+- Graph structure stays explicit
+- Dynamic branching, fan-out, and synchronization stay natural
+- Execution units compose cleanly across different kinds of workloads
+- Code, config, and API submission share the same model
+- The local development experience stays straightforward
+- The interface stays small, stable, and easy to reason about
 
 ## What Elan Is Trying To Be
 
@@ -52,5 +52,5 @@ The intent is to make simple workflows feel simple, while keeping the model
 strong enough to support branching, fan-out, recursive barriers, sub-workflows,
 and dynamic graph expansion without introducing a different programming model.
 
-Developer experience is a core concern. Elan should be easy to learn, predictable
+Developer experience is a core concern. Elan is easy to learn, predictable
 to operate, and practical to move from local development to production.

@@ -1298,10 +1298,6 @@ The final run response shape still needs to be updated once the execution and re
 
 These topics are part of the broader interface design and remain for later work:
 
-- Dynamic execution
-  - detailed policy defaults and budget values
-  - admission-control behavior
-  - boundaries for self-writing workflows
 - State
   - context write authorization
   - merge and promotion rules
@@ -1309,6 +1305,9 @@ These topics are part of the broader interface design and remain for later work:
   - implementation strategy for static graph validation
   - implementation strategy for static type validation
   - implementation strategy for semi-static runtime validation
+- Error handling
+  - error categories and definitions
+  - handling behavior for each error type and scope
 - Model surface
   - `After.callback` as an advanced escape hatch
   - whether `after` should later become a dedicated object instead of a plain field

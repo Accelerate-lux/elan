@@ -554,6 +554,94 @@ The child workflow remains reusable because its outward contract is declared onc
 
 The parent does not bind against the child's full execution object. It binds against the child's exported value.
 
+## Join
+
+`Join` is the first-pass synchronization and reduction primitive.
+
+It is a public graph element.
+
+In the first pass, `Join` is only allowed as the reserved `result` node.
+
+That keeps the model narrow:
+
+- composition happens through sub-workflows
+- branching happens inside those workflows
+- joins close the workflow scope and produce the exported result
+
+Intended shape:
+
+```python
+import elan as el
+from elan import Join, Node, Workflow
+
+
+@el.task
+def pair_inputs(a: int, b: int, c: int, d: int):
+    yield a, b
+    yield c, d
+
+
+@el.task
+def multiply_pair(left: int, right: int) -> int:
+    return left * right
+
+
+@el.task
+def sum_values(values: list[int]) -> int:
+    return sum(values)
+
+
+workflow = Workflow(
+    "sum_products",
+    start=Node(run=pair_inputs, next="multiply"),
+    multiply=Node(run=multiply_pair, next="result"),
+    result=Join(run=sum_values),
+)
+```
+
+This computes:
+
+```text
+(a * b) + (c * d)
+```
+
+`Join` follows these execution rules:
+
+- it waits for the current workflow scope to complete
+- it collects the packets that were explicitly routed to `result`
+- branches that do not route to `result` are still awaited, but do not contribute values
+- if `run` is provided, the collected values are passed to that reducer
+- the reduced value becomes `WorkflowRun.result`
+
+That makes `Join` the explicit promotion point from branch-local work into the workflow's exported result.
+
+The simplest form is:
+
+```python
+result=Join()
+```
+
+In that form, the workflow result is the collected list itself.
+
+The reducer form is:
+
+```python
+result=Join(run=reduce_values)
+```
+
+In that form, the reducer receives the collected contributions as one value.
+
+The first-pass contract is intentionally strict:
+
+- `Join` is terminal
+- `Join` waits on workflow completion, not on selected internal nodes
+- if finer-grained synchronization is needed, the workflow should be factored into smaller sub-workflows
+
+This also fits the yield placement rules:
+
+- `yield -> sub_workflow(...)` creates several independent child workflow executions
+- `sub_workflow(yield -> ...)` creates coupled internal branches that may converge through `Join`
+
 ## Structured Payloads
 
 Elan supports native structured payloads through Pydantic models.

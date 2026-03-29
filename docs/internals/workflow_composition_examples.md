@@ -15,7 +15,7 @@ These examples assume the current design choices:
 
 ```python
 import elan as el
-from elan import Context, Input, Node, Upstream, Workflow
+from elan import Context, Input, Join, Node, Upstream, Workflow
 from pydantic import BaseModel
 
 
@@ -390,7 +390,159 @@ The interesting part is the boundary behavior:
 - `context` prepares branch-local state
 - the child workflow inherits both
 
-## 7. Composition Stops Being Enough When Sibling Results Must Meet Again
+## 7. Internal Yield Plus Terminal Join
+
+This is the first expression that needs a join:
+
+```text
+(a * b) + (c * d)
+```
+
+One workflow needs to:
+
+- create several internal branches
+- let each branch compute one value
+- wait for all of them
+- reduce those values into one exported result
+
+```python
+@el.task
+def pair_inputs(a: int, b: int, c: int, d: int):
+    yield a, b
+    yield c, d
+
+
+@el.task
+def multiply_pair(left: int, right: int) -> int:
+    return left * right
+
+
+@el.task
+def sum_values(values: list[int]) -> int:
+    return sum(values)
+
+
+workflow = Workflow(
+    "sum_products",
+    start=Node(
+        run=pair_inputs,
+        next="multiply",
+    ),
+    multiply=Node(
+        run=multiply_pair,
+        next="result",
+    ),
+    result=Join(run=sum_values),
+)
+```
+
+For `a=2, b=3, c=4, d=5`:
+
+```text
+(2 * 3) + (4 * 5) = 26
+```
+
+The key point is where the `yield` lives:
+
+- the `yield` is inside the workflow
+- so the branches belong to the same workflow scope
+- `Join` can wait for that scope and reduce its contributions
+
+## 8. Side-Effect Branches Can Be Awaited Without Contributing
+
+Not every branch needs to contribute a value to the final result.
+
+Some branches may exist only for side effects.
+
+```python
+@el.task
+def audit_pair(left: int, right: int) -> None:
+    ...
+
+
+workflow = Workflow(
+    "sum_products_with_audit",
+    start=Node(
+        run=pair_inputs,
+        next=["multiply", "audit"],
+    ),
+    multiply=Node(
+        run=multiply_pair,
+        next="result",
+    ),
+    audit=Node(
+        run=audit_pair,
+    ),
+    result=Join(run=sum_values),
+)
+```
+
+The join still waits for the whole workflow scope to complete.
+
+That means:
+
+- `multiply` branches contribute values because they route to `result`
+- `audit` branches are still awaited
+- `audit` branches do not contribute values because they never route to `result`
+
+This is important because it keeps synchronization and contribution separate.
+
+## 9. Yield Placement Controls Independence Versus Coupling
+
+These two shapes look similar, but they mean different things.
+
+### Yield Outside The Child Workflow
+
+```python
+child = Workflow(
+    "product",
+    start=Node(run=multiply_pair, next="result"),
+    result=Node(run=identity, output="value"),
+)
+
+
+parent = Workflow(
+    "parent",
+    start=Node(run=pair_inputs, next="product"),
+    product=Node(run=child),
+)
+```
+
+Here:
+
+- `pair_inputs` yields in the parent
+- each yielded item starts one child workflow execution
+- those child workflows are independent
+
+If they need to meet again, that happens in the parent, not in the child.
+
+### Yield Inside The Child Workflow
+
+```python
+child = Workflow(
+    "sum_products",
+    start=Node(run=pair_inputs, next="multiply"),
+    multiply=Node(run=multiply_pair, next="result"),
+    result=Join(run=sum_values),
+)
+
+
+parent = Workflow(
+    "parent",
+    start=Node(run=child, next="result"),
+    result=Node(run=identity),
+)
+```
+
+Here:
+
+- the `yield` is inside the child workflow
+- the branches are coupled inside one workflow scope
+- the child joins them before exporting its `result`
+
+That is the structural rule behind Elan's join model.
+
+## 10. Composition And Joins Work Together
 
 This expression still fits composition cleanly:
 
@@ -398,18 +550,19 @@ This expression still fits composition cleanly:
 ((a + b) * c) / d
 ```
 
-This one does not:
+This one now does too:
 
 ```text
 (a + b) + (c * d)
 ```
 
-That second expression wants two sibling child workflows:
+It simply needs a child workflow with internal branching and a terminal join.
 
-- one computes `(a + b)`
-- one computes `(c * d)`
-- then something waits for both and combines them
+Composition and joins play different roles:
 
-That is where joins and promotion begin. Composition alone is enough to define the child workflow boundaries, but it is not enough to say how sibling branches merge back together.
+- composition defines boundaries
+- `yield` defines expansion
+- `Join` closes a workflow scope and reduces the contributed branch results
+- the reduced value becomes the exported `result`
 
-That is the next design topic.
+That is the first complete model for workflow composition in Elan.

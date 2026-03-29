@@ -150,6 +150,118 @@ These are not structural rules.
 
 They are policy controls that let users choose how much dynamic power is allowed in a given workflow or runtime environment.
 
+### Validation Guardrails
+
+Validation guardrails control how strictly Elan validates a workflow or dynamic expansion before it is allowed to run.
+
+The validation policy surface is:
+
+- validation mode
+- static graph validation
+- static type validation
+- dynamic graph validation
+- dynamic type validation
+- untyped dynamic expansion policy
+- join validation strictness
+
+Validation mode defines the overall strictness profile.
+
+Core profiles:
+
+- `strict`
+- `permissive`
+
+Static graph validation and static type validation apply to the known workflow definition.
+
+Dynamic graph validation and dynamic type validation apply when an expansion materializes at runtime.
+
+Untyped dynamic expansion is a separate policy concern.
+
+Dynamic expansion is a more sensitive boundary than ordinary static wiring, so a workflow may allow partially typed static nodes while still forbidding untyped dynamic fragments.
+
+Join validation strictness is also part of this surface.
+
+Core cases:
+
+- whether join contributions must be homogeneous
+- whether a join reducer must be typed
+
+### Boundary Guardrails
+
+Boundary guardrails control what a dynamic expansion is allowed to return and how it is allowed to connect to the surrounding graph.
+
+The boundary policy surface is:
+
+- whether expansion is allowed at all
+- whether expansion may return `Node`
+- whether expansion may return workflow-shaped fragments
+- whether expansion may return `Workflow`
+- whether expansions may reference existing static nodes directly
+- whether `then` anchors are allowed
+- whether nested `Expand(...)` is allowed
+- whether recursive dynamic expansion is allowed
+
+These rules constrain dynamic graph evolution without changing the graph language itself.
+
+They define which forms of continuation are allowed in a workflow scope.
+
+### Policy Shape
+
+These validation and boundary guardrails belong in a workflow-level policy object.
+
+Intended shape:
+
+```python
+Workflow(
+    "dynamic_pipeline",
+    start=...,
+    result=...,
+    policy=RuntimePolicy(
+        validation=ValidationPolicy(
+            mode="strict",
+            validate_static_graph=True,
+            validate_static_types=True,
+            validate_dynamic_graph=True,
+            validate_dynamic_types=True,
+            allow_untyped_dynamic_expansion=False,
+            require_homogeneous_join_contributions=True,
+            require_typed_join_reducer=True,
+        ),
+        boundaries=BoundaryPolicy(
+            allow_expansion=True,
+            allow_expand_node=True,
+            allow_expand_fragment=True,
+            allow_expand_workflow=True,
+            allow_direct_static_references_from_expansion=True,
+            allow_then_anchor=True,
+            allow_nested_expand=False,
+            allow_recursive_expand=False,
+        ),
+    ),
+)
+```
+
+This policy shape keeps structural validity, execution budgets, validation strictness, and dynamic boundary rules separate.
+
+### Default Direction
+
+The default direction is:
+
+- static graph validation on
+- static type validation on
+- dynamic graph validation on
+- dynamic type validation on
+- untyped dynamic expansion off
+- direct node expansion on
+- fragment expansion on
+- workflow expansion on
+- direct static references from expansion on
+- `then` anchors on
+- nested expansion off
+- recursive expansion off
+
+This keeps the default runtime strict enough for production use while still allowing the main dynamic execution forms.
+
 ### Enforcement Model
 
 Runtime guardrails are enforced through admission control.

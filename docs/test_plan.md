@@ -10,6 +10,60 @@ Status:
 - ⬜ planned
 - 🔒 reserved for a feature that does not exist yet
 
+## Feature Breakdown
+
+### Phase 1. Core Task Execution And Binding
+
+This phase covers the smallest executable workflows: one task, simple chaining, automatic binding, explicit `input` and `output` adaptation, and the base run/result contract.
+
+### Phase 2. Registry And Workflow Declaration
+
+This phase covers task registration, canonical keys, aliases, workflow declaration shape, and basic graph construction errors such as unknown task references or invalid node references.
+
+### Phase 3. Structured Payloads And Refs
+
+This phase covers structured payload binding, `@el.ref`, named field access, workflow result boundaries, and how registered payloads participate in routing, context updates, and config/API references.
+
+### Phase 4. Context And Post-Execution Updates
+
+This phase covers workflow context models, `Node.context`, `after.context`, merge semantics, unknown-field rejection, timing rules, and branch-local context behavior before join or workflow completion.
+
+### Phase 5. Routing And Branching
+
+This phase covers exclusive branching, conditional multi-routing, branch creation rules, route validation, `route_on`, `When(...)`, and the scoped behavior of sibling branches after routing decisions.
+
+### Phase 6. Yield Fan-Out And Branch Completion
+
+This phase covers `yield` as runtime fan-out, dynamic branch cardinality, downstream scheduling for yielded packets, branch-local execution scopes, and workflow completion behavior when yielded branches are still active.
+
+### Phase 7. Composition And Result Boundaries
+
+This phase covers `Node(run=child_workflow)`, child result export through `result`, input and context crossing workflow boundaries, and parent behavior while child workflows are executing.
+
+### Phase 8. Join Behavior
+
+This phase covers the first implementation of `Join`: terminal-only usage on `result`, contribution collection, reducer behavior, waiting on workflow scope completion, and non-contributing sibling branches.
+
+### Phase 9. Dynamic Execution And Expansion
+
+This phase covers callable `next`, `Expand(...)`, append-only graph growth, direct node/fragment/workflow expansion, continuation anchors through `then`, and incremental validation of materialized graph segments.
+
+### Phase 10. Cycles And Policy Guardrails
+
+This phase covers policy-controlled static cycles, dynamic expansion toggles, graph and time budgets, validation toggles, and the runtime boundaries that constrain recurrence and graph growth.
+
+### Phase 11. Validation And Error Surfaces
+
+This phase covers static graph validation, static type validation, semi-static runtime validation, and the failure surfaces that must stay narrow and explicit when workflows, routing, joins, or expansions are invalid.
+
+### Phase 12. Config And API Parity
+
+This phase covers the config/API representation of the Python model, including workflow definitions, refs, context ids, dynamic continuation shapes, and run/result payloads.
+
+### Phase 13. Reserved Future Surfaces
+
+This phase keeps space for deferred features that need their own test surface later, especially mid-graph joins, richer error handling behavior, and agent-specific workflow features.
+
 ## 1. One async task workflow
 
 Status: ✅  

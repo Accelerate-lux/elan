@@ -1308,6 +1308,15 @@ These topics are part of the broader interface design and remain for later work:
 - Error handling
   - error categories and definitions
   - handling behavior for each error type and scope
+- Agent features
+  - agent state and message history
+  - tool-call state and tool authorization
+  - pause, resume, interrupt, and human-in-the-loop control
+  - persistent vs ephemeral memory
+  - multi-agent delegation and coordination
+  - streaming outputs and agent-specific result shapes
+  - observability and trace policy
+  - the boundary between workflow context and agent-local state
 - Model surface
   - `After.callback` as an advanced escape hatch
   - whether `after` should later become a dedicated object instead of a plain field

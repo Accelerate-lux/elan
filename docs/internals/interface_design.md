@@ -712,6 +712,20 @@ Static continuation still looks like:
 next="revalidate"
 ```
 
+The common dynamic shorthand is a bare callable:
+
+```python
+next=build_dependencies
+```
+
+That is equivalent to:
+
+```python
+next=Expand(build_dependencies)
+```
+
+The explicit `Expand(...)` form is used when the dynamic continuation needs extra metadata, especially a `then` continuation anchor.
+
 Dynamic continuation uses `Expand(...)`:
 
 ```python
@@ -759,6 +773,17 @@ This allows both:
 
 - whole workflow generation
 - direct expansion of the current local workflow scope without forcing a sub-workflow boundary every time
+
+Dynamic graph validation follows the same incremental rule as the execution model:
+
+- Elan validates the graph as it is currently materialized
+- a returned fragment may route directly to existing static nodes
+- if the returned structure does not reference an existing continuation itself, `then` provides the continuation anchor
+- if the returned structure itself contains `Expand(...)`, that nested dynamic continuation is validated later, when it materializes
+
+So the validator does not try to prove the entire future graph upfront.
+
+It validates the known current graph and defers only the parts that are still genuinely dynamic.
 
 The current design only locks the expansion mechanism itself.
 

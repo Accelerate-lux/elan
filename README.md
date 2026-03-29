@@ -9,13 +9,14 @@ While traditional DAG-based orchestrators excel at static scheduling, they strug
 Designed with developer experience in mind, Elan bridges this gap by offering a simple, predictable orchestration model:
 
 - **Dynamic Execution:** A core model where branches can expand, recurse, and synchronize at runtime as your workflow emerges.
+- **Unified Execution Model:** Write workflows in pure Python, YAML/JSON config, or HTTP API payloads—all share the exact same orchestration model and semantics.
 - **Simple Mental Model:** A declarative API that strictly separates pure business logic (Tasks) from routing and orchestration (Workflows).
-- **Native Pydantic Integration:** Built around standard Python type hints and Pydantic models. This gives your IDE maximum context and automatically validates data as it flows between nodes.
-- **Framework Agnostic:** Elan doesn't lock you into a proprietary LLM ecosystem. Because tasks are just Python functions, you can easily orchestrate any model, API, or custom logic without fighting the framework.
+- **Intuitive Graph Control:** Branching, fan-out, and conditional routing are declared explicitly at the workflow level. You maintain full control over the graph's behavior without hiding routing logic inside your tasks.
+- **Type-Safe Data Flow:** Built around standard Python type hints and Pydantic models. It automatically binds data for simple cases and provides explicit adapters to reshape inputs and outputs.
+- **Static and Runtime Graph Validation:** Ensures graph integrity through static validation before execution, and applies semi-static runtime validation as dynamic structures materialize.
+- **First-Class Composability:** Sub-workflows compose cleanly as standard nodes. Build complex graphs by nesting smaller, reusable workflows with explicit `result` boundaries.
 - **Testable by Design:** Because tasks are just plain Python functions that know nothing about the graph, you can unit test your business logic without mocking the orchestrator.
-- **Workload Agnostic:** Whether you are coordinating standard Python data tasks or complex agent loops, Elan provides a consistent interface.
-- **Easily Extensible:** The core architecture is built around standard Python primitives, making it trivial to write custom adapters, integrate third-party tools, or extend the orchestrator's capabilities to fit your specific needs.
-- **Low Boilerplate:** Designed to get out of your way, it is simple to learn and easily moves from local setup to production without over-engineering your codebase.
+- **Workload & Framework Agnostic:** Whether you are coordinating standard Python data tasks or complex agent loops, Elan provides a consistent interface that doesn't lock you into a proprietary LLM ecosystem.
 
 The name—pronounced "ay-lan"—comes from the French word "élan" which mean both momentum and moose.
 

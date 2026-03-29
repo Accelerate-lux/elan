@@ -696,6 +696,31 @@ This also fits the yield placement rules:
 - `yield -> sub_workflow(...)` creates several independent child workflow executions
 - `sub_workflow(yield -> ...)` creates coupled internal branches that may converge through `Join`
 
+### Future Mid-Graph Join Direction
+
+Mid-graph joins remain deferred.
+
+If Elan later allows `Join` outside `result`, it reuses the same `Join(...)` surface instead of introducing a second join syntax.
+
+The design direction is:
+
+- a mid-graph join is tied to one upstream yield-producing task execution
+- that yield-producing execution defines the branch family
+- the producer finishing emission closes that family
+- the join waits for the branches between that producer and the join to settle
+
+That direction keeps dynamic branch cardinality compatible with joins without forcing a statically paired split-and-join model.
+
+The first future extension is a simple concatenation join:
+
+- the join waits for the resolved branch family
+- it collects the contributed packets into one list
+- any actual reduction still happens in an ordinary node after the join
+
+Nested or repeated fan-out before a join still needs a more complete family-resolution rule.
+
+That work stays out of the first implementation.
+
 ## Dynamic Execution
 
 Dynamic execution extends the graph at runtime.

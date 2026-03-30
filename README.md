@@ -21,6 +21,24 @@ Designed with developer experience in mind, Elan bridges this gap by offering a 
 
 The name—pronounced "ay-lan"—comes from the French word "élan" which mean both momentum and moose.
 
+## Why Elan?
+
+Building data pipelines and AI agents usually means stitching together different tools: static DAGs for data, and specialized state-machine runtimes for agents. This leads to a patchwork of frameworks and disjointed developer experiences.
+
+Elan is a multi-purpose orchestrator designed to handle both. Built with developer experience and flexibility at its core, it is easy to get started with for simple tasks, yet powerful enough for complex dynamic use cases without introducing heavy boilerplate. This means you no longer need to learn and maintain entirely different tools for your data pipelines and your AI agents.
+
+- **One Tool for Data and Agents:** Whether you are orchestrating standard data workflows or complex, recursive agent loops, Elan provides the exact same predictable, graph-native interface.
+- **Runtime Graph Materialization:** Unlike tools that just do dynamic mapping or traverse a pre-compiled state graph, Elan can materialize entirely new workflow structures into the active graph at runtime.
+- **Strict Task/Orchestration Separation:** Tasks are pure Python functions. Routing is declared explicitly at the workflow level, making it easy to test your business logic and compose smaller workflows together.
+
+| Capability | Traditional DAGs | Agent Runtimes | Elan |
+| :--- | :--- | :--- | :--- |
+| **Runtime Multiplicity** | Strong | Strong | **Native** |
+| **Runtime Control Flow** | Weak / Moderate | Strong | **Native** |
+| **Runtime Graph Materialization** | N/A | Weak | **Native** |
+| **Explicit Routing** | Moderate | Strong | **Native** |
+| **Composition** | Moderate | Moderate | **Native** |
+
 ## Quickstart
 
 Elan separates the work you want to do (Tasks) from how that work is routed (Nodes) and orchestrated (Workflows).

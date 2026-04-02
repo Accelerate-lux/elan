@@ -12,6 +12,7 @@ For the precise dynamic taxonomy used here, see [dynamic_models.md](./dynamic_mo
 | Prefect | Moderate | Moderate | Weak | Weak | Strong | Strong |
 | Dagster | Strong | Weak | N/A | Moderate | Strong | Moderate |
 | Metaflow | Strong | Moderate | N/A | Strong | Moderate | Moderate |
+| Temporal | Moderate | Strong | Weak | Weak | Strong | Strong |
 | LangGraph | Strong | Strong | Weak | Strong | Strong | Moderate |
 | Elan | Native | Native | Native | Native | Native | Strong |
 
@@ -25,6 +26,7 @@ Legend: `Native` means the capability is a first-class fit for the tool's model.
 | Prefect | Moderate | Strong | Moderate | Strong | Moderate |
 | Dagster | Moderate | Moderate | Moderate | Strong | Strong |
 | Metaflow | Strong | Moderate | Moderate | Moderate | Strong |
+| Temporal | Moderate | Moderate | Moderate | Moderate | Strong |
 | LangGraph | Moderate | Weak | Weak | Moderate | Moderate |
 | Elan | Strong | Strong | Native | Strong | Strong |
 
@@ -40,12 +42,14 @@ Dagster is the strongest data-platform comparator in this set. It handles dynami
 
 Metaflow is one of the most readable explicit control-flow comparators. It is broader than simple mapping because it has joins and narrow recursion, but it still does not treat runtime graph growth as a first-class concept. Elan's additional step is cleaner task-orchestration separation and more uniform graph composition.
 
+Temporal is the durable-execution comparator in this set. It is strong when reliability, replay, timers, and long-running coordination are the main problem. Elan is differentiated when the workflow should be graph-native and routing-centric rather than durability-centric.
+
 LangGraph is the closest comparison on dynamic control-flow power. It is strong exactly where agent workflows need it to be strong, but it is still traversing a compiled state graph rather than materializing new workflow structure into the active graph. Elan is differentiated when users want that broader runtime graph growth model without committing to a shared-state-machine abstraction.
 
 Elan's strongest position in this set is not raw feature count. It is the combination of explicit routing, native cycles, composable sub-workflows, and runtime graph materialization in a workflow model that stays small and readable across both data and agent-style use cases.
 
 ## Overall takeaway
 
-Elan is not trying to out-platform Airflow or Dagster, and it is not trying to be an LLM-only runtime like many agent frameworks. Its differentiation is narrower and clearer: it gives developers a graph-native orchestration model for dynamic workflows while keeping tasks simple, routing explicit, and composition uniform.
+Elan is not trying to out-platform Airflow or Dagster, out-durable-execute Temporal, or act as an LLM-only runtime like many agent frameworks. Its differentiation is narrower and clearer: it gives developers a graph-native orchestration model for dynamic workflows while keeping tasks simple, routing explicit, and composition uniform.
 
 That makes Elan especially compelling for adopters who find scheduler-oriented tools too static and state-machine-oriented agent runtimes too mechanical. The added value is the shape of the programming model itself.

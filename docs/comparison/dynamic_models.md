@@ -22,6 +22,7 @@ The first two are common. The third is much rarer, and it is the distinction tha
 | Prefect   | Plain Python control flow inside flows               | Moderate             | Moderate             | Weak                          | Regular Python `if` / loops, tasks, nested flows                                     | The graph is flexible in code, but not graph-materializing as a first-class orchestration primitive |
 | Dagster   | Dynamic duplication of known graph regions           | Strong               | Weak                 | N/A                           | `DynamicOut`, `.map(...)`, `.collect()`                                              | Dynamic behavior stays inside a DAG of compute                                                      |
 | Metaflow  | Branches, foreach, joins, and special-case recursion | Strong               | Moderate             | N/A                           | `self.next(...)`, `foreach`, joins, conditional transitions, step self-recursion     | Recursion is narrow and the flow remains DAG-shaped overall                                         |
+| Temporal  | Durable imperative workflow control flow             | Moderate             | Strong               | Weak                          | workflow code, child workflows, signals, timers, Continue-As-New                     | Strong runtime coordination, but not graph-native workflow growth                                   |
 | LangGraph | Dynamic traversal of a compiled state graph          | Strong               | Strong               | Weak                          | conditional edges, `Send`, `Command`, subgraphs                                      | Highly flexible routing, but not arbitrary runtime graph construction                               |
 | Elan      | Runtime graph growth as part of the model            | Native               | Native               | Native                        | `Expand(...)`, callable `next`, fragments, child workflows, append-only continuation | Expansion is broad but still bounded by validation and guardrails                                   |
 
@@ -51,6 +52,12 @@ In other words, Dagster supports runtime duplication of known compute structure,
 Metaflow supports branching, `foreach`, joins, and now conditional and recursive steps. This gives it a richer interpretation of `dynamic` than Airflow or Dagster if the comparison includes joins and limited recursion.
 
 The important limit is that Metaflow's recursion is a special case: a step may recurse to itself, but the system is still documented as a DAG model rather than a general cyclic graph runtime. So Metaflow's dynamic story is meaningful, but still narrower than graph-native expansion.
+
+## Temporal
+
+Temporal is dynamic mainly through durable workflow code. A Temporal workflow can branch, loop, wait on timers, react to signals, start child workflows, and Continue-As-New into a fresh execution chain. That gives it strong runtime control-flow power and strong compositional durability, but it is not the same thing as runtime graph materialization.
+
+The workflow remains code that drives durable execution and replay, not a graph that grows by materializing new nodes or fragments into the active topology. So Temporal is broader than DAG tools on long-running control flow, but it is still solving a different problem than Elan's graph-native expansion model.
 
 ## LangGraph
 
@@ -84,6 +91,7 @@ If all of these tools are evaluated under one generic `Dynamic Graphs` label, th
 
 - Airflow and Dagster are dynamic mainly in multiplicity
 - Prefect is dynamic mainly in imperative control flow
+- Temporal is dynamic mainly in durable imperative control flow
 - Metaflow is dynamic in structured branching, joins, and narrow recursion
 - LangGraph is dynamic in graph traversal and stateful coordination
 - Elan is dynamic in runtime graph materialization itself
@@ -99,8 +107,12 @@ That distinction is the clearest explanation for why Elan sits between scheduler
 - Dagster overview: [https://docs.dagster.io/](https://docs.dagster.io/)
 - Dagster dynamic graphs: [https://docs.dagster.io/guides/build/ops/dynamic-graphs](https://docs.dagster.io/guides/build/ops/dynamic-graphs)
 - Metaflow basics: [https://docs.metaflow.org/metaflow/basics](https://docs.metaflow.org/metaflow/basics)
+- Temporal docs home: [https://docs.temporal.io/](https://docs.temporal.io/)
+- Temporal developer guide: [https://docs.temporal.io/develop](https://docs.temporal.io/develop)
+- Temporal Python SDK guide: [https://docs.temporal.io/develop/python](https://docs.temporal.io/develop/python)
+- Temporal child workflows: [https://docs.temporal.io/develop/python/child-workflows](https://docs.temporal.io/develop/python/child-workflows)
+- Temporal Continue-As-New: [https://docs.temporal.io/develop/python/continue-as-new](https://docs.temporal.io/develop/python/continue-as-new)
 - LangGraph overview: [https://docs.langchain.com/oss/python/langgraph/overview](https://docs.langchain.com/oss/python/langgraph/overview)
 - LangGraph graph API: [https://docs.langchain.com/oss/python/langgraph/graph-api](https://docs.langchain.com/oss/python/langgraph/graph-api)
 - Elan dynamic continuation notes: [interface_design.md](../internals/interface_design.md)
 - Elan type-system notes on dynamic workflows: [type_system_requirements.md](../internals/type_system_requirements.md)
-

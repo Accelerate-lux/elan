@@ -1,9 +1,8 @@
-import asyncio
 from typing import Any
 
-from ._binding import bind_entry_input, bind_input, map_output
-from ._resolution import resolve_node
-from ._routing import resolve_linear_next
+from ._graph_state import GraphState
+from ._orchestrator import Orchestrator
+from ._run_state import RunState
 from .node import Node
 from .result import WorkflowRun
 from .task import Task, task
@@ -21,31 +20,18 @@ class Workflow:
         self.nodes = nodes
 
     async def run(self, **input: Any) -> WorkflowRun:
-        current = self.start
-        current_input: Any = input
-        result: dict[str, list[Any]] = {}
+        run_state = self._create_run_state()
+        orchestrator = Orchestrator(run_state=run_state)
+        return await orchestrator.run(**input)
 
-        while True:
-            node = resolve_node(self.name, current)
-            if current is self.start:
-                args, kwargs = bind_entry_input(node.run, current_input)
-            else:
-                args, kwargs = bind_input(node.run, current_input)
-
-            if node.run.is_async:
-                execution = node.run.fn(*args, **kwargs)
-            else:
-                execution = asyncio.to_thread(node.run.fn, *args, **kwargs)
-
-            output = await execution
-            result.setdefault(node.run.name, []).append(output)
-
-            next_node = resolve_linear_next(self.name, node.next, self.nodes)
-            if next_node is None:
-                return WorkflowRun(result=result)
-
-            current = next_node
-            current_input = map_output(node.output, output)
+    def _create_run_state(self) -> RunState:
+        return RunState(
+            workflow=self,
+            graph=GraphState(
+                start=self.start,
+                nodes=dict(self.nodes),
+            ),
+        )
 
 
 __all__ = ["Workflow", "task"]

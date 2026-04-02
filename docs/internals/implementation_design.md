@@ -45,7 +45,7 @@ For now, one activation corresponds to one node execution attempt for one branch
 
 It exists to support:
 
-- ready/running/settled execution state
+- queued/running/settled execution state
 - launch of concrete runtime work
 - handoff from execution back into progression
 
@@ -103,7 +103,7 @@ The simple loop is:
 2. create the initial branch
 3. create the initial activation
 4. enqueue that activation
-5. dequeue one ready activation
+5. dequeue one queued activation
 6. resolve `input`
 7. resolve `context`
 8. build the task call
@@ -120,11 +120,11 @@ The simple loop is:
 16. only then is the previous activation fully settled
 17. repeat until no continuation remains
 
-The key rule is that continuation must be enqueued before the previous activation is fully settled. Otherwise the engine can observe a false terminal state with no ready work, no running work, and no next activation yet materialized.
+The key rule is that continuation must be enqueued before the previous activation is fully settled. Otherwise the engine can observe a false terminal state with no queued work, no running work, and no next activation yet materialized.
 
 Open points:
 
-- exact activation states between ready and fully settled
+- exact activation states between queued and fully settled
 - where raw versus adapted node output is stored
 - how non-success outcomes modify progression
 - how the loop generalizes once branching is introduced
@@ -144,10 +144,37 @@ The accepted relation is:
 
 This avoids two competing run representations.
 
+`RunState` also owns the run-local graph state. The workflow definition stays immutable; the run progresses against a mutable graph working copy that can later absorb expansion and other run-local graph changes.
+
+## GraphState
+
+`GraphState` is the run-local materialized graph for one workflow run.
+
+It separates:
+
+- the immutable `Workflow` definition
+- the mutable graph that the engine actually progresses against
+
+This distinction is required before dynamic execution is added. Expansion cannot mutate the workflow definition directly; it must append to a run-local graph.
+
+At minimum, `GraphState` is expected to own:
+
+- the effective `start` reference for the run
+- the current node registry for the run
+
+Open points:
+
+- whether `result` also lives directly on graph state
+- how appended nodes are namespaced
+- whether graph state also tracks edges explicitly or only node-local continuation
+- how graph state exposes append-only updates
+- whether sub-workflows use nested graph state objects or separate run states
+
 At minimum, `RunState` is expected to own:
 
 - run identity
 - workflow definition reference
+- graph state
 - workflow input
 - global status
 - branch registry
@@ -170,13 +197,13 @@ Open points:
 
 It stays close to the `ao_pipeline` shape and tracks activations as:
 
-- ready
+- queued
 - running
 - settled
 
 So the intended first shape is:
 
-- ready queue
+- queued activation queue
 - running set
 - settled set
 
@@ -196,7 +223,7 @@ Open points:
 
 At the current level of design, it stays narrow. Its job is to:
 
-- dequeue ready activations
+- dequeue queued activations
 - launch execution
 - observe completion
 - mark activations settled
@@ -205,7 +232,7 @@ At the current level of design, it stays narrow. Its job is to:
 
 In the simple linear case, the scheduler cycle is:
 
-1. take one ready activation from `SchedulerState`
+1. take one queued activation from `SchedulerState`
 2. launch its concrete execution
 3. move it into the running set
 4. wait for one running activation to complete
@@ -232,6 +259,37 @@ Open points:
 - whether post-execution progression happens inside the scheduler or in an adjacent runner step
 - how quiescence is checked once waits and barriers are introduced
 
+## Orchestrator
+
+`Orchestrator` is the high-level runtime object that executes one workflow run.
+
+It sits between the public `Workflow` object and the lower-level scheduler machinery.
+
+Its job is to:
+
+- create and own the per-run `RunState`
+- create and use the `Scheduler`
+- seed the initial branch and activation from `start`
+- drive the progression loop
+- interpret workflow continuation
+- build the final `WorkflowRun`
+
+This keeps `Workflow` primarily declarative and prevents it from accumulating run-engine responsibilities directly.
+
+The intended layering is:
+
+- `Workflow` defines the workflow and exposes the public entrypoint
+- `Orchestrator` executes one run
+- `Scheduler` manages activation scheduling transitions
+- `RunState` and `SchedulerState` remain passive state containers
+
+Open points:
+
+- whether `Orchestrator` is created per `Workflow.run()` call or reused indirectly
+- how much progression logic remains on `Workflow` versus moves into `Orchestrator`
+- whether child workflows use the same orchestrator shape recursively
+- where final error-to-`WorkflowRun` translation lives
+
 ## Current State Of The Design
 
 The following internal concepts are concrete enough to live in this document:
@@ -240,8 +298,10 @@ The following internal concepts are concrete enough to live in this document:
 - `Activation`
 - `Barrier` as the internal mechanism behind workflow `result` joins
 - the simple linear `Progression Loop`
+- `GraphState`
 - `RunState`
 - `SchedulerState`
 - `Scheduler`
+- `Orchestrator`
 
 Everything else stays out until it is discussed at the same level of precision.

@@ -24,7 +24,7 @@ class Orchestrator:
         scheduler = Scheduler()
 
         initial_branch = self._create_branch(
-            current=self.run_state.graph.start,
+            current_node_name="start",
             is_entry=True,
         )
         initial_activation = self._create_activation(
@@ -40,9 +40,12 @@ class Orchestrator:
                 settled = await scheduler.update(self.run_state)
                 if settled is None:
                     self.run_state.status = "completed"
-                    return WorkflowRun(result=self.run_state.result)
+                    return WorkflowRun(
+                        result=self._final_result(),
+                        outputs=self.run_state.outputs,
+                    )
 
-            self._record_output(settled.node.run.name, settled.output)
+            self._record_output(settled)
             next_activation = self._progress_branch(settled)
             if next_activation is not None:
                 scheduler.enqueue(next_activation)
@@ -52,16 +55,17 @@ class Orchestrator:
         settled: Activation,
     ) -> Activation | None:
         branch = self.run_state.branches[settled.branch_id]
-        next_node = resolve_linear_next(
+        next_target = resolve_linear_next(
             self.run_state.workflow.name,
             settled.node.next,
             self.run_state.graph.nodes,
         )
-        if next_node is None:
+        if next_target is None:
             return None
 
+        next_name, _next_node = next_target
         next_input = map_output(settled.node.output, settled.output)
-        branch.advance_to(next_node)
+        branch.advance_to(next_name)
         return self._create_activation(
             branch,
             input_value=next_input,
@@ -69,10 +73,19 @@ class Orchestrator:
 
     def _record_output(
         self,
-        task_name: str,
-        output: Any,
+        activation: Activation,
     ) -> None:
-        self.run_state.result.setdefault(task_name, []).append(output)
+        self.run_state.last_output = activation.output
+        self.run_state.outputs.setdefault(activation.node.run.name, []).append(
+            activation.output
+        )
+        if activation.node_name == "result":
+            self.run_state.result = activation.output
+
+    def _final_result(self) -> Any:
+        if self.run_state.result is not None:
+            return self.run_state.result
+        return self.run_state.last_output
 
     def _create_activation(
         self,
@@ -84,7 +97,11 @@ class Orchestrator:
         activation = Activation(
             id=f"activation-{self.run_state._activation_counter}",
             branch_id=branch.id,
-            node=resolve_node(self.run_state.workflow.name, branch.current),
+            node_name=branch.current_node_name,
+            node=resolve_node(
+                self.run_state.workflow.name,
+                self._resolve_current_node(branch.current_node_name),
+            ),
             input_value=input_value,
             is_entry=branch.is_entry,
         )
@@ -94,14 +111,23 @@ class Orchestrator:
     def _create_branch(
         self,
         *,
-        current: Task | str | Node,
+        current_node_name: str | None,
         is_entry: bool,
     ) -> Branch:
         self.run_state._branch_counter += 1
         branch = Branch(
             id=f"branch-{self.run_state._branch_counter}",
-            current=current,
+            _current_node_name=current_node_name,
             _is_entry=is_entry,
         )
         self.run_state.branches[branch.id] = branch
         return branch
+
+    def _resolve_current_node(self, node_name: str | None) -> Task | str | Node:
+        if node_name == "start":
+            return self.run_state.graph.start
+
+        if node_name is None:
+            raise RuntimeError("Cannot resolve current node without a node name.")
+
+        return self.run_state.graph.nodes[node_name]

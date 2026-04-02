@@ -84,11 +84,18 @@ Declared but unsupported fields:
 
 Fields:
 
-- `result: dict[str, list[Any]]`
+- `result: Any`
+- `outputs: dict[str, list[Any]]`
 
 ## Binding Rules
 
 `Workflow.run(**input)` binds named workflow input to the start task.
+
+`WorkflowRun.result` is the exported value of the reserved `result` node when the workflow defines one.
+
+If no reserved `result` node is defined, `WorkflowRun.result` falls back to the last terminal output of the run.
+
+`WorkflowRun.outputs` stores executed task outputs grouped by task name.
 
 Between nodes, Elan binds values using these rules:
 

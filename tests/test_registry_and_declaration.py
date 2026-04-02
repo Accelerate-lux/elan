@@ -15,7 +15,8 @@ async def test_run_workflow_start_resolved_by_canonical_key(mock_task_factory):
     run = await workflow.run()
 
     hello.mock.assert_called_once_with()
-    assert run.result == {"_hello": ["Hello, world!"]}
+    assert run.result == "Hello, world!"
+    assert run.outputs == {"_hello": ["Hello, world!"]}
 
 
 @pytest.mark.asyncio
@@ -39,7 +40,8 @@ async def test_run_workflow_node_resolved_by_canonical_key(mock_task_factory):
 
     prepare.mock.assert_called_once_with()
     greet.mock.assert_called_once_with(name="world")
-    assert run.result == {
+    assert run.result == "Hello, world!"
+    assert run.outputs == {
         "_prepare": ["world"],
         "_greet": ["Hello, world!"],
     }
@@ -66,7 +68,8 @@ async def test_run_workflow_resolves_tasks_by_alias(mock_task_factory):
 
     prepare.mock.assert_called_once_with()
     greet.mock.assert_called_once_with(name="world")
-    assert run.result == {
+    assert run.result == "Hello, world!"
+    assert run.outputs == {
         "prepare": ["world"],
         "greet": ["Hello, world!"],
     }

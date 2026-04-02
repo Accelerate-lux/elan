@@ -10,6 +10,7 @@ ActivationStatus = Literal["queued", "running", "settled"]
 class Activation:
     id: str
     branch_id: str
+    node_name: str | None
     node: Node
     input_value: Any
     is_entry: bool

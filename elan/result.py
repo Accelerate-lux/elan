@@ -4,4 +4,5 @@ from typing import Any
 
 @dataclass(slots=True)
 class WorkflowRun:
-    result: dict[str, list[Any]] = field(default_factory=dict)
+    result: Any = None
+    outputs: dict[str, list[Any]] = field(default_factory=dict)

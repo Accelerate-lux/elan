@@ -78,13 +78,17 @@ When constructing the graph, the workflow needs to reference the tasks it will o
 
 While a `Workflow` acts as a reusable blueprint, a **Run** is a single, concrete execution of that blueprint with a specific set of inputs.
 
-Calling `await workflow.run()` executes the graph and returns a `WorkflowRun` object. This object serves as a full report of the execution. 
+Calling `await workflow.run()` executes the graph and returns a `WorkflowRun` object.
 
-The primary data it contains is the `result`—a dictionary mapping each executed task's name to a list of its outputs. For the single-task workflow above, the run produces:
+`WorkflowRun.outputs` is the execution report: a dictionary mapping each executed task's name to a list of its outputs. For the single-task workflow above, the run produces:
 
 ```python
 {"hello": ["Hello, world!"]}
 ```
+
+When the workflow defines the reserved `result` node, its exported value is available on `WorkflowRun.result`.
+
+If no reserved `result` node is defined, `WorkflowRun.result` falls back to the last terminal output of the run.
 
 ## Configuring Nodes
 
@@ -140,6 +144,8 @@ This execution produces:
     "greet": ["Hello, world!"],
 }
 ```
+
+on `run.outputs`.
 
 Notice how `prepare` is wrapped in a `Node`. Because it is not the final step, it requires the `next` field to point the graph toward `greet`. The raw string returned by `prepare` is automatically passed as the first positional argument to `greet`.
 
@@ -383,4 +389,3 @@ These features are not supported by the runtime:
 - routing through `route_on`
 - sub-workflows
 - barriers and joins
-

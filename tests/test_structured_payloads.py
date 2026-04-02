@@ -34,7 +34,8 @@ async def test_run_workflow_pydantic_payload_auto_unpack(mock_task_factory):
 
     prepare.mock.assert_called_once_with()
     greet.mock.assert_called_once_with(name="world")
-    assert run.result == {
+    assert run.result == "Hello, world!"
+    assert run.outputs == {
         "_prepare": [UserPayload(name="world", age=32)],
         "_greet": ["Hello, world!"],
     }
@@ -61,7 +62,8 @@ async def test_run_workflow_pydantic_payload_ignores_extra_fields(mock_task_fact
 
     prepare.mock.assert_called_once_with()
     greet.mock.assert_called_once_with(name="world")
-    assert run.result == {
+    assert run.result == "Hello, world!"
+    assert run.outputs == {
         "_prepare": [UserPayload(name="world", age=32)],
         "_greet": ["Hello, world!"],
     }
@@ -109,7 +111,8 @@ async def test_run_workflow_pydantic_payload_pass_through(mock_task_factory):
 
     prepare.mock.assert_called_once_with()
     greet.mock.assert_called_once_with(UserPayload(name="world", age=32))
-    assert run.result == {
+    assert run.result == "Hello, world!"
+    assert run.outputs == {
         "_prepare": [UserPayload(name="world", age=32)],
         "_greet": ["Hello, world!"],
     }

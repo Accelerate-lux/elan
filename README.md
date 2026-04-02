@@ -78,3 +78,5 @@ print(run.result)
 For a complete introduction to Elan's mental model, graph topology, and data binding rules, read the [Basics Guide](docs/basics.md).
 
 For side-by-side assessments of tools adjacent to Elan, read the [Comparison Summary](docs/comparison/summary.md) and the focused note on [what "dynamic" means across workflow tools](docs/comparison/dynamic_models.md).
+
+For rough candidate demos and later-planning notes, read the [Demo Ideas Catalog](docs/demo_ideas_catalog.md).

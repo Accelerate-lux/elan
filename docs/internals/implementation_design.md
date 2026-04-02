@@ -190,6 +190,48 @@ Open points:
 - how waits and barriers are indexed relative to scheduler state
 - how cancellation and time budgets are reflected in scheduler state
 
+## Scheduler
+
+`Scheduler` is the engine component that drives the progression loop using `SchedulerState`.
+
+At the current level of design, it stays narrow. Its job is to:
+
+- dequeue ready activations
+- launch execution
+- observe completion
+- mark activations settled
+- hand settled activations back into progression
+- decide when the run is quiescent
+
+In the simple linear case, the scheduler cycle is:
+
+1. take one ready activation from `SchedulerState`
+2. launch its concrete execution
+3. move it into the running set
+4. wait for one running activation to complete
+5. move that activation into the settled set
+6. hand it back into progression so continuation can be materialized
+7. repeat until the run is quiescent
+
+The scheduler is not:
+
+- the owner of run truth
+- the owner of branch lineage
+- the owner of synchronization semantics
+- the place where workflow continuation is interpreted
+
+Those responsibilities stay in progression and run state.
+
+The scheduler only owns the operative execution cycle over activations.
+
+Open points:
+
+- exact dequeue discipline
+- whether the first implementation runs one activation at a time or allows immediate parallel launch
+- how settled activations are handed back into progression
+- whether post-execution progression happens inside the scheduler or in an adjacent runner step
+- how quiescence is checked once waits and barriers are introduced
+
 ## Current State Of The Design
 
 The following internal concepts are concrete enough to live in this document:
@@ -200,5 +242,6 @@ The following internal concepts are concrete enough to live in this document:
 - the simple linear `Progression Loop`
 - `RunState`
 - `SchedulerState`
+- `Scheduler`
 
 Everything else stays out until it is discussed at the same level of precision.

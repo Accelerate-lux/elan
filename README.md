@@ -70,6 +70,9 @@ workflow = Workflow(
 run = asyncio.run(workflow.run())
 
 print(run.result)
+# Hello, World!
+
+print(run.outputs)
 # {'prepare': ['World'], 'greet': ['Hello, World!']}
 ```
 

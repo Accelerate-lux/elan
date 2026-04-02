@@ -14,7 +14,9 @@ if TYPE_CHECKING:
 class RunState:
     workflow: "Workflow"
     graph: GraphState
-    result: dict[str, list[Any]] = field(default_factory=dict)
+    result: Any = None
+    last_output: Any = None
+    outputs: dict[str, list[Any]] = field(default_factory=dict)
     branches: dict[str, Branch] = field(default_factory=dict)
     activations: dict[str, Activation] = field(default_factory=dict)
     status: str = "created"

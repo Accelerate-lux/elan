@@ -24,7 +24,8 @@ async def test_run_workflow_two_tasks_mapped_output(mock_task_factory):
 
     prepare.mock.assert_called_once_with()
     greet.mock.assert_called_once_with(name="world")
-    assert run.result == {
+    assert run.result == "Hello, world!"
+    assert run.outputs == {
         "_prepare": ["world"],
         "_greet": ["Hello, world!"],
     }
@@ -51,7 +52,8 @@ async def test_run_workflow_two_tasks_discard_output(mock_task_factory):
 
     prepare.mock.assert_called_once_with()
     greet.mock.assert_called_once_with(name="world")
-    assert run.result == {
+    assert run.result == "Hello, world!"
+    assert run.outputs == {
         "_prepare": [("ignored", "world")],
         "_greet": ["Hello, world!"],
     }
@@ -78,7 +80,8 @@ async def test_run_workflow_tuple_output(mock_task_factory):
 
     prepare.mock.assert_called_once_with()
     greet.mock.assert_called_once_with("hello", "world")
-    assert run.result == {
+    assert run.result == "Hello, world!"
+    assert run.outputs == {
         "_prepare": [("hello", "world")],
         "_greet": ["Hello, world!"],
     }
@@ -147,7 +150,8 @@ async def test_run_workflow_list_output_is_opaque(mock_task_factory):
 
     prepare.mock.assert_called_once_with()
     greet.mock.assert_called_once_with(["hello", "world"])
-    assert run.result == {
+    assert run.result == "Hello, world!"
+    assert run.outputs == {
         "_prepare": [["hello", "world"]],
         "_greet": ["Hello, world!"],
     }
@@ -174,7 +178,8 @@ async def test_run_workflow_raw_dict_output_is_opaque(mock_task_factory):
 
     prepare.mock.assert_called_once_with()
     greet.mock.assert_called_once_with({"name": "world"})
-    assert run.result == {
+    assert run.result == "Hello, world!"
+    assert run.outputs == {
         "_prepare": [{"name": "world"}],
         "_greet": ["Hello, world!"],
     }

@@ -6,7 +6,7 @@ def resolve_linear_next(
     workflow_name: str,
     next_value: str | list[str] | dict[str, str] | None,
     nodes: dict[str, Task | str | Node],
-) -> Task | str | Node | None:
+) -> tuple[str, Task | str | Node] | None:
     if next_value is None:
         return None
 
@@ -20,4 +20,4 @@ def resolve_linear_next(
             f"Workflow '{workflow_name}' references unknown node '{next_value}'."
         )
 
-    return nodes[next_value]
+    return next_value, nodes[next_value]

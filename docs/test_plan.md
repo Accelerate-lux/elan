@@ -14,7 +14,7 @@ Status:
 
 ### Phase 1. Core Task Execution And Binding
 
-This phase covers the smallest executable workflows: one task, simple chaining, automatic binding, explicit `input` and `output` adaptation, and the base run/result contract.
+This phase covers the smallest executable workflows: one task, simple chaining, automatic binding, explicit `input` and `output` adaptation, and the base `WorkflowRun` contract.
 
 ### Phase 2. Registry And Workflow Declaration
 
@@ -73,7 +73,7 @@ What it tests:
 
 - a registered async task can be used directly as a workflow start node
 - `Workflow.run()` executes it successfully
-- `WorkflowRun` stores the task output under the task name
+- `WorkflowRun.outputs` stores the task output under the task name
 
 ## 2. One sync task workflow
 
@@ -95,7 +95,7 @@ What it tests:
 
 - a workflow can chain one task to another through `next`
 - a scalar output binds automatically to one downstream parameter
-- the run result contains outputs for both tasks
+- `WorkflowRun.outputs` contains outputs for both tasks
 
 ## 4. Two-task workflow with explicit output mapping
 
@@ -117,7 +117,7 @@ What it tests:
 
 - output mapping can discard positions with `...`
 - only selected values are forwarded
-- the raw upstream output is still preserved in `WorkflowRun`
+- the raw upstream output is still preserved in `WorkflowRun.outputs`
 
 ## 6. Tuple output binds positionally
 

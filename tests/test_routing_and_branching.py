@@ -1,7 +1,7 @@
 import pytest
 from pydantic import BaseModel
 
-from elan import Node, When, Workflow, ref
+from elan import Join, Node, When, Workflow, ref
 from elan._refs import ModelFieldRef
 
 
@@ -987,6 +987,40 @@ async def test_run_workflow_fan_out_with_reserved_result_is_invalid(mock_task_fa
 
 
 @pytest.mark.asyncio
+async def test_run_workflow_fan_out_with_join_result_is_valid(mock_task_factory, branch_id):
+    def _prepare():
+        return "world"
+
+    async def _greet(name: str):
+        return f"Hello, {name}!"
+
+    prepare = mock_task_factory(_prepare)
+    greet = mock_task_factory(_greet)
+
+    run = await Workflow(
+        "fan_out_profile",
+        start=Node(
+            run=prepare,
+            bind_output="name",
+            next=["greet"],
+        ),
+        greet=Node(run=greet, next="result"),
+        result=Join(),
+    ).run()
+
+    greet.mock.assert_called_once_with(name="world")
+    assert run.result == ["Hello, world!"]
+    assert run.outputs == {
+        branch_id[0]: {
+            "_prepare": ["world"],
+        },
+        branch_id[1]: {
+            "_greet": ["Hello, world!"],
+        },
+    }
+
+
+@pytest.mark.asyncio
 async def test_run_workflow_when_with_reserved_result_is_invalid(mock_task_factory):
     def _prepare():
         return "world", True
@@ -1017,6 +1051,40 @@ async def test_run_workflow_when_with_reserved_result_is_invalid(mock_task_facto
         match="List-based branching with reserved result",
     ):
         await workflow.run()
+
+
+@pytest.mark.asyncio
+async def test_run_workflow_when_with_join_result_is_valid(mock_task_factory, branch_id):
+    def _prepare():
+        return "world", True
+
+    async def _send_email(name: str):
+        return f"email:{name}"
+
+    prepare = mock_task_factory(_prepare)
+    send_email = mock_task_factory(_send_email)
+
+    run = await Workflow(
+        "conditional_routes",
+        start=Node(
+            run=prepare,
+            bind_output=["name", "should_email"],
+            next=[When("should_email", "send_email")],
+        ),
+        send_email=Node(run=send_email, next="result"),
+        result=Join(),
+    ).run()
+
+    send_email.mock.assert_called_once_with(name="world")
+    assert run.result == ["email:world"]
+    assert run.outputs == {
+        branch_id[0]: {
+            "_prepare": [("world", True)],
+        },
+        branch_id[1]: {
+            "_send_email": ["email:world"],
+        },
+    }
 
 
 @pytest.mark.asyncio

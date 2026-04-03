@@ -1,3 +1,4 @@
+from .join import Join
 from .node import Node
 from ._refs import Context, Input, Upstream, ref
 from .result import WorkflowRun
@@ -10,6 +11,7 @@ __all__ = [
     "WorkflowRun",
     "Task",
     "Node",
+    "Join",
     "Upstream",
     "Input",
     "Context",

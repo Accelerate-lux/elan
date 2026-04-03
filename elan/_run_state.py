@@ -7,6 +7,7 @@ from pydantic import BaseModel
 from ._activation import Activation
 from ._branch import Branch
 from ._graph_state import GraphState
+from ._join_state import JoinState
 
 if TYPE_CHECKING:
     from .workflow import Workflow
@@ -25,3 +26,4 @@ class RunState:
     activations: dict[str, Activation] = field(default_factory=dict)
     status: str = "created"
     used_branching: bool = False
+    join_state: JoinState | None = None

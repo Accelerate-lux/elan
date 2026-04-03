@@ -4,11 +4,12 @@ from pydantic import BaseModel
 
 from ._binding import _MappedPayload
 from ._refs import ModelFieldRef
+from .join import Join
 from .node import Node
 from .task import Task
 from .when import When
 
-ResolvedTarget = tuple[str, Task | str | Node]
+ResolvedTarget = tuple[str, Task | str | Node | Join]
 ResolvedNext = ResolvedTarget | list[ResolvedTarget] | None
 
 
@@ -24,7 +25,7 @@ def resolve_next_targets(
     next_value: str | list[str | When] | dict[str, str] | None,
     route_on: str | ModelFieldRef | None,
     emitted_value: Any,
-    nodes: dict[str, Task | str | Node],
+    nodes: dict[str, Task | str | Node | Join],
 ) -> ResolvedNext:
     if next_value is None:
         return None
@@ -84,8 +85,8 @@ def resolve_next_targets(
 def _resolve_target(
     workflow_name: str,
     target_name: str,
-    nodes: dict[str, Task | str | Node],
-) -> tuple[str, Task | str | Node]:
+    nodes: dict[str, Task | str | Node | Join],
+) -> tuple[str, Task | str | Node | Join]:
     if not isinstance(target_name, str):
         raise NotImplementedError(
             "Only string node ids are supported in the current routing runtime."
@@ -246,8 +247,8 @@ def _resolve_when_target(
     workflow_name: str,
     *,
     target: str | list[str],
-    nodes: dict[str, Task | str | Node],
-) -> list[tuple[str, Task | str | Node]]:
+    nodes: dict[str, Task | str | Node | Join],
+) -> list[tuple[str, Task | str | Node | Join]]:
     if isinstance(target, str):
         return [_resolve_target(workflow_name, target, nodes)]
 

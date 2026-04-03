@@ -1,7 +1,7 @@
 import pytest
 from pydantic import BaseModel
 
-from elan import Context, Input, Node, Upstream, When, Workflow, ref
+from elan import Context, Input, Join, Node, Upstream, When, Workflow, ref
 
 
 @pytest.mark.asyncio
@@ -242,6 +242,57 @@ async def test_fan_out_without_reserved_result(mock_task_factory, branch_id):
     greet.mock.assert_called_once_with(name="world")
     badge.mock.assert_called_once_with(name="world")
     assert run.result is None
+    assert run.outputs == {
+        branch_id[0]: {
+            "_prepare": ["world"],
+        },
+        branch_id[1]: {
+            "_greet": ["Hello, world!"],
+        },
+        branch_id[2]: {
+            "_badge": ["badge:world"],
+        },
+    }
+
+
+@pytest.mark.asyncio
+async def test_join_reducer_with_list_branching(mock_task_factory, branch_id):
+    def _prepare():
+        return "world"
+
+    async def _greet(name: str):
+        return f"Hello, {name}!"
+
+    async def _badge(name: str):
+        return f"badge:{name}"
+
+    def _collect(values: list[str]):
+        return " | ".join(values)
+
+    prepare = mock_task_factory(_prepare)
+    greet = mock_task_factory(_greet)
+    badge = mock_task_factory(_badge)
+    collect = mock_task_factory(_collect)
+
+    run = await Workflow(
+        "fan_out_profile",
+        start=Node(
+            run=prepare,
+            bind_output="name",
+            next=["greet", "badge"],
+        ),
+        greet=Node(run=greet, next="result"),
+        badge=Node(run=badge, next="result"),
+        result=Join(run=collect),
+    ).run()
+
+    prepare.mock.assert_called_once_with()
+    greet.mock.assert_called_once_with(name="world")
+    badge.mock.assert_called_once_with(name="world")
+    collect.mock.assert_called_once_with(
+        ["Hello, world!", "badge:world"]
+    )
+    assert run.result == "Hello, world! | badge:world"
     assert run.outputs == {
         branch_id[0]: {
             "_prepare": ["world"],

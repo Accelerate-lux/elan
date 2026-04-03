@@ -1,9 +1,11 @@
+import asyncio
 from typing import Any
 from uuid import uuid4
 
 from ._activation import Activation
 from ._binding import bind_output
 from ._branch import Branch
+from .join import Join
 from ._resolution import resolve_node
 from ._routing import (
     ResolvedNext,
@@ -44,6 +46,11 @@ class Orchestrator:
             if settled is None:
                 settled = await scheduler.update(self.run_state)
                 if settled is None:
+                    if self._has_active_branches():
+                        raise RuntimeError(
+                            f"Workflow '{self.run_state.workflow.name}' reached quiescence with active branches."
+                        )
+                    await self._finalize_join()
                     self.run_state.status = "completed"
                     return WorkflowRun(
                         result=self._final_result(),
@@ -65,7 +72,11 @@ class Orchestrator:
         if isinstance(settled.node.next, dict) or is_target_producer_list(settled.node.next):
             self.run_state.used_branching = True
 
-        if is_target_producer_list(settled.node.next) and "result" in self.run_state.graph.nodes:
+        if (
+            is_target_producer_list(settled.node.next)
+            and "result" in self.run_state.graph.nodes
+            and not self._uses_join_result()
+        ):
             raise NotImplementedError(
                 "List-based branching with reserved result is not implemented before Join."
             )
@@ -96,6 +107,21 @@ class Orchestrator:
             return None
         return self.run_state.last_output
 
+    async def _finalize_join(self) -> None:
+        join_state = self.run_state.join_state
+        if join_state is None or join_state.finalized:
+            return
+
+        contributions = list(join_state.contributions)
+        if join_state.reducer is None:
+            self.run_state.result = contributions
+        else:
+            self.run_state.result = await self._run_join_reducer(
+                join_state.reducer,
+                contributions,
+            )
+        join_state.finalized = True
+
     def _create_next_activations(
         self,
         branch: Branch,
@@ -103,10 +129,15 @@ class Orchestrator:
         next_targets: ResolvedNext,
     ) -> list[Activation]:
         if next_targets is None:
+            branch.complete()
             return []
 
         if not isinstance(next_targets, list):
             next_name, _next_node = next_targets
+            if self._uses_join_result() and next_name == "result":
+                self._register_join_contribution(emitted_value)
+                branch.complete()
+                return []
             branch.advance_to(next_name)
             return [
                 self._create_activation(
@@ -115,8 +146,12 @@ class Orchestrator:
                 )
             ]
 
+        branch.complete()
         activations: list[Activation] = []
         for next_name, _next_node in next_targets:
+            if self._uses_join_result() and next_name == "result":
+                self._register_join_contribution(emitted_value)
+                continue
             child_branch = self._create_branch(
                 current_node_name=next_name,
                 is_entry=False,
@@ -128,6 +163,31 @@ class Orchestrator:
                 )
             )
         return activations
+
+    def _register_join_contribution(
+        self,
+        emitted_value: Any,
+    ) -> None:
+        join_state = self.run_state.join_state
+        if join_state is None:
+            raise RuntimeError("Cannot register join contribution without join state.")
+
+        join_state.contributions.append(emitted_value)
+
+    def _uses_join_result(self) -> bool:
+        return self.run_state.join_state is not None
+
+    def _has_active_branches(self) -> bool:
+        return any(not branch.is_complete for branch in self.run_state.branches.values())
+
+    async def _run_join_reducer(
+        self,
+        reducer: Task,
+        contributions: list[Any],
+    ) -> Any:
+        if reducer.is_async:
+            return await reducer.fn(contributions)
+        return await asyncio.to_thread(reducer.fn, contributions)
 
     def _create_activation(
         self,
@@ -163,7 +223,7 @@ class Orchestrator:
         self.run_state.branches[branch.id] = branch
         return branch
 
-    def _resolve_current_node(self, node_name: str | None) -> Task | str | Node:
+    def _resolve_current_node(self, node_name: str | None) -> Task | str | Node | Join:
         if node_name == "start":
             return self.run_state.graph.start
 

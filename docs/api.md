@@ -95,6 +95,17 @@ Supported forms:
 - `When(RoutePayload.should_email, "send_email")`
 - `When("should_ticket", ["open_ticket", "audit"])`
 
+## `Join(run=None)`
+
+Terminal workflow-scope synchronization primitive.
+
+Supported forms:
+
+- `result=Join()`
+- `result=Join(run=reduce_values)`
+
+`Join` is only valid as the reserved `result` node.
+
 ## `Workflow(name, start, context=None, **nodes)`
 
 Defines a workflow.
@@ -104,7 +115,7 @@ Parameters:
 - `name: str`
 - `start: Task | str | Node`
 - `context: type[BaseModel] | None`
-- `**nodes: Task | str | Node`
+- `**nodes: Task | str | Node | Join`
 
 String task references are resolved through the task registry.
 
@@ -206,4 +217,10 @@ Ref-based `route_on` currently applies to exclusive branching with `next={...}` 
 
 If a workflow uses branching forms and does not define the reserved `result` node, `WorkflowRun.result` is `None`.
 
-Any workflow using `When(...)` together with the reserved `result` node is rejected until `Join` exists.
+If `result=Join(...)` is used:
+
+- branches routed to `result` contribute their emitted values
+- non-contributing branches are still awaited
+- `Join()` returns the collected list
+- `Join(run=reducer)` calls the reducer with the collected list as one value
+- join reduction is not recorded in `WorkflowRun.outputs`

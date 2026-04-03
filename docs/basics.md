@@ -630,9 +630,60 @@ If a workflow uses branching forms and does not define the reserved `result` nod
 
 For `When(...)`, each entry is evaluated independently. Zero matches is valid, and duplicate matched destinations are allowed.
 
+## First-Pass Join On `result`
+
+The current runtime also supports a first terminal join form on the reserved `result` node:
+
+```python
+from elan import Join, Node, Workflow, task
+
+
+@task
+def prepare():
+    return "world"
+
+
+@task
+async def greet(name: str):
+    return f"Hello, {name}!"
+
+
+@task
+async def badge(name: str):
+    return f"badge:{name}"
+
+
+@task
+def collect(values: list[str]):
+    return " | ".join(values)
+
+
+workflow = Workflow(
+    "fan_out_profile",
+    start=Node(
+        run=prepare,
+        bind_output="name",
+        next=["greet", "badge"],
+    ),
+    greet=Node(run=greet, next="result"),
+    badge=Node(run=badge, next="result"),
+    result=Join(run=collect),
+)
+```
+
+`Join` is terminal-only in this first pass:
+
+- it is only allowed as the reserved `result` node
+- it collects the emitted values routed to `result`
+- `Join()` returns the collected list
+- `Join(run=reducer)` calls the reducer with that list as one value
+- the reduced result appears on `run.result`
+- join reduction is not recorded in `run.outputs`
+
 ## Still Unsupported
 
 These features are still not supported by the runtime:
 
 - sub-workflows
-- barriers and joins
+- mid-graph joins
+- general barriers

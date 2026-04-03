@@ -321,7 +321,8 @@ What it tests:
 - sibling branches receive duplicated downstream payload
 - outputs are grouped under distinct branch ids
 - fan-out without reserved `result` returns `None`
-- fan-out with reserved `result` is rejected until `Join` exists
+- fan-out with ordinary reserved `result=Node(...)` is rejected
+- fan-out with `result=Join(...)` contributes to the terminal join
 
 ## 27. Conditional multi-routing with `When(...)`
 
@@ -334,12 +335,15 @@ What it tests:
 - `When(Payload.field, "node")` routing from registered ref model outputs
 - `When(condition, ["a", "b"])` conditional fan-out
 - multiple independent matches, zero matches, and duplicate destinations
-- missing fields, non-bool conditions, mixed `next` lists, unknown destinations, and reserved `result` rejection
+- missing fields, non-bool conditions, mixed `next` lists, unknown destinations, and ordinary reserved `result=Node(...)` rejection
 
 ## 28. Barriers and joins
 
-Status: 🔒
+Status: ✅
 
-What it should test:
+What it tests:
 
-- parallel branches can synchronize before the workflow continues
+- `Join()` collects terminal `result` contributions
+- `Join(run=reducer)` reduces them after workflow-scope completion
+- non-contributing sibling branches are still awaited
+- join reduction becomes `WorkflowRun.result` without adding extra `outputs` entries

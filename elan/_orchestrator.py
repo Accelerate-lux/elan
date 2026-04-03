@@ -1,10 +1,11 @@
 from typing import Any
+from uuid import uuid4
 
 from ._activation import Activation
 from ._binding import bind_output
 from ._branch import Branch
 from ._resolution import resolve_node
-from ._routing import resolve_linear_next
+from ._routing import resolve_next_targets
 from ._run_state import RunState
 from ._scheduler import Scheduler
 from .node import Node
@@ -46,45 +47,84 @@ class Orchestrator:
                     )
 
             self._record_output(settled)
-            next_activation = self._progress_branch(settled)
-            if next_activation is not None:
+            next_activations = self._progress_branch(settled)
+            for next_activation in next_activations:
                 scheduler.enqueue(next_activation)
 
     def _progress_branch(
         self,
         settled: Activation,
-    ) -> Activation | None:
+    ) -> list[Activation]:
         branch = self.run_state.branches[settled.branch_id]
-        next_target = resolve_linear_next(
-            self.run_state.workflow.name,
-            settled.node.next,
-            self.run_state.graph.nodes,
-        )
-        if next_target is None:
-            return None
+        emitted_value = bind_output(settled.node.bind_output, settled.output)
 
-        next_name, _next_node = next_target
-        next_input = bind_output(settled.node.bind_output, settled.output)
-        branch.advance_to(next_name)
-        return self._create_activation(
-            branch,
-            input_value=next_input,
+        if isinstance(settled.node.next, (dict, list)):
+            self.run_state.used_branching = True
+
+        if isinstance(settled.node.next, list) and "result" in self.run_state.graph.nodes:
+            raise NotImplementedError(
+                "Fan-out with reserved result is not implemented before Join."
+            )
+
+        next_targets = resolve_next_targets(
+            self.run_state.workflow.name,
+            next_value=settled.node.next,
+            route_on=settled.node.route_on,
+            emitted_value=emitted_value,
+            nodes=self.run_state.graph.nodes,
         )
+        if not next_targets:
+            return []
+
+        if isinstance(settled.node.next, str):
+            next_name, _next_node = next_targets[0]
+            branch.advance_to(next_name)
+            return [
+                self._create_activation(
+                    branch,
+                    input_value=emitted_value,
+                )
+            ]
+
+        if isinstance(settled.node.next, dict):
+            next_name, _next_node = next_targets[0]
+            branch.advance_to(next_name)
+            return [
+                self._create_activation(
+                    branch,
+                    input_value=emitted_value,
+                )
+            ]
+
+        activations: list[Activation] = []
+        for next_name, _next_node in next_targets:
+            child_branch = self._create_branch(
+                current_node_name=next_name,
+                is_entry=False,
+            )
+            activations.append(
+                self._create_activation(
+                    child_branch,
+                    input_value=emitted_value,
+                )
+            )
+        return activations
 
     def _record_output(
         self,
         activation: Activation,
     ) -> None:
         self.run_state.last_output = activation.output
-        self.run_state.outputs.setdefault(activation.node.run.name, []).append(
-            activation.output
-        )
+        branch_outputs = self.run_state.outputs.setdefault(activation.branch_id, {})
+        branch_outputs.setdefault(activation.node.run.name, []).append(activation.output)
         if activation.node_name == "result":
             self.run_state.result = activation.output
 
     def _final_result(self) -> Any:
         if self.run_state.result is not None:
             return self.run_state.result
+        if self.run_state.used_branching:
+            return None
         return self.run_state.last_output
 
     def _create_activation(
@@ -93,9 +133,8 @@ class Orchestrator:
         *,
         input_value: Any,
     ) -> Activation:
-        self.run_state._activation_counter += 1
         activation = Activation(
-            id=f"activation-{self.run_state._activation_counter}",
+            id=f"activation-{uuid4()}",
             branch_id=branch.id,
             node_name=branch.current_node_name,
             node=resolve_node(
@@ -114,9 +153,8 @@ class Orchestrator:
         current_node_name: str | None,
         is_entry: bool,
     ) -> Branch:
-        self.run_state._branch_counter += 1
         branch = Branch(
-            id=f"branch-{self.run_state._branch_counter}",
+            id=f"branch-{uuid4()}",
             current_node_name=current_node_name,
             _is_entry=is_entry,
         )

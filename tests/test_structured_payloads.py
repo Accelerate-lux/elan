@@ -20,7 +20,7 @@ class RegisteredUserPayload(BaseModel):
 
 
 @pytest.mark.asyncio
-async def test_run_workflow_pydantic_payload_auto_unpack(mock_task_factory):
+async def test_run_workflow_pydantic_payload_auto_unpack(mock_task_factory, branch_id):
     def _prepare() -> UserPayload:
         return UserPayload(name="world", age=32)
 
@@ -42,13 +42,15 @@ async def test_run_workflow_pydantic_payload_auto_unpack(mock_task_factory):
     greet.mock.assert_called_once_with(name="world")
     assert run.result == "Hello, world!"
     assert run.outputs == {
-        "_prepare": [UserPayload(name="world", age=32)],
-        "_greet": ["Hello, world!"],
+        branch_id[0]: {
+            "_prepare": [UserPayload(name="world", age=32)],
+            "_greet": ["Hello, world!"],
+        }
     }
 
 
 @pytest.mark.asyncio
-async def test_run_workflow_pydantic_payload_ignores_extra_fields(mock_task_factory):
+async def test_run_workflow_pydantic_payload_ignores_extra_fields(mock_task_factory, branch_id):
     def _prepare() -> UserPayload:
         return UserPayload(name="world", age=32)
 
@@ -70,8 +72,10 @@ async def test_run_workflow_pydantic_payload_ignores_extra_fields(mock_task_fact
     greet.mock.assert_called_once_with(name="world")
     assert run.result == "Hello, world!"
     assert run.outputs == {
-        "_prepare": [UserPayload(name="world", age=32)],
-        "_greet": ["Hello, world!"],
+        branch_id[0]: {
+            "_prepare": [UserPayload(name="world", age=32)],
+            "_greet": ["Hello, world!"],
+        }
     }
 
 
@@ -97,7 +101,7 @@ async def test_run_workflow_pydantic_payload_missing_required_field(mock_task_fa
 
 
 @pytest.mark.asyncio
-async def test_run_workflow_pydantic_payload_pass_through(mock_task_factory):
+async def test_run_workflow_pydantic_payload_pass_through(mock_task_factory, branch_id):
     def _prepare() -> UserPayload:
         return UserPayload(name="world", age=32)
 
@@ -119,8 +123,10 @@ async def test_run_workflow_pydantic_payload_pass_through(mock_task_factory):
     greet.mock.assert_called_once_with(UserPayload(name="world", age=32))
     assert run.result == "Hello, world!"
     assert run.outputs == {
-        "_prepare": [UserPayload(name="world", age=32)],
-        "_greet": ["Hello, world!"],
+        branch_id[0]: {
+            "_prepare": [UserPayload(name="world", age=32)],
+            "_greet": ["Hello, world!"],
+        }
     }
 
 
@@ -201,3 +207,4 @@ async def test_run_workflow_registered_model_field_ref_requires_source_namespace
         match="cannot be used as a binding source without Upstream/Input/Context",
     ):
         await workflow.run()
+

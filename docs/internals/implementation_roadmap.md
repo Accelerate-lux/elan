@@ -11,7 +11,7 @@ The current runtime foundation is sufficient to stop refactoring internals and s
 - `GraphState` is the run-local graph surface needed for later expansion
 - `WorkflowRun` now exposes:
   - `result`: exported result, or terminal fallback
-  - `outputs`: execution log grouped by task name
+  - `outputs`: execution log grouped by branch id and task name
 
 From here, all work proceeds feature-by-feature in interface order, with each feature implemented through a red/green/refactor loop and grounded in the current runtime objects rather than adding logic back into `Workflow`.
 

@@ -5,7 +5,7 @@ from elan import Context, Input, Node, Upstream, Workflow, ref
 
 
 @pytest.mark.asyncio
-async def test_run_workflow_two_tasks_mapped_output(mock_task_factory):
+async def test_run_workflow_two_tasks_mapped_output(mock_task_factory, branch_id):
     def _prepare():
         return "world"
 
@@ -27,13 +27,15 @@ async def test_run_workflow_two_tasks_mapped_output(mock_task_factory):
     greet.mock.assert_called_once_with(name="world")
     assert run.result == "Hello, world!"
     assert run.outputs == {
-        "_prepare": ["world"],
-        "_greet": ["Hello, world!"],
+        branch_id[0]: {
+            "_prepare": ["world"],
+            "_greet": ["Hello, world!"],
+        }
     }
 
 
 @pytest.mark.asyncio
-async def test_run_workflow_two_tasks_discard_output(mock_task_factory):
+async def test_run_workflow_two_tasks_discard_output(mock_task_factory, branch_id):
     def _prepare():
         return "ignored", "world"
 
@@ -55,13 +57,15 @@ async def test_run_workflow_two_tasks_discard_output(mock_task_factory):
     greet.mock.assert_called_once_with(name="world")
     assert run.result == "Hello, world!"
     assert run.outputs == {
-        "_prepare": [("ignored", "world")],
-        "_greet": ["Hello, world!"],
+        branch_id[0]: {
+            "_prepare": [("ignored", "world")],
+            "_greet": ["Hello, world!"],
+        }
     }
 
 
 @pytest.mark.asyncio
-async def test_run_workflow_tuple_output(mock_task_factory):
+async def test_run_workflow_tuple_output(mock_task_factory, branch_id):
     def _prepare():
         return "hello", "world"
 
@@ -83,8 +87,10 @@ async def test_run_workflow_tuple_output(mock_task_factory):
     greet.mock.assert_called_once_with("hello", "world")
     assert run.result == "Hello, world!"
     assert run.outputs == {
-        "_prepare": [("hello", "world")],
-        "_greet": ["Hello, world!"],
+        branch_id[0]: {
+            "_prepare": [("hello", "world")],
+            "_greet": ["Hello, world!"],
+        }
     }
 
 
@@ -131,7 +137,7 @@ async def test_run_workflow_tuple_output_type_mismatch(mock_task_factory):
 
 
 @pytest.mark.asyncio
-async def test_run_workflow_list_output_is_opaque(mock_task_factory):
+async def test_run_workflow_list_output_is_opaque(mock_task_factory, branch_id):
     def _prepare():
         return ["hello", "world"]
 
@@ -153,13 +159,15 @@ async def test_run_workflow_list_output_is_opaque(mock_task_factory):
     greet.mock.assert_called_once_with(["hello", "world"])
     assert run.result == "Hello, world!"
     assert run.outputs == {
-        "_prepare": [["hello", "world"]],
-        "_greet": ["Hello, world!"],
+        branch_id[0]: {
+            "_prepare": [["hello", "world"]],
+            "_greet": ["Hello, world!"],
+        }
     }
 
 
 @pytest.mark.asyncio
-async def test_run_workflow_raw_dict_output_is_opaque(mock_task_factory):
+async def test_run_workflow_raw_dict_output_is_opaque(mock_task_factory, branch_id):
     def _prepare():
         return {"name": "world"}
 
@@ -181,8 +189,10 @@ async def test_run_workflow_raw_dict_output_is_opaque(mock_task_factory):
     greet.mock.assert_called_once_with({"name": "world"})
     assert run.result == "Hello, world!"
     assert run.outputs == {
-        "_prepare": [{"name": "world"}],
-        "_greet": ["Hello, world!"],
+        branch_id[0]: {
+            "_prepare": [{"name": "world"}],
+            "_greet": ["Hello, world!"],
+        }
     }
 
 
@@ -491,3 +501,4 @@ async def test_run_workflow_context_ref_missing_field(mock_task_factory):
 
     with pytest.raises(TypeError, match="Context does not provide field 'missing'"):
         await workflow.run()
+

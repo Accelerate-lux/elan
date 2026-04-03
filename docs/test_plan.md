@@ -30,7 +30,7 @@ This phase covers workflow context models, `Node.context`, `after.context`, merg
 
 ### Phase 5. Routing And Branching
 
-This phase covers exclusive branching, conditional multi-routing, branch creation rules, route validation, `route_on`, `When(...)`, and the scoped behavior of sibling branches after routing decisions.
+This phase covers first-pass exclusive branching, first-pass fan-out, branch creation rules, route validation, string-only `route_on`, and the scoped behavior of sibling branches after routing decisions. `When(...)` and ref-based `route_on` stay deferred.
 
 ### Phase 6. Yield Fan-Out And Branch Completion
 
@@ -73,7 +73,7 @@ What it tests:
 
 - a registered async task can be used directly as a workflow start node
 - `Workflow.run()` executes it successfully
-- `WorkflowRun.outputs` stores the task output under the task name
+- `WorkflowRun.outputs` stores the task output under the initial branch id and task name
 
 ## 2. One sync task workflow
 
@@ -95,7 +95,7 @@ What it tests:
 
 - a workflow can chain one task to another through `next`
 - a scalar output binds automatically to one downstream parameter
-- `WorkflowRun.outputs` contains outputs for both tasks
+- `WorkflowRun.outputs` contains outputs for both tasks under the initial branch id
 
 ## 4. Two-task workflow with explicit output mapping
 
@@ -300,20 +300,27 @@ What it tests:
 
 ## 25. Branching with `next` as `dict`
 
-Status: 🔒
+Status: ✅  
+Source: [tests/test_routing_and_branching.py](/C:/Users/Hugod/Workspace/elan/tests/test_routing_and_branching.py)
 
-What it should test:
+What it tests:
 
-- one node can route to one of several downstream branches
+- one node can route to one downstream branch from a named adapter payload
+- one node can route to one downstream branch from a raw `dict`
+- missing `route_on`, missing selector fields, unmapped values, and unknown targets fail clearly
 
 ## 26. Fan-out with `next` as `list`
 
-Status: 🔒
+Status: ✅  
+Source: [tests/test_routing_and_branching.py](/C:/Users/Hugod/Workspace/elan/tests/test_routing_and_branching.py)
 
-What it should test:
+What it tests:
 
 - one node can schedule multiple downstream branches
-- workflow completion waits for all active branches
+- sibling branches receive duplicated downstream payload
+- outputs are grouped under distinct branch ids
+- fan-out without reserved `result` returns `None`
+- fan-out with reserved `result` is rejected until `Join` exists
 
 ## 27. Barriers and joins
 

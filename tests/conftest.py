@@ -8,15 +8,18 @@ import pytest
 from elan import task
 
 task_module = importlib.import_module("elan.task")
+refs_module = importlib.import_module("elan._refs")
 
 
 @pytest.fixture(autouse=True)
 def clear_task_registry():
     task_module._TASKS_BY_KEY.clear()
     task_module._TASKS_BY_ALIAS.clear()
+    refs_module._REFS_BY_NAME.clear()
     yield
     task_module._TASKS_BY_KEY.clear()
     task_module._TASKS_BY_ALIAS.clear()
+    refs_module._REFS_BY_NAME.clear()
 
 
 @pytest.fixture()

@@ -8,51 +8,46 @@ from .node import Node
 from .task import Task
 from .when import When
 
+ResolvedTarget = tuple[str, Task | str | Node]
+ResolvedNext = ResolvedTarget | list[ResolvedTarget] | None
 
-def is_string_target_list(next_value: Any) -> bool:
+
+def is_target_producer_list(next_value: Any) -> bool:
     return isinstance(next_value, list) and all(
-        isinstance(target, str) for target in next_value
-    )
-
-
-def is_when_list(next_value: Any) -> bool:
-    return isinstance(next_value, list) and all(
-        isinstance(target, When) for target in next_value
+        isinstance(target, (str, When)) for target in next_value
     )
 
 
 def resolve_next_targets(
     workflow_name: str,
     *,
-    next_value: str | list[str] | list[When] | dict[str, str] | None,
-    route_on: str | None,
+    next_value: str | list[str | When] | dict[str, str] | None,
+    route_on: str | ModelFieldRef | None,
     emitted_value: Any,
     nodes: dict[str, Task | str | Node],
-) -> list[tuple[str, Task | str | Node]]:
+) -> ResolvedNext:
     if next_value is None:
-        return []
+        return None
 
     if isinstance(next_value, str):
-        return [_resolve_target(workflow_name, next_value, nodes)]
+        return _resolve_target(workflow_name, next_value, nodes)
 
-    if is_string_target_list(next_value):
-        return [
-            _resolve_target(workflow_name, target_name, nodes)
-            for target_name in next_value
-        ]
-
-    if is_when_list(next_value):
+    if is_target_producer_list(next_value):
         targets: list[tuple[str, Task | str | Node]] = []
-        for when in next_value:
+        for target in next_value:
+            if isinstance(target, str):
+                targets.append(_resolve_target(workflow_name, target, nodes))
+                continue
+
             if _resolve_when_condition(
                 workflow_name,
-                condition=when.condition,
+                condition=target.condition,
                 value=emitted_value,
             ):
                 targets.extend(
                     _resolve_when_target(
                         workflow_name,
-                        target=when.target,
+                        target=target.target,
                         nodes=nodes,
                     )
                 )
@@ -60,7 +55,7 @@ def resolve_next_targets(
 
     if isinstance(next_value, list):
         raise TypeError(
-            f"Workflow '{workflow_name}' cannot mix raw node ids and When(...) in the same next list."
+            f"Workflow '{workflow_name}' uses an unsupported next list entry type."
         )
 
     if isinstance(next_value, dict):
@@ -79,7 +74,7 @@ def resolve_next_targets(
                 f"Workflow '{workflow_name}' does not define a route for value {route_value!r}."
             )
 
-        return [_resolve_target(workflow_name, next_value[route_value], nodes)]
+        return _resolve_target(workflow_name, next_value[route_value], nodes)
 
     raise NotImplementedError(
         "Only string, list, dict, and When(...) routing are implemented in the current runtime."
@@ -107,9 +102,16 @@ def _resolve_target(
 def _resolve_route_value(
     workflow_name: str,
     *,
-    field_name: str,
+    field_name: str | ModelFieldRef,
     value: Any,
 ) -> Any:
+    if isinstance(field_name, ModelFieldRef):
+        return _resolve_model_route_value(
+            workflow_name,
+            ref=field_name,
+            value=value,
+        )
+
     if isinstance(value, _MappedPayload):
         if field_name not in value.values:
             raise TypeError(
@@ -127,6 +129,32 @@ def _resolve_route_value(
     raise TypeError(
         f"Workflow '{workflow_name}' cannot use route_on='{field_name}' with value of type {type(value).__name__}."
     )
+
+
+def _resolve_model_route_value(
+    workflow_name: str,
+    *,
+    ref: ModelFieldRef,
+    value: Any,
+) -> Any:
+    if not isinstance(value, BaseModel):
+        raise TypeError(
+            f"Workflow '{workflow_name}' cannot use route_on='{ref.model.__name__}.{ref.field_name}' "
+            f"with value of type {type(value).__name__}."
+        )
+
+    if not isinstance(value, ref.model):
+        raise TypeError(
+            f"Workflow '{workflow_name}' cannot use route_on='{ref.model.__name__}.{ref.field_name}' "
+            f"with model value of type {type(value).__name__}."
+        )
+
+    if ref.field_name not in ref.model.model_fields:
+        raise TypeError(
+            f"Workflow '{workflow_name}' route source does not provide field '{ref.field_name}'."
+        )
+
+    return getattr(value, ref.field_name)
 
 
 def _resolve_when_condition(

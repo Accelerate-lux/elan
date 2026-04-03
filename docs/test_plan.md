@@ -30,7 +30,7 @@ This phase covers workflow context models, `Node.context`, `after.context`, merg
 
 ### Phase 5. Routing And Branching
 
-This phase covers first-pass exclusive branching, first-pass fan-out, first-pass `When(...)` conditional multi-routing, branch creation rules, route validation, string-only `route_on`, and the scoped behavior of sibling branches after routing decisions. Ref-based `route_on` stays deferred.
+This phase covers first-pass exclusive branching, first-pass fan-out, first-pass `When(...)` conditional multi-routing, mixed `next=[str | When, ...]` target-producer lists, branch creation rules, route validation, string and ref-based `route_on`, and the scoped behavior of sibling branches after routing decisions.
 
 ### Phase 6. Yield Fan-Out And Branch Completion
 
@@ -307,7 +307,8 @@ What it tests:
 
 - one node can route to one downstream branch from a named adapter payload
 - one node can route to one downstream branch from a raw `dict`
-- missing `route_on`, missing selector fields, unmapped values, and unknown targets fail clearly
+- one node can route to one downstream branch from a registered `@ref` model output
+- missing `route_on`, missing selector fields, wrong model types, unmapped values, and unknown targets fail clearly
 
 ## 26. Fan-out with `next` as `list`
 

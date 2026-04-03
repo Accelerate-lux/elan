@@ -119,7 +119,7 @@ Defines a configured task node.
 Supported fields:
 
 - `run: Task | str`
-- `next` as `str | list[str] | list[When] | dict[str, str]`
+- `next` as `str | list[str | When] | dict[str, str]`
 - `bind_input`
 - `bind_output`
 - `route_on`
@@ -184,19 +184,25 @@ Between nodes, Elan binds values using these rules:
 The current runtime supports three branching forms:
 
 - `next={"formal": "greet_formal", "casual": "greet_casual"}` with `route_on="style"`
+- `next={"formal": "greet_formal", "casual": "greet_casual"}` with `route_on=RoutePayload.style`
 - `next=["a", "b"]` for fan-out
 - `next=[When("should_email", "send_email"), When(RoutePayload.should_ticket, ["open_ticket", "audit"])]`
 
-`route_on` is string-only in the current runtime. For mapping-based branching, Elan reads the route selector from:
+Inside `next=[...]`, plain node ids and `When(...)` entries may be mixed. The list is evaluated left to right as a sequence of target producers.
 
-- named adapter payloads created by `bind_output`
-- raw `dict` outputs
+For mapping-based branching, Elan reads the route selector from:
+
+- named adapter payloads created by `bind_output` when `route_on` is a string
+- raw `dict` outputs when `route_on` is a string
+- registered `@ref` model outputs when `route_on` is a ref field like `RoutePayload.style`
 
 For `When(...)`:
 
 - string conditions read from named adapter payloads and raw `dict` outputs
 - ref-field conditions read from registered `@ref` model instances only
 - conditions must resolve to `bool`
+
+Ref-based `route_on` currently applies to exclusive branching with `next={...}` only.
 
 If a workflow uses branching forms and does not define the reserved `result` node, `WorkflowRun.result` is `None`.
 

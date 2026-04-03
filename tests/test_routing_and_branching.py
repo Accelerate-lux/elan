@@ -8,6 +8,7 @@ from elan._refs import ModelFieldRef
 @ref
 class RoutePayload(BaseModel):
     name: str
+    style: str
     should_email: bool
     should_notify: bool
 
@@ -15,7 +16,12 @@ class RoutePayload(BaseModel):
 @ref
 class OtherRoutePayload(BaseModel):
     name: str
+    style: str
     should_email: bool
+
+
+class SubRoutePayload(RoutePayload):
+    pass
 
 
 @pytest.mark.asyncio
@@ -106,6 +112,113 @@ async def test_run_workflow_exclusive_branch_from_raw_dict(mock_task_factory, br
 
 
 @pytest.mark.asyncio
+async def test_run_workflow_exclusive_branch_from_registered_ref_model(
+    mock_task_factory,
+    branch_id,
+):
+    def _prepare() -> RoutePayload:
+        return RoutePayload(
+            name="world",
+            style="formal",
+            should_email=True,
+            should_notify=False,
+        )
+
+    async def _greet_formal(payload: RoutePayload):
+        return f"Hello, {payload.name}."
+
+    async def _greet_casual(payload: RoutePayload):
+        return f"Hey {payload.name}!"
+
+    prepare = mock_task_factory(_prepare)
+    greet_formal = mock_task_factory(_greet_formal)
+    greet_casual = mock_task_factory(_greet_casual)
+
+    workflow = Workflow(
+        "branching_greet",
+        start=Node(
+            run=prepare,
+            route_on=RoutePayload.style,
+            next={
+                "formal": "greet_formal",
+                "casual": "greet_casual",
+            },
+        ),
+        greet_formal=greet_formal,
+        greet_casual=greet_casual,
+    )
+
+    run = await workflow.run()
+
+    prepare.mock.assert_called_once_with()
+    greet_formal.mock.assert_called_once()
+    greet_casual.mock.assert_not_called()
+    assert run.result is None
+    assert run.outputs == {
+        branch_id[0]: {
+            "_prepare": [
+                RoutePayload(
+                    name="world",
+                    style="formal",
+                    should_email=True,
+                    should_notify=False,
+                )
+            ],
+            "_greet_formal": ["Hello, world."],
+        }
+    }
+
+
+@pytest.mark.asyncio
+async def test_run_workflow_exclusive_branch_accepts_ref_model_subclass(
+    mock_task_factory,
+    branch_id,
+):
+    def _prepare() -> SubRoutePayload:
+        return SubRoutePayload(
+            name="world",
+            style="formal",
+            should_email=True,
+            should_notify=False,
+        )
+
+    async def _greet_formal(payload: RoutePayload):
+        return f"Hello, {payload.name}."
+
+    prepare = mock_task_factory(_prepare)
+    greet_formal = mock_task_factory(_greet_formal)
+
+    workflow = Workflow(
+        "branching_greet",
+        start=Node(
+            run=prepare,
+            route_on=RoutePayload.style,
+            next={"formal": "greet_formal"},
+        ),
+        greet_formal=greet_formal,
+    )
+
+    run = await workflow.run()
+
+    prepare.mock.assert_called_once_with()
+    greet_formal.mock.assert_called_once()
+    assert run.result is None
+    assert run.outputs == {
+        branch_id[0]: {
+            "_prepare": [
+                SubRoutePayload(
+                    name="world",
+                    style="formal",
+                    should_email=True,
+                    should_notify=False,
+                )
+            ],
+            "_greet_formal": ["Hello, world."],
+        }
+    }
+
+
+@pytest.mark.asyncio
 async def test_run_workflow_when_from_named_payload(mock_task_factory, branch_id):
     def _prepare():
         return "world", True
@@ -179,7 +292,12 @@ async def test_run_workflow_when_from_raw_dict(mock_task_factory, branch_id):
 @pytest.mark.asyncio
 async def test_run_workflow_when_from_registered_ref_model(mock_task_factory, branch_id):
     def _prepare() -> RoutePayload:
-        return RoutePayload(name="world", should_email=True, should_notify=False)
+        return RoutePayload(
+            name="world",
+            style="formal",
+            should_email=True,
+            should_notify=False,
+        )
 
     async def _send_email(name: str):
         return f"email:{name}"
@@ -203,7 +321,12 @@ async def test_run_workflow_when_from_registered_ref_model(mock_task_factory, br
     assert run.outputs == {
         branch_id[0]: {
             "_prepare": [
-                RoutePayload(name="world", should_email=True, should_notify=False)
+                RoutePayload(
+                    name="world",
+                    style="formal",
+                    should_email=True,
+                    should_notify=False,
+                )
             ],
         },
         branch_id[1]: {
@@ -259,7 +382,12 @@ async def test_run_workflow_when_list_target(mock_task_factory, branch_id):
 @pytest.mark.asyncio
 async def test_run_workflow_multiple_when_matches(mock_task_factory, branch_id):
     def _prepare() -> RoutePayload:
-        return RoutePayload(name="world", should_email=True, should_notify=True)
+        return RoutePayload(
+            name="world",
+            style="formal",
+            should_email=True,
+            should_notify=True,
+        )
 
     async def _send_email(name: str):
         return f"email:{name}"
@@ -292,7 +420,12 @@ async def test_run_workflow_multiple_when_matches(mock_task_factory, branch_id):
     assert run.outputs == {
         branch_id[0]: {
             "_prepare": [
-                RoutePayload(name="world", should_email=True, should_notify=True)
+                RoutePayload(
+                    name="world",
+                    style="formal",
+                    should_email=True,
+                    should_notify=True,
+                )
             ],
         },
         branch_id[1]: {
@@ -406,6 +539,99 @@ async def test_run_workflow_missing_route_on_fails_clearly(mock_task_factory):
 
 
 @pytest.mark.asyncio
+async def test_run_workflow_route_on_ref_non_model_value_fails_clearly(
+    mock_task_factory,
+):
+    def _prepare():
+        return "world", "formal"
+
+    async def _greet_formal(name: str):
+        return f"Hello, {name}."
+
+    prepare = mock_task_factory(_prepare)
+    greet_formal = mock_task_factory(_greet_formal)
+
+    workflow = Workflow(
+        "branching_greet",
+        start=Node(
+            run=prepare,
+            bind_output=["name", "style"],
+            route_on=RoutePayload.style,
+            next={"formal": "greet_formal"},
+        ),
+        greet_formal=greet_formal,
+    )
+
+    with pytest.raises(
+        TypeError,
+        match="cannot use route_on='RoutePayload.style' with value of type _MappedPayload",
+    ):
+        await workflow.run()
+
+
+@pytest.mark.asyncio
+async def test_run_workflow_route_on_ref_wrong_model_type_fails_clearly(
+    mock_task_factory,
+):
+    def _prepare() -> OtherRoutePayload:
+        return OtherRoutePayload(name="world", style="formal", should_email=True)
+
+    async def _greet_formal(payload: RoutePayload):
+        return f"Hello, {payload.name}."
+
+    prepare = mock_task_factory(_prepare)
+    greet_formal = mock_task_factory(_greet_formal)
+
+    workflow = Workflow(
+        "branching_greet",
+        start=Node(
+            run=prepare,
+            route_on=RoutePayload.style,
+            next={"formal": "greet_formal"},
+        ),
+        greet_formal=greet_formal,
+    )
+
+    with pytest.raises(
+        TypeError,
+        match="cannot use route_on='RoutePayload.style' with model value of type OtherRoutePayload",
+    ):
+        await workflow.run()
+
+
+@pytest.mark.asyncio
+async def test_run_workflow_route_on_ref_missing_field_fails_clearly(
+    mock_task_factory,
+):
+    def _prepare() -> RoutePayload:
+        return RoutePayload(
+            name="world",
+            style="formal",
+            should_email=True,
+            should_notify=False,
+        )
+
+    async def _greet_formal(payload: RoutePayload):
+        return f"Hello, {payload.name}."
+
+    prepare = mock_task_factory(_prepare)
+    greet_formal = mock_task_factory(_greet_formal)
+
+    workflow = Workflow(
+        "branching_greet",
+        start=Node(
+            run=prepare,
+            route_on=ModelFieldRef(model=RoutePayload, field_name="missing"),
+            next={"formal": "greet_formal"},
+        ),
+        greet_formal=greet_formal,
+    )
+
+    with pytest.raises(TypeError, match="route source does not provide field 'missing'"):
+        await workflow.run()
+
+
+@pytest.mark.asyncio
 async def test_run_workflow_route_on_missing_field_fails_clearly(mock_task_factory):
     def _prepare():
         return "world"
@@ -463,7 +689,12 @@ async def test_run_workflow_when_missing_ref_condition_field_fails_clearly(
     mock_task_factory,
 ):
     def _prepare() -> RoutePayload:
-        return RoutePayload(name="world", should_email=True, should_notify=False)
+        return RoutePayload(
+            name="world",
+            style="formal",
+            should_email=True,
+            should_notify=False,
+        )
 
     async def _send_email(name: str):
         return f"email:{name}"
@@ -501,6 +732,36 @@ async def test_run_workflow_route_on_unmapped_value_fails_clearly(mock_task_fact
             run=prepare,
             bind_output=["name", "style"],
             route_on="style",
+            next={"formal": "greet_formal"},
+        ),
+        greet_formal=greet_formal,
+    )
+
+    with pytest.raises(KeyError, match="does not define a route for value 'unknown'"):
+        await workflow.run()
+
+
+@pytest.mark.asyncio
+async def test_run_workflow_route_on_ref_unmapped_value_fails_clearly(mock_task_factory):
+    def _prepare() -> RoutePayload:
+        return RoutePayload(
+            name="world",
+            style="unknown",
+            should_email=True,
+            should_notify=False,
+        )
+
+    async def _greet_formal(payload: RoutePayload):
+        return f"Hello, {payload.name}."
+
+    prepare = mock_task_factory(_prepare)
+    greet_formal = mock_task_factory(_greet_formal)
+
+    workflow = Workflow(
+        "branching_greet",
+        start=Node(
+            run=prepare,
+            route_on=RoutePayload.style,
             next={"formal": "greet_formal"},
         ),
         greet_formal=greet_formal,
@@ -557,6 +818,33 @@ async def test_run_workflow_branch_mapping_unknown_node_fails_clearly(mock_task_
 
 
 @pytest.mark.asyncio
+async def test_run_workflow_route_on_ref_unknown_target_node_fails_clearly(
+    mock_task_factory,
+):
+    def _prepare() -> RoutePayload:
+        return RoutePayload(
+            name="world",
+            style="formal",
+            should_email=True,
+            should_notify=False,
+        )
+
+    prepare = mock_task_factory(_prepare)
+
+    workflow = Workflow(
+        "branching_greet",
+        start=Node(
+            run=prepare,
+            route_on=RoutePayload.style,
+            next={"formal": "missing"},
+        ),
+    )
+
+    with pytest.raises(KeyError, match="references unknown node 'missing'"):
+        await workflow.run()
+
+
+@pytest.mark.asyncio
 async def test_run_workflow_when_unknown_destination_node_fails_clearly(
     mock_task_factory,
 ):
@@ -579,7 +867,10 @@ async def test_run_workflow_when_unknown_destination_node_fails_clearly(
 
 
 @pytest.mark.asyncio
-async def test_run_workflow_mixed_next_list_fails_clearly(mock_task_factory):
+async def test_run_workflow_mixed_next_list_is_evaluated_in_order(
+    mock_task_factory,
+    branch_id,
+):
     def _prepare():
         return "world", True
 
@@ -593,7 +884,7 @@ async def test_run_workflow_mixed_next_list_fails_clearly(mock_task_factory):
     send_email = mock_task_factory(_send_email)
     notify = mock_task_factory(_notify)
 
-    workflow = Workflow(
+    run = await Workflow(
         "conditional_routes",
         start=Node(
             run=prepare,
@@ -602,10 +893,22 @@ async def test_run_workflow_mixed_next_list_fails_clearly(mock_task_factory):
         ),
         send_email=send_email,
         notify=notify,
-    )
+    ).run()
 
-    with pytest.raises(TypeError, match="cannot mix raw node ids and When"):
-        await workflow.run()
+    send_email.mock.assert_called_once_with(name="world")
+    notify.mock.assert_called_once_with(name="world")
+    assert run.result is None
+    assert run.outputs == {
+        branch_id[0]: {
+            "_prepare": [("world", True)],
+        },
+        branch_id[1]: {
+            "_send_email": ["email:world"],
+        },
+        branch_id[2]: {
+            "_notify": ["notify:world"],
+        },
+    }
 
 
 @pytest.mark.asyncio
@@ -679,7 +982,7 @@ async def test_run_workflow_fan_out_with_reserved_result_is_invalid(mock_task_fa
         result=Node(run=identity),
     )
 
-    with pytest.raises(NotImplementedError, match="Fan-out with reserved result"):
+    with pytest.raises(NotImplementedError, match="List-based branching with reserved result"):
         await workflow.run()
 
 
@@ -711,7 +1014,7 @@ async def test_run_workflow_when_with_reserved_result_is_invalid(mock_task_facto
 
     with pytest.raises(
         NotImplementedError,
-        match="Conditional multi-routing with reserved result",
+        match="List-based branching with reserved result",
     ):
         await workflow.run()
 
@@ -721,7 +1024,7 @@ async def test_run_workflow_when_ref_condition_wrong_model_type_fails_clearly(
     mock_task_factory,
 ):
     def _prepare() -> OtherRoutePayload:
-        return OtherRoutePayload(name="world", should_email=True)
+        return OtherRoutePayload(name="world", style="formal", should_email=True)
 
     async def _send_email(name: str):
         return f"email:{name}"

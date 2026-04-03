@@ -5,7 +5,11 @@ from ._activation import Activation
 from ._binding import bind_output
 from ._branch import Branch
 from ._resolution import resolve_node
-from ._routing import is_string_target_list, is_when_list, resolve_next_targets
+from ._routing import (
+    ResolvedNext,
+    is_target_producer_list,
+    resolve_next_targets,
+)
 from ._run_state import RunState
 from ._scheduler import Scheduler
 from .node import Node
@@ -58,18 +62,12 @@ class Orchestrator:
         branch = self.run_state.branches[settled.branch_id]
         emitted_value = bind_output(settled.node.bind_output, settled.output)
 
-        if isinstance(settled.node.next, dict) or is_string_target_list(
-            settled.node.next
-        ) or is_when_list(settled.node.next):
+        if isinstance(settled.node.next, dict) or is_target_producer_list(settled.node.next):
             self.run_state.used_branching = True
 
-        if is_string_target_list(settled.node.next) and "result" in self.run_state.graph.nodes:
+        if is_target_producer_list(settled.node.next) and "result" in self.run_state.graph.nodes:
             raise NotImplementedError(
-                "Fan-out with reserved result is not implemented before Join."
-            )
-        if is_when_list(settled.node.next) and "result" in self.run_state.graph.nodes:
-            raise NotImplementedError(
-                "Conditional multi-routing with reserved result is not implemented before Join."
+                "List-based branching with reserved result is not implemented before Join."
             )
 
         next_targets = resolve_next_targets(
@@ -79,21 +77,36 @@ class Orchestrator:
             emitted_value=emitted_value,
             nodes=self.run_state.graph.nodes,
         )
-        if not next_targets:
+        return self._create_next_activations(branch, emitted_value, next_targets)
+
+    def _record_output(
+        self,
+        activation: Activation,
+    ) -> None:
+        self.run_state.last_output = activation.output
+        branch_outputs = self.run_state.outputs.setdefault(activation.branch_id, {})
+        branch_outputs.setdefault(activation.node.run.name, []).append(activation.output)
+        if activation.node_name == "result":
+            self.run_state.result = activation.output
+
+    def _final_result(self) -> Any:
+        if self.run_state.result is not None:
+            return self.run_state.result
+        if self.run_state.used_branching:
+            return None
+        return self.run_state.last_output
+
+    def _create_next_activations(
+        self,
+        branch: Branch,
+        emitted_value: Any,
+        next_targets: ResolvedNext,
+    ) -> list[Activation]:
+        if next_targets is None:
             return []
 
-        if isinstance(settled.node.next, str):
-            next_name, _next_node = next_targets[0]
-            branch.advance_to(next_name)
-            return [
-                self._create_activation(
-                    branch,
-                    input_value=emitted_value,
-                )
-            ]
-
-        if isinstance(settled.node.next, dict):
-            next_name, _next_node = next_targets[0]
+        if not isinstance(next_targets, list):
+            next_name, _next_node = next_targets
             branch.advance_to(next_name)
             return [
                 self._create_activation(
@@ -115,23 +128,6 @@ class Orchestrator:
                 )
             )
         return activations
-
-    def _record_output(
-        self,
-        activation: Activation,
-    ) -> None:
-        self.run_state.last_output = activation.output
-        branch_outputs = self.run_state.outputs.setdefault(activation.branch_id, {})
-        branch_outputs.setdefault(activation.node.run.name, []).append(activation.output)
-        if activation.node_name == "result":
-            self.run_state.result = activation.output
-
-    def _final_result(self) -> Any:
-        if self.run_state.result is not None:
-            return self.run_state.result
-        if self.run_state.used_branching:
-            return None
-        return self.run_state.last_output
 
     def _create_activation(
         self,

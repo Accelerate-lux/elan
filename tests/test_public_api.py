@@ -76,6 +76,12 @@ class NotificationRoute(BaseModel):
     should_ticket: bool
 
 
+@ref
+class GreetingRoute(BaseModel):
+    name: str
+    style: str
+
+
 @pytest.mark.asyncio
 async def test_ref_backed_binding(mock_task_factory, branch_id):
     def _prepare() -> GreetingRefPayload:
@@ -161,6 +167,47 @@ async def test_exclusive_branching_with_reserved_result(mock_task_factory, branc
             "_prepare": [("world", "formal")],
             "_greet_formal": ["Hello, world."],
             "_identity": ["Hello, world."],
+        }
+    }
+
+
+@pytest.mark.asyncio
+async def test_ref_based_exclusive_branching(mock_task_factory, branch_id):
+    def _prepare() -> GreetingRoute:
+        return GreetingRoute(name="world", style="formal")
+
+    async def _greet_formal(payload: GreetingRoute):
+        return f"Hello, {payload.name}."
+
+    async def _greet_casual(payload: GreetingRoute):
+        return f"Hey {payload.name}!"
+
+    prepare = mock_task_factory(_prepare)
+    greet_formal = mock_task_factory(_greet_formal)
+    greet_casual = mock_task_factory(_greet_casual)
+
+    run = await Workflow(
+        "branching_greet",
+        start=Node(
+            run=prepare,
+            route_on=GreetingRoute.style,
+            next={
+                "formal": "greet_formal",
+                "casual": "greet_casual",
+            },
+        ),
+        greet_formal=greet_formal,
+        greet_casual=greet_casual,
+    ).run()
+
+    prepare.mock.assert_called_once_with()
+    greet_formal.mock.assert_called_once()
+    greet_casual.mock.assert_not_called()
+    assert run.result is None
+    assert run.outputs == {
+        branch_id[0]: {
+            "_prepare": [GreetingRoute(name="world", style="formal")],
+            "_greet_formal": ["Hello, world."],
         }
     }
 

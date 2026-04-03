@@ -496,6 +496,39 @@ workflow = Workflow(
 )
 ```
 
+If the task returns a registered ref model, the selector may also come from a ref field:
+
+```python
+from pydantic import BaseModel
+from elan import Node, Workflow, ref, task
+
+
+@ref
+class RoutePayload(BaseModel):
+    name: str
+    style: str
+
+
+@task
+def prepare() -> RoutePayload:
+    return RoutePayload(name="world", style="formal")
+
+
+workflow = Workflow(
+    "branching_greet",
+    start=Node(
+        run=prepare,
+        route_on=RoutePayload.style,
+        next={
+            "formal": "greet_formal",
+            "casual": "greet_casual",
+        },
+    ),
+    greet_formal=greet_formal,
+    greet_casual=greet_casual,
+)
+```
+
 Fan-out uses `next` as a list:
 
 ```python
@@ -560,6 +593,23 @@ workflow = Workflow(
 )
 ```
 
+List-based branching is evaluated left to right. Plain node ids and `When(...)` entries may be mixed in the same `next=[...]` list:
+
+```python
+workflow = Workflow(
+    "conditional_routes",
+    start=Node(
+        run=classify,
+        next=[
+            "audit",
+            When(RoutePayload.should_email, "send_email"),
+        ],
+    ),
+    audit=audit,
+    send_email=send_email,
+)
+```
+
 For branched workflows, `run.outputs` stays branch-aware:
 
 ```python
@@ -584,6 +634,5 @@ For `When(...)`, each entry is evaluated independently. Zero matches is valid, a
 
 These features are still not supported by the runtime:
 
-- ref-based `route_on`
 - sub-workflows
 - barriers and joins

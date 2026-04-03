@@ -1,4 +1,5 @@
 import pytest
+from pydantic import BaseModel
 
 from elan import Node, Workflow, task
 
@@ -32,7 +33,7 @@ async def test_run_workflow_node_resolved_by_canonical_key(mock_task_factory):
 
     workflow = Workflow(
         "greet_world",
-        start=Node(run=prepare.key, output="name", next="greet"),
+        start=Node(run=prepare.key, bind_output="name", next="greet"),
         greet=greet.key,
     )
 
@@ -60,7 +61,7 @@ async def test_run_workflow_resolves_tasks_by_alias(mock_task_factory):
 
     workflow = Workflow(
         "greet_world",
-        start=Node(run="prepare", output="name", next="greet_node"),
+        start=Node(run="prepare", bind_output="name", next="greet_node"),
         greet_node="greet",
     )
 
@@ -108,3 +109,14 @@ async def test_raw_callable_is_rejected():
 
     with pytest.raises(TypeError, match="expects tasks decorated with @task"):
         await workflow.run()
+
+
+def test_context_instance_is_rejected():
+    class RunContext(BaseModel):
+        locale: str = "en"
+
+    with pytest.raises(
+        TypeError,
+        match="Workflow context must be a Pydantic model class or None",
+    ):
+        Workflow("hello_world", start="missing.task", context=RunContext())

@@ -14,7 +14,7 @@ Status:
 
 ### Phase 1. Core Task Execution And Binding
 
-This phase covers the smallest executable workflows: one task, simple chaining, automatic binding, explicit `input` and `output` adaptation, and the base `WorkflowRun` contract.
+This phase covers the smallest executable workflows: one task, simple chaining, automatic binding, explicit `bind_input` and `bind_output` adaptation, and the base `WorkflowRun` contract.
 
 ### Phase 2. Registry And Workflow Declaration
 
@@ -104,7 +104,7 @@ Source: [tests/test_public_api.py](/C:/Users/Hugod/Workspace/elan/tests/test_pub
 
 What it tests:
 
-- `Node.output` can adapt one task output into a named payload
+- `Node.bind_output` can adapt one task output into a named payload
 - the downstream task receives the mapped named argument
 - mapped payloads bind by parameter name
 

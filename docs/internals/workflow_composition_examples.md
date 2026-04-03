@@ -48,7 +48,7 @@ sum_ab = Workflow(
     "sum_ab",
     start=Node(
         run=add,
-        input={
+        bind_input={
             "left": Input.a,
             "right": Input.b,
         },
@@ -56,7 +56,7 @@ sum_ab = Workflow(
     ),
     result=Node(
         run=identity,
-        output="value",
+        bind_output="value",
     ),
 )
 ```
@@ -68,7 +68,7 @@ expr = Workflow(
     "expr",
     start=Node(
         run=sum_ab,
-        input={
+        bind_input={
             "a": Input.a,
             "b": Input.b,
         },
@@ -76,7 +76,7 @@ expr = Workflow(
     ),
     result=Node(
         run=multiply,
-        input={
+        bind_input={
             "left": Upstream.value,
             "right": Input.c,
         },
@@ -102,7 +102,7 @@ product_bc = Workflow(
     "product_bc",
     start=Node(
         run=multiply,
-        input={
+        bind_input={
             "left": Input.b,
             "right": Input.c,
         },
@@ -110,7 +110,7 @@ product_bc = Workflow(
     ),
     result=Node(
         run=identity,
-        output="value",
+        bind_output="value",
     ),
 )
 ```
@@ -122,7 +122,7 @@ expr = Workflow(
     "expr",
     start=Node(
         run=product_bc,
-        input={
+        bind_input={
             "b": Input.b,
             "c": Input.c,
         },
@@ -130,7 +130,7 @@ expr = Workflow(
     ),
     result=Node(
         run=add,
-        input={
+        bind_input={
             "left": Input.a,
             "right": Upstream.value,
         },
@@ -156,7 +156,7 @@ sum_ab = Workflow(
     "sum_ab",
     start=Node(
         run=add,
-        input={
+        bind_input={
             "left": Input.a,
             "right": Input.b,
         },
@@ -164,7 +164,7 @@ sum_ab = Workflow(
     ),
     result=Node(
         run=identity,
-        output="value",
+        bind_output="value",
     ),
 )
 ```
@@ -176,7 +176,7 @@ scaled_sum = Workflow(
     "scaled_sum",
     start=Node(
         run=sum_ab,
-        input={
+        bind_input={
             "a": Input.a,
             "b": Input.b,
         },
@@ -184,11 +184,11 @@ scaled_sum = Workflow(
     ),
     result=Node(
         run=multiply,
-        input={
+        bind_input={
             "left": Upstream.value,
             "right": Input.c,
         },
-        output="value",
+        bind_output="value",
     ),
 )
 ```
@@ -200,7 +200,7 @@ expr = Workflow(
     "expr",
     start=Node(
         run=scaled_sum,
-        input={
+        bind_input={
             "a": Input.a,
             "b": Input.b,
             "c": Input.c,
@@ -209,7 +209,7 @@ expr = Workflow(
     ),
     result=Node(
         run=divide,
-        input={
+        bind_input={
             "numerator": Upstream.value,
             "denominator": Input.d,
         },
@@ -272,7 +272,7 @@ This is the low-friction case. Composition does not require extra syntax when th
 
 ## 5. Explicit Boundary Adaptation
 
-`Node.input` matters when the child workflow exposes a different interface from the parent.
+`Node.bind_input` matters when the child workflow exposes a different interface from the parent.
 
 This child workflow expects `left` and `right`.
 
@@ -281,7 +281,7 @@ sum_pair = Workflow(
     "sum_pair",
     start=Node(
         run=add,
-        input={
+        bind_input={
             "left": Input.left,
             "right": Input.right,
         },
@@ -289,7 +289,7 @@ sum_pair = Workflow(
     ),
     result=Node(
         run=identity,
-        output="value",
+        bind_output="value",
     ),
 )
 ```
@@ -301,7 +301,7 @@ expr = Workflow(
     "expr",
     start=Node(
         run=sum_pair,
-        input={
+        bind_input={
             "left": Input.a,
             "right": Input.b,
         },
@@ -309,7 +309,7 @@ expr = Workflow(
     ),
     result=Node(
         run=multiply,
-        input={
+        bind_input={
             "left": Upstream.value,
             "right": Input.c,
         },
@@ -340,16 +340,16 @@ scaled_sum = Workflow(
     context=RunContext,
     start=Node(
         run=add,
-        input={
+        bind_input={
             "left": Input.a,
             "right": Input.b,
         },
-        output="value",
+        bind_output="value",
         next="result",
     ),
     result=Node(
         run=multiply,
-        input={
+        bind_input={
             "left": Upstream.value,
             "right": Context.factor,
         },
@@ -366,7 +366,7 @@ expr = Workflow(
     start="result",
     result=Node(
         run=scaled_sum,
-        input={
+        bind_input={
             "a": Input.a,
             "b": Input.b,
         },
@@ -497,7 +497,7 @@ These two shapes look similar, but they mean different things.
 child = Workflow(
     "product",
     start=Node(run=multiply_pair, next="result"),
-    result=Node(run=identity, output="value"),
+    result=Node(run=identity, bind_output="value"),
 )
 
 

@@ -49,7 +49,43 @@ When a task returns a Pydantic model:
 
 Raw `dict` values are not treated as structured payloads. They remain opaque values unless a node explicitly adapts them.
 
-## `Workflow(name, start, **nodes)`
+`@ref` is only required when you want to use explicit field-reference features. Ordinary Pydantic binding does not require registration.
+
+## `@ref`
+
+Registers a Pydantic model class for field-reference features.
+
+```python
+from pydantic import BaseModel
+from elan import ref
+
+
+@ref
+class UserPayload(BaseModel):
+    name: str
+    age: int
+```
+
+## `Upstream`, `Input`, and `Context`
+
+Reference namespaces used by `Node.bind_input`.
+
+Examples:
+
+```python
+from elan import Context, Input, Node, Upstream
+
+Node(
+    run=greet,
+    bind_input={
+        "name": Upstream.name,
+        "title": Input.title,
+        "punctuation": Context.punctuation,
+    },
+)
+```
+
+## `Workflow(name, start, context=None, **nodes)`
 
 Defines a workflow.
 
@@ -57,6 +93,7 @@ Parameters:
 
 - `name: str`
 - `start: Task | str | Node`
+- `context: type[BaseModel] | None`
 - `**nodes: Task | str | Node`
 
 String task references are resolved through the task registry.
@@ -65,7 +102,7 @@ String task references are resolved through the task registry.
 
 Runs the workflow and returns a `WorkflowRun`.
 
-## `Node(run, next=None, input=None, output=None, route_on=None)`
+## `Node(run, next=None, bind_input=None, bind_output=None, route_on=None)`
 
 Defines a configured task node.
 
@@ -73,11 +110,11 @@ Supported fields:
 
 - `run: Task | str`
 - `next` as `str`
-- `output`
+- `bind_input`
+- `bind_output`
 
 Declared but unsupported fields:
 
-- `input`
 - `route_on`
 
 ## `WorkflowRun`
@@ -104,4 +141,6 @@ Between nodes, Elan binds values using these rules:
 - list outputs remain opaque values
 - raw `dict` outputs remain opaque values
 - Pydantic model outputs may pass through as one value or auto-unpack by field name
-- explicit `Node.output` mapping creates a named adapter payload for downstream binding
+- explicit `Node.bind_output` mapping creates a named adapter payload for downstream binding
+- `Node.bind_input` may provide explicit literal values for target parameters
+- `Node.bind_input` may also read from `Upstream.field`, `Input.field`, and `Context.field`

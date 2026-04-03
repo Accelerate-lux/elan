@@ -225,7 +225,7 @@ workflow = Workflow(
     "greet_world",
     start=Node(
         run=normalize_name,
-        output="name",
+        bind_output="name",
         next="greet",
     ),
     greet=greet,
@@ -332,7 +332,7 @@ When one node interface needs to be reshaped into another, the workflow uses exp
 
 ## Output Mapping
 
-`Node.output` is the explicit output adapter.
+`Node.bind_output` is the explicit output adapter.
 
 It is used when a node must:
 
@@ -343,7 +343,7 @@ It is used when a node must:
 Examples:
 
 ```python
-output="name"
+bind_output="name"
 ```
 
 turns:
@@ -361,15 +361,15 @@ into the named payload:
 Multi-value output adaptation stays positional:
 
 ```python
-output=["name", "style"]
-output=[..., "style"]
+bind_output=["name", "style"]
+bind_output=[..., "style"]
 ```
 
 In Python, `...` discards a returned position. In config, the equivalent is `null`.
 
 ## Input Mapping
 
-`Node.input` is the explicit input adapter.
+`Node.bind_input` is the explicit input adapter.
 
 It is used when a node must consume:
 
@@ -394,7 +394,7 @@ workflow = Workflow(
     "profile",
     start=Node(
         run=build_profile,
-        input={
+        bind_input={
             "name": Upstream.name,
             "surname": Input.surname,
             "locale": Context.locale,
@@ -423,15 +423,15 @@ The supported sources are:
 - `Context`
 - literals
 
-Arbitrary references to other named nodes are not part of `Node.input`.
+Arbitrary references to other named nodes are not part of `Node.bind_input`.
 
-That keeps `Node.input` focused on adaptation. Multi-node mixing and join semantics belong to explicit synchronization features, not to ordinary input mapping.
+That keeps `Node.bind_input` focused on adaptation. Multi-node mixing and join semantics belong to explicit synchronization features, not to ordinary input mapping.
 
 ## Context Preparation
 
 `Node.context` prepares the context before the node executes.
 
-It is part of the pre-execution phase, alongside `Node.input`.
+It is part of the pre-execution phase, alongside `Node.bind_input`.
 
 That makes one thing explicit: it defines the context view the task sees when it runs.
 
@@ -460,7 +460,7 @@ workflow = Workflow(
     context=RunContext,
     start=Node(
         run=build_profile,
-        input={
+        bind_input={
             "name": Upstream.name,
             "surname": Input.surname,
             "locale": Context.locale,
@@ -492,7 +492,7 @@ nodes:
       surname: $input.surname
 ```
 
-Ordinary nodes read freely from context through `Node.input`. `Node.context` prepares scoped context before the task runs.
+Ordinary nodes read freely from context through `Node.bind_input`. `Node.context` prepares scoped context before the task runs.
 
 ## After
 
@@ -999,7 +999,7 @@ workflow = Workflow(
     "branching_greet",
     start=Node(
         run=choose_greeting,
-        output=["name", "style"],
+        bind_output=["name", "style"],
         route_on="style",
         next={
             "formal": "greet_formal",
@@ -1118,7 +1118,7 @@ workflow = Workflow(
     "fan_out_profile",
     start=Node(
         run=prepare_profile,
-        output="name",
+        bind_output="name",
         next=["build_greeting", "build_badge"],
     ),
     build_greeting=build_greeting,
@@ -1154,7 +1154,7 @@ workflow = Workflow(
     "yield_fan_out",
     start=Node(
         run=split_names,
-        output="name",
+        bind_output="name",
         next="greet",
     ),
     greet=greet,

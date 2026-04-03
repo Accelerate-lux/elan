@@ -50,53 +50,56 @@ Keep the current split phase files as the real deeper spec:
 - `test_registry_and_declaration.py`
 - `test_structured_payloads.py`
 
-### 2. Richer `Node.output`
-First new feature slice.
+### 2. Baseline `Node.bind_output`
+Treat the current `Node.bind_output` surface as implemented baseline behavior.
 
 Implementation goal:
-- expand `Node.output` beyond the current simple string/list mapping surface
-- keep it as output adaptation only, not routing logic
+- keep the current adapter surface:
+  - `bind_output="name"`
+  - `bind_output=["a", "b"]`
+  - discard via `...`
+- do not broaden it yet
 
 Test work:
-- smoke test in `test_public_api.py`
-- deeper cases in `test_binding_and_adaptation.py`
+- smoke coverage in `test_public_api.py`
+- adapter matrix in `test_binding_and_adaptation.py`
 
 Acceptance:
 - mapped outputs still preserve raw task output in `run.outputs`
-- richer output adaptation composes cleanly with existing binding rules
-- no changes leak into `Workflow`
+- docs describe `Node.bind_output` as current baseline behavior, not a future slice
 
-### 3. `Node.input`
-Second feature slice.
+### 3. Literal-only `Node.bind_input`
+Next feature slice.
 
 Implementation goal:
 - explicit input adaptation for downstream tasks
-- done in the binding/orchestration layer, not inside tasks
+- first pass uses literal values only
+- provided values override automatic binding for those parameters
 
 Test work:
 - one public smoke example in `test_public_api.py`
-- focused cases in `test_binding_and_adaptation.py`
+- focused literal-binding cases in `test_binding_and_adaptation.py`
 
 Acceptance:
-- explicit input mapping overrides default automatic binding for that node
-- binding failures stay narrow and explicit
-- activation progression still flows through `Orchestrator` and `Scheduler`
+- explicit literal mapping works without changing `Workflow`
+- remaining parameters still use the existing automatic binding path
 
-### 4. Structured payload binding and `@el.ref`
+### 4. Structured payload refs and `@el.ref`
 Third slice.
 
 Implementation goal:
-- keep current Pydantic payload behavior
-- add registered ref participation where the public interface already expects it
+- add `Upstream`, `Input`, and `Context` source references
+- add `@el.ref` for field-reference features only
+- keep ordinary Pydantic binding working without `@el.ref`
 
 Test work:
-- smoke case in `test_public_api.py`
-- deeper cases in `test_structured_payloads.py`
+- one public smoke ref example in `test_public_api.py`
+- deeper coverage in `test_binding_and_adaptation.py`
+- registered payload behavior in `test_structured_payloads.py`
 
 Acceptance:
-- structured payload binding remains stable
-- ref registration and lookup are covered explicitly
-- no config/API parity work yet beyond what is needed for Python behavior
+- ref-backed input binding resolves from upstream payload, workflow input, and context
+- plain Pydantic pass-through and auto-unpack remain stable
 
 ### 5. Branching forms
 Fourth slice.
@@ -208,8 +211,8 @@ Usage rule:
 
 - `test_public_api.py` is restored as the small end-to-end smoke surface.
 - Feature work follows the interface-order sequence already established:
-  - richer `Node.output`
-  - `Node.input`
+  - `Node.bind_output`
+  - `Node.bind_input`
   - structured payloads / refs
   - branching
   - terminal `Join`

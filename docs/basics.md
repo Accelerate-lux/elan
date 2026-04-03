@@ -358,24 +358,96 @@ async def greet(name: str):
 
 workflow = Workflow(
     "greet_world",
-    start=Node(run=prepare, output="name", next="greet"),
+    start=Node(run=prepare, bind_output="name", next="greet"),
     greet=greet,
 )
 ```
 
-By setting `output="name"`, you explicitly wrap the raw string returned by `prepare` into a named payload (`{"name": "world"}`). The downstream `greet` task then binds to it by parameter name.
+By setting `bind_output="name"`, you explicitly wrap the raw string returned by `prepare` into a named payload (`{"name": "world"}`). The downstream `greet` task then binds to it by parameter name.
 
 This mechanism also supports multi-value mappings for tuples:
 
 ```python
 # Maps a 2-tuple to two named parameters
-output=["name", "style"]
+bind_output=["name", "style"]
 
 # Discards the first value of a 2-tuple, maps the second to "style"
-output=[..., "style"]
+bind_output=[..., "style"]
 ```
 
-The `output` field acts as a lightweight adapter layer, ensuring your tasks remain decoupled even when their interfaces don't align perfectly.
+The `bind_output` field acts as a lightweight adapter layer, ensuring your tasks remain decoupled even when their interfaces don't align perfectly.
+
+### 6. Explicit Input Adaptation
+
+`Node.bind_input` lets you prepare the downstream task call explicitly.
+
+The simplest form uses literal values:
+
+```python
+from elan import Node, Workflow, task
+
+
+@task
+def prepare():
+    return "world"
+
+
+@task
+async def greet(name: str, punctuation: str):
+    return f"Hello, {name}{punctuation}"
+
+
+workflow = Workflow(
+    "greet_world",
+    start=Node(run=prepare, next="greet"),
+    greet=Node(run=greet, bind_input={"punctuation": "!"}),
+)
+```
+
+Explicit values override automatic binding for the parameters they provide. Remaining parameters still use the normal binding rules when possible.
+
+`Node.bind_input` also supports source references:
+
+```python
+from pydantic import BaseModel
+from elan import Context, Input, Node, Upstream, Workflow, ref, task
+
+
+class GreetingContext(BaseModel):
+    punctuation: str = "!"
+
+
+@ref
+class GreetingPayload(BaseModel):
+    name: str
+
+
+@task
+def prepare() -> GreetingPayload:
+    return GreetingPayload(name="world")
+
+
+@task
+async def greet(name: str, title: str, punctuation: str):
+    return f"Hello, {title} {name}{punctuation}"
+
+
+workflow = Workflow(
+    "greet_world",
+    context=GreetingContext,
+    start=Node(run=prepare, next="greet"),
+    greet=Node(
+        run=greet,
+        bind_input={
+            "name": Upstream.name,
+            "title": Input.title,
+            "punctuation": Context.punctuation,
+        },
+    ),
+)
+```
+
+`@ref` is only required for field-reference features. Ordinary Pydantic binding still works without it.
 
 ## Unsupported Features
 
@@ -385,7 +457,6 @@ These features are not supported by the runtime:
 - fan-out
 - `next` as `list`
 - `next` as `dict`
-- explicit input mapping through `Node.input`
 - routing through `route_on`
 - sub-workflows
 - barriers and joins

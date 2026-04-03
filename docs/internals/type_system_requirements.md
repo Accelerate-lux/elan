@@ -84,8 +84,8 @@ The static type system must reason over these surfaces:
 - task return annotations
 - yielded item types
 - workflow context model
-- `Node.input`
-- `Node.output`
+- `Node.bind_input`
+- `Node.bind_output`
 - `Node.context`
 - `after.context`
 - `route_on`
@@ -98,7 +98,7 @@ The static type system must reason over these surfaces:
 
 The validator must verify, when possible:
 
-- that `Node.input` provides values compatible with the target task parameters
+- that `Node.bind_input` provides values compatible with the target task parameters
 - that automatic binding is valid for the receiving task
 - that parent-to-child workflow boundaries are compatible
 
@@ -106,7 +106,7 @@ The validator must verify, when possible:
 
 The validator must verify, when possible:
 
-- that a task return annotation is compatible with `Node.output`
+- that a task return annotation is compatible with `Node.bind_output`
 - that positional output mapping matches tuple shape
 - that discarded positions are valid
 - that structured payload binding is compatible with downstream expectations
@@ -246,18 +246,18 @@ Elan must infer node-facing contracts from:
 
 - task signatures
 - task return annotations
-- `Node.output`
+- `Node.bind_output`
 - child workflow `result`
 - `Join(...)`
 
 ### Output Adaptation Inference
 
-`Node.output` is part of the type contract, not just a runtime convenience.
+`Node.bind_output` is part of the type contract, not just a runtime convenience.
 
 Examples:
 
-- `output="name"` turns a scalar into a named packet with one field
-- `output=["name", "style"]` turns a tuple into a named packet with two fields
+- `bind_output="name"` turns a scalar into a named packet with one field
+- `bind_output=["name", "style"]` turns a tuple into a named packet with two fields
 
 The validator must reason over that exposed packet shape even if Elan does not surface it as a public Python class.
 

@@ -1,6 +1,21 @@
 import pytest
+from pydantic import BaseModel
 
-from elan import Node, Workflow
+from elan import Node, When, Workflow, ref
+from elan._refs import ModelFieldRef
+
+
+@ref
+class RoutePayload(BaseModel):
+    name: str
+    should_email: bool
+    should_notify: bool
+
+
+@ref
+class OtherRoutePayload(BaseModel):
+    name: str
+    should_email: bool
 
 
 @pytest.mark.asyncio
@@ -91,6 +106,281 @@ async def test_run_workflow_exclusive_branch_from_raw_dict(mock_task_factory, br
 
 
 @pytest.mark.asyncio
+async def test_run_workflow_when_from_named_payload(mock_task_factory, branch_id):
+    def _prepare():
+        return "world", True
+
+    async def _send_email(name: str):
+        return f"email:{name}"
+
+    prepare = mock_task_factory(_prepare)
+    send_email = mock_task_factory(_send_email)
+
+    workflow = Workflow(
+        "conditional_routes",
+        start=Node(
+            run=prepare,
+            bind_output=["name", "should_email"],
+            next=[When("should_email", "send_email")],
+        ),
+        send_email=send_email,
+    )
+
+    run = await workflow.run()
+
+    send_email.mock.assert_called_once_with(name="world")
+    assert run.result is None
+    assert run.outputs == {
+        branch_id[0]: {
+            "_prepare": [("world", True)],
+        },
+        branch_id[1]: {
+            "_send_email": ["email:world"],
+        },
+    }
+
+
+@pytest.mark.asyncio
+async def test_run_workflow_when_from_raw_dict(mock_task_factory, branch_id):
+    def _prepare():
+        return {"name": "world", "should_email": True}
+
+    async def _send_email(payload: dict[str, object]):
+        return f"email:{payload['name']}"
+
+    prepare = mock_task_factory(_prepare)
+    send_email = mock_task_factory(_send_email)
+
+    workflow = Workflow(
+        "conditional_routes",
+        start=Node(
+            run=prepare,
+            next=[When("should_email", "send_email")],
+        ),
+        send_email=send_email,
+    )
+
+    run = await workflow.run()
+
+    send_email.mock.assert_called_once_with(
+        {"name": "world", "should_email": True}
+    )
+    assert run.result is None
+    assert run.outputs == {
+        branch_id[0]: {
+            "_prepare": [{"name": "world", "should_email": True}],
+        },
+        branch_id[1]: {
+            "_send_email": ["email:world"],
+        },
+    }
+
+
+@pytest.mark.asyncio
+async def test_run_workflow_when_from_registered_ref_model(mock_task_factory, branch_id):
+    def _prepare() -> RoutePayload:
+        return RoutePayload(name="world", should_email=True, should_notify=False)
+
+    async def _send_email(name: str):
+        return f"email:{name}"
+
+    prepare = mock_task_factory(_prepare)
+    send_email = mock_task_factory(_send_email)
+
+    workflow = Workflow(
+        "conditional_routes",
+        start=Node(
+            run=prepare,
+            next=[When(RoutePayload.should_email, "send_email")],
+        ),
+        send_email=send_email,
+    )
+
+    run = await workflow.run()
+
+    send_email.mock.assert_called_once_with(name="world")
+    assert run.result is None
+    assert run.outputs == {
+        branch_id[0]: {
+            "_prepare": [
+                RoutePayload(name="world", should_email=True, should_notify=False)
+            ],
+        },
+        branch_id[1]: {
+            "_send_email": ["email:world"],
+        },
+    }
+
+
+@pytest.mark.asyncio
+async def test_run_workflow_when_list_target(mock_task_factory, branch_id):
+    def _prepare():
+        return "world", True
+
+    async def _send_email(name: str):
+        return f"email:{name}"
+
+    async def _notify(name: str):
+        return f"notify:{name}"
+
+    prepare = mock_task_factory(_prepare)
+    send_email = mock_task_factory(_send_email)
+    notify = mock_task_factory(_notify)
+
+    workflow = Workflow(
+        "conditional_routes",
+        start=Node(
+            run=prepare,
+            bind_output=["name", "should_notify"],
+            next=[When("should_notify", ["send_email", "notify"])],
+        ),
+        send_email=send_email,
+        notify=notify,
+    )
+
+    run = await workflow.run()
+
+    send_email.mock.assert_called_once_with(name="world")
+    notify.mock.assert_called_once_with(name="world")
+    assert run.result is None
+    assert run.outputs == {
+        branch_id[0]: {
+            "_prepare": [("world", True)],
+        },
+        branch_id[1]: {
+            "_send_email": ["email:world"],
+        },
+        branch_id[2]: {
+            "_notify": ["notify:world"],
+        },
+    }
+
+
+@pytest.mark.asyncio
+async def test_run_workflow_multiple_when_matches(mock_task_factory, branch_id):
+    def _prepare() -> RoutePayload:
+        return RoutePayload(name="world", should_email=True, should_notify=True)
+
+    async def _send_email(name: str):
+        return f"email:{name}"
+
+    async def _notify(name: str):
+        return f"notify:{name}"
+
+    prepare = mock_task_factory(_prepare)
+    send_email = mock_task_factory(_send_email)
+    notify = mock_task_factory(_notify)
+
+    workflow = Workflow(
+        "conditional_routes",
+        start=Node(
+            run=prepare,
+            next=[
+                When(RoutePayload.should_email, "send_email"),
+                When(RoutePayload.should_notify, "notify"),
+            ],
+        ),
+        send_email=send_email,
+        notify=notify,
+    )
+
+    run = await workflow.run()
+
+    send_email.mock.assert_called_once_with(name="world")
+    notify.mock.assert_called_once_with(name="world")
+    assert run.result is None
+    assert run.outputs == {
+        branch_id[0]: {
+            "_prepare": [
+                RoutePayload(name="world", should_email=True, should_notify=True)
+            ],
+        },
+        branch_id[1]: {
+            "_send_email": ["email:world"],
+        },
+        branch_id[2]: {
+            "_notify": ["notify:world"],
+        },
+    }
+
+
+@pytest.mark.asyncio
+async def test_run_workflow_zero_when_matches_is_valid(mock_task_factory, branch_id):
+    def _prepare():
+        return "world", False
+
+    async def _send_email(name: str):
+        return f"email:{name}"
+
+    prepare = mock_task_factory(_prepare)
+    send_email = mock_task_factory(_send_email)
+
+    workflow = Workflow(
+        "conditional_routes",
+        start=Node(
+            run=prepare,
+            bind_output=["name", "should_email"],
+            next=[When("should_email", "send_email")],
+        ),
+        send_email=send_email,
+    )
+
+    run = await workflow.run()
+
+    send_email.mock.assert_not_called()
+    assert run.result is None
+    assert run.outputs == {
+        branch_id[0]: {
+            "_prepare": [("world", False)],
+        },
+    }
+
+
+@pytest.mark.asyncio
+async def test_run_workflow_duplicate_when_destinations_are_allowed(
+    mock_task_factory,
+    branch_id,
+):
+    def _prepare():
+        return "world", True, True
+
+    async def _send_email(name: str):
+        return f"email:{name}"
+
+    prepare = mock_task_factory(_prepare)
+    send_email = mock_task_factory(_send_email)
+
+    workflow = Workflow(
+        "conditional_routes",
+        start=Node(
+            run=prepare,
+            bind_output=["name", "should_email", "should_notify"],
+            next=[
+                When("should_email", "send_email"),
+                When("should_notify", "send_email"),
+            ],
+        ),
+        send_email=send_email,
+    )
+
+    run = await workflow.run()
+
+    assert send_email.mock.call_count == 2
+    assert run.result is None
+    assert run.outputs == {
+        branch_id[0]: {
+            "_prepare": [("world", True, True)],
+        },
+        branch_id[1]: {
+            "_send_email": ["email:world"],
+        },
+        branch_id[2]: {
+            "_send_email": ["email:world"],
+        },
+    }
+
+
+@pytest.mark.asyncio
 async def test_run_workflow_missing_route_on_fails_clearly(mock_task_factory):
     def _prepare():
         return "world", "formal"
@@ -142,6 +432,59 @@ async def test_run_workflow_route_on_missing_field_fails_clearly(mock_task_facto
 
 
 @pytest.mark.asyncio
+async def test_run_workflow_when_missing_string_condition_field_fails_clearly(
+    mock_task_factory,
+):
+    def _prepare():
+        return "world"
+
+    async def _send_email(name: str):
+        return f"email:{name}"
+
+    prepare = mock_task_factory(_prepare)
+    send_email = mock_task_factory(_send_email)
+
+    workflow = Workflow(
+        "conditional_routes",
+        start=Node(
+            run=prepare,
+            bind_output="name",
+            next=[When("should_email", "send_email")],
+        ),
+        send_email=send_email,
+    )
+
+    with pytest.raises(TypeError, match="condition source does not provide field 'should_email'"):
+        await workflow.run()
+
+
+@pytest.mark.asyncio
+async def test_run_workflow_when_missing_ref_condition_field_fails_clearly(
+    mock_task_factory,
+):
+    def _prepare() -> RoutePayload:
+        return RoutePayload(name="world", should_email=True, should_notify=False)
+
+    async def _send_email(name: str):
+        return f"email:{name}"
+
+    prepare = mock_task_factory(_prepare)
+    send_email = mock_task_factory(_send_email)
+
+    workflow = Workflow(
+        "conditional_routes",
+        start=Node(
+            run=prepare,
+            next=[When(ModelFieldRef(model=RoutePayload, field_name="missing"), "send_email")],
+        ),
+        send_email=send_email,
+    )
+
+    with pytest.raises(TypeError, match="does not provide field 'missing'"):
+        await workflow.run()
+
+
+@pytest.mark.asyncio
 async def test_run_workflow_route_on_unmapped_value_fails_clearly(mock_task_factory):
     def _prepare():
         return "world", "unknown"
@@ -168,6 +511,31 @@ async def test_run_workflow_route_on_unmapped_value_fails_clearly(mock_task_fact
 
 
 @pytest.mark.asyncio
+async def test_run_workflow_when_non_bool_condition_fails_clearly(mock_task_factory):
+    def _prepare():
+        return "world", "yes"
+
+    async def _send_email(name: str):
+        return f"email:{name}"
+
+    prepare = mock_task_factory(_prepare)
+    send_email = mock_task_factory(_send_email)
+
+    workflow = Workflow(
+        "conditional_routes",
+        start=Node(
+            run=prepare,
+            bind_output=["name", "should_email"],
+            next=[When("should_email", "send_email")],
+        ),
+        send_email=send_email,
+    )
+
+    with pytest.raises(TypeError, match="requires When condition 'should_email' to resolve to bool"):
+        await workflow.run()
+
+
+@pytest.mark.asyncio
 async def test_run_workflow_branch_mapping_unknown_node_fails_clearly(mock_task_factory):
     def _prepare():
         return "world", "formal"
@@ -185,6 +553,58 @@ async def test_run_workflow_branch_mapping_unknown_node_fails_clearly(mock_task_
     )
 
     with pytest.raises(KeyError, match="references unknown node 'missing'"):
+        await workflow.run()
+
+
+@pytest.mark.asyncio
+async def test_run_workflow_when_unknown_destination_node_fails_clearly(
+    mock_task_factory,
+):
+    def _prepare():
+        return "world", True
+
+    prepare = mock_task_factory(_prepare)
+
+    workflow = Workflow(
+        "conditional_routes",
+        start=Node(
+            run=prepare,
+            bind_output=["name", "should_email"],
+            next=[When("should_email", "missing")],
+        ),
+    )
+
+    with pytest.raises(KeyError, match="references unknown node 'missing'"):
+        await workflow.run()
+
+
+@pytest.mark.asyncio
+async def test_run_workflow_mixed_next_list_fails_clearly(mock_task_factory):
+    def _prepare():
+        return "world", True
+
+    async def _send_email(name: str):
+        return f"email:{name}"
+
+    async def _notify(name: str):
+        return f"notify:{name}"
+
+    prepare = mock_task_factory(_prepare)
+    send_email = mock_task_factory(_send_email)
+    notify = mock_task_factory(_notify)
+
+    workflow = Workflow(
+        "conditional_routes",
+        start=Node(
+            run=prepare,
+            bind_output=["name", "should_email"],
+            next=["send_email", When("should_email", "notify")],
+        ),
+        send_email=send_email,
+        notify=notify,
+    )
+
+    with pytest.raises(TypeError, match="cannot mix raw node ids and When"):
         await workflow.run()
 
 
@@ -260,6 +680,68 @@ async def test_run_workflow_fan_out_with_reserved_result_is_invalid(mock_task_fa
     )
 
     with pytest.raises(NotImplementedError, match="Fan-out with reserved result"):
+        await workflow.run()
+
+
+@pytest.mark.asyncio
+async def test_run_workflow_when_with_reserved_result_is_invalid(mock_task_factory):
+    def _prepare():
+        return "world", True
+
+    async def _send_email(name: str):
+        return f"email:{name}"
+
+    def _identity(value: str):
+        return value
+
+    prepare = mock_task_factory(_prepare)
+    send_email = mock_task_factory(_send_email)
+    identity = mock_task_factory(_identity)
+
+    workflow = Workflow(
+        "conditional_routes",
+        start=Node(
+            run=prepare,
+            bind_output=["name", "should_email"],
+            next=[When("should_email", "send_email")],
+        ),
+        send_email=Node(run=send_email, next="result"),
+        result=Node(run=identity),
+    )
+
+    with pytest.raises(
+        NotImplementedError,
+        match="Conditional multi-routing with reserved result",
+    ):
+        await workflow.run()
+
+
+@pytest.mark.asyncio
+async def test_run_workflow_when_ref_condition_wrong_model_type_fails_clearly(
+    mock_task_factory,
+):
+    def _prepare() -> OtherRoutePayload:
+        return OtherRoutePayload(name="world", should_email=True)
+
+    async def _send_email(name: str):
+        return f"email:{name}"
+
+    prepare = mock_task_factory(_prepare)
+    send_email = mock_task_factory(_send_email)
+
+    workflow = Workflow(
+        "conditional_routes",
+        start=Node(
+            run=prepare,
+            next=[When(RoutePayload.should_email, "send_email")],
+        ),
+        send_email=send_email,
+    )
+
+    with pytest.raises(
+        TypeError,
+        match="cannot read When condition 'RoutePayload.should_email' from model value of type OtherRoutePayload",
+    ):
         await workflow.run()
 
 

@@ -1,7 +1,7 @@
 import pytest
 from pydantic import BaseModel
 
-from elan import Context, Input, Node, Upstream, Workflow, ref
+from elan import Context, Input, Node, Upstream, When, Workflow, ref
 
 
 @pytest.mark.asyncio
@@ -67,6 +67,13 @@ class GreetingContext(BaseModel):
 @ref
 class GreetingRefPayload(BaseModel):
     name: str
+
+
+@ref
+class NotificationRoute(BaseModel):
+    name: str
+    should_email: bool
+    should_ticket: bool
 
 
 @pytest.mark.asyncio
@@ -197,6 +204,69 @@ async def test_fan_out_without_reserved_result(mock_task_factory, branch_id):
         },
         branch_id[2]: {
             "_badge": ["badge:world"],
+        },
+    }
+
+
+@pytest.mark.asyncio
+async def test_conditional_multi_routing(mock_task_factory, branch_id):
+    def _prepare() -> NotificationRoute:
+        return NotificationRoute(
+            name="world",
+            should_email=True,
+            should_ticket=True,
+        )
+
+    async def _send_email(name: str):
+        return f"email:{name}"
+
+    async def _open_ticket(name: str):
+        return f"ticket:{name}"
+
+    async def _audit(name: str):
+        return f"audit:{name}"
+
+    prepare = mock_task_factory(_prepare)
+    send_email = mock_task_factory(_send_email)
+    open_ticket = mock_task_factory(_open_ticket)
+    audit = mock_task_factory(_audit)
+
+    run = await Workflow(
+        "conditional_routes",
+        start=Node(
+            run=prepare,
+            next=[
+                When(NotificationRoute.should_email, "send_email"),
+                When(NotificationRoute.should_ticket, ["open_ticket", "audit"]),
+            ],
+        ),
+        send_email=send_email,
+        open_ticket=open_ticket,
+        audit=audit,
+    ).run()
+
+    send_email.mock.assert_called_once_with(name="world")
+    open_ticket.mock.assert_called_once_with(name="world")
+    audit.mock.assert_called_once_with(name="world")
+    assert run.result is None
+    assert run.outputs == {
+        branch_id[0]: {
+            "_prepare": [
+                NotificationRoute(
+                    name="world",
+                    should_email=True,
+                    should_ticket=True,
+                )
+            ],
+        },
+        branch_id[1]: {
+            "_send_email": ["email:world"],
+        },
+        branch_id[2]: {
+            "_open_ticket": ["ticket:world"],
+        },
+        branch_id[3]: {
+            "_audit": ["audit:world"],
         },
     }
 

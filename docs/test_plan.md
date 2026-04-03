@@ -30,7 +30,7 @@ This phase covers workflow context models, `Node.context`, `after.context`, merg
 
 ### Phase 5. Routing And Branching
 
-This phase covers first-pass exclusive branching, first-pass fan-out, branch creation rules, route validation, string-only `route_on`, and the scoped behavior of sibling branches after routing decisions. `When(...)` and ref-based `route_on` stay deferred.
+This phase covers first-pass exclusive branching, first-pass fan-out, first-pass `When(...)` conditional multi-routing, branch creation rules, route validation, string-only `route_on`, and the scoped behavior of sibling branches after routing decisions. Ref-based `route_on` stays deferred.
 
 ### Phase 6. Yield Fan-Out And Branch Completion
 
@@ -322,7 +322,20 @@ What it tests:
 - fan-out without reserved `result` returns `None`
 - fan-out with reserved `result` is rejected until `Join` exists
 
-## 27. Barriers and joins
+## 27. Conditional multi-routing with `When(...)`
+
+Status: ✅  
+Source: [tests/test_routing_and_branching.py](/C:/Users/Hugod/Workspace/elan/tests/test_routing_and_branching.py)
+
+What it tests:
+
+- `When("field", "node")` routing from named payloads and raw `dict` outputs
+- `When(Payload.field, "node")` routing from registered ref model outputs
+- `When(condition, ["a", "b"])` conditional fan-out
+- multiple independent matches, zero matches, and duplicate destinations
+- missing fields, non-bool conditions, mixed `next` lists, unknown destinations, and reserved `result` rejection
+
+## 28. Barriers and joins
 
 Status: 🔒
 

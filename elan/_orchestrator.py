@@ -5,7 +5,7 @@ from ._activation import Activation
 from ._binding import bind_output
 from ._branch import Branch
 from ._resolution import resolve_node
-from ._routing import resolve_next_targets
+from ._routing import is_string_target_list, is_when_list, resolve_next_targets
 from ._run_state import RunState
 from ._scheduler import Scheduler
 from .node import Node
@@ -58,12 +58,18 @@ class Orchestrator:
         branch = self.run_state.branches[settled.branch_id]
         emitted_value = bind_output(settled.node.bind_output, settled.output)
 
-        if isinstance(settled.node.next, (dict, list)):
+        if isinstance(settled.node.next, dict) or is_string_target_list(
+            settled.node.next
+        ) or is_when_list(settled.node.next):
             self.run_state.used_branching = True
 
-        if isinstance(settled.node.next, list) and "result" in self.run_state.graph.nodes:
+        if is_string_target_list(settled.node.next) and "result" in self.run_state.graph.nodes:
             raise NotImplementedError(
                 "Fan-out with reserved result is not implemented before Join."
+            )
+        if is_when_list(settled.node.next) and "result" in self.run_state.graph.nodes:
+            raise NotImplementedError(
+                "Conditional multi-routing with reserved result is not implemented before Join."
             )
 
         next_targets = resolve_next_targets(

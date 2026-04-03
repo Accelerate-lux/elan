@@ -85,6 +85,16 @@ Node(
 )
 ```
 
+## `When(condition, target)`
+
+Conditional routing primitive used inside `Node.next`.
+
+Supported forms:
+
+- `When("should_email", "send_email")`
+- `When(RoutePayload.should_email, "send_email")`
+- `When("should_ticket", ["open_ticket", "audit"])`
+
 ## `Workflow(name, start, context=None, **nodes)`
 
 Defines a workflow.
@@ -109,7 +119,7 @@ Defines a configured task node.
 Supported fields:
 
 - `run: Task | str`
-- `next` as `str | list[str] | dict[str, str]`
+- `next` as `str | list[str] | list[When] | dict[str, str]`
 - `bind_input`
 - `bind_output`
 - `route_on`
@@ -171,14 +181,23 @@ Between nodes, Elan binds values using these rules:
 
 ## Branching Rules
 
-The current runtime supports two first-pass branching forms:
+The current runtime supports three branching forms:
 
 - `next={"formal": "greet_formal", "casual": "greet_casual"}` with `route_on="style"`
 - `next=["a", "b"]` for fan-out
+- `next=[When("should_email", "send_email"), When(RoutePayload.should_ticket, ["open_ticket", "audit"])]`
 
 `route_on` is string-only in the current runtime. For mapping-based branching, Elan reads the route selector from:
 
 - named adapter payloads created by `bind_output`
 - raw `dict` outputs
 
+For `When(...)`:
+
+- string conditions read from named adapter payloads and raw `dict` outputs
+- ref-field conditions read from registered `@ref` model instances only
+- conditions must resolve to `bool`
+
 If a workflow uses branching forms and does not define the reserved `result` node, `WorkflowRun.result` is `None`.
+
+Any workflow using `When(...)` together with the reserved `result` node is rejected until `Join` exists.

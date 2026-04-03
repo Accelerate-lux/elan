@@ -457,7 +457,7 @@ workflow = Workflow(
 
 ## First-Pass Branching
 
-The current runtime supports two first-pass branching forms.
+The current runtime supports three branching forms.
 
 Exclusive branching uses `next` as a mapping plus `route_on`:
 
@@ -511,6 +511,55 @@ workflow = Workflow(
 )
 ```
 
+Conditional multi-routing uses `When(...)` entries in `next`:
+
+```python
+from pydantic import BaseModel
+from elan import Node, When, Workflow, ref, task
+
+
+@ref
+class RoutePayload(BaseModel):
+    name: str
+    should_email: bool
+    should_ticket: bool
+
+
+@task
+def classify() -> RoutePayload:
+    return RoutePayload(name="world", should_email=True, should_ticket=True)
+
+
+@task
+async def send_email(name: str):
+    return f"email:{name}"
+
+
+@task
+async def open_ticket(name: str):
+    return f"ticket:{name}"
+
+
+@task
+async def audit(name: str):
+    return f"audit:{name}"
+
+
+workflow = Workflow(
+    "conditional_routes",
+    start=Node(
+        run=classify,
+        next=[
+            When(RoutePayload.should_email, "send_email"),
+            When(RoutePayload.should_ticket, ["open_ticket", "audit"]),
+        ],
+    ),
+    send_email=send_email,
+    open_ticket=open_ticket,
+    audit=audit,
+)
+```
+
 For branched workflows, `run.outputs` stays branch-aware:
 
 ```python
@@ -529,11 +578,12 @@ For branched workflows, `run.outputs` stays branch-aware:
 
 If a workflow uses branching forms and does not define the reserved `result` node, `run.result` is `None`.
 
+For `When(...)`, each entry is evaluated independently. Zero matches is valid, and duplicate matched destinations are allowed.
+
 ## Still Unsupported
 
 These features are still not supported by the runtime:
 
-- `When(...)`
 - ref-based `route_on`
 - sub-workflows
 - barriers and joins

@@ -54,15 +54,31 @@ class Scheduler:
                 f"Workflow '{run_state.workflow.name}' reached a non-quiescent state without queued activations."
             )
 
-        activation.output = await self._execute_activation(activation)
+        activation.output = await self._execute_activation(run_state, activation)
         self.settle(activation)
         return self.next_settled(run_state)
 
-    async def _execute_activation(self, activation: Activation) -> object:
+    async def _execute_activation(
+        self,
+        run_state: RunState,
+        activation: Activation,
+    ) -> object:
         if activation.is_entry:
-            args, kwargs = bind_entry_input(activation.node.run, activation.input_value)
+            args, kwargs = bind_entry_input(
+                activation.node.run,
+                activation.input_value,
+                input_spec=activation.node.bind_input,
+                workflow_input=run_state.workflow_input,
+                context_value=run_state.context_value,
+            )
         else:
-            args, kwargs = bind_input(activation.node.run, activation.input_value)
+            args, kwargs = bind_input(
+                activation.node.run,
+                activation.input_value,
+                input_spec=activation.node.bind_input,
+                workflow_input=run_state.workflow_input,
+                context_value=run_state.context_value,
+            )
 
         if activation.node.run.is_async:
             execution = activation.node.run.fn(*args, **kwargs)

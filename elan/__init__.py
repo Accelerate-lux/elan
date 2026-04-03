@@ -1,4 +1,5 @@
 from .node import Node
+from ._refs import Context, Input, Upstream, ref
 from .result import WorkflowRun
 from .task import Task, task
 from .workflow import Workflow
@@ -8,5 +9,9 @@ __all__ = [
     "WorkflowRun",
     "Task",
     "Node",
+    "Upstream",
+    "Input",
+    "Context",
     "task",
+    "ref",
 ]

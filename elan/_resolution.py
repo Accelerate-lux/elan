@@ -7,8 +7,8 @@ def resolve_node(workflow_name: str, value: Task | str | Node) -> Node:
         return Node(
             run=resolve_task_ref(workflow_name, value.run),
             next=value.next,
-            input=value.input,
-            output=value.output,
+            bind_input=value.bind_input,
+            bind_output=value.bind_output,
             route_on=value.route_on,
         )
 

@@ -1,7 +1,7 @@
 from typing import Any
 
 from ._activation import Activation
-from ._binding import map_output
+from ._binding import bind_output
 from ._branch import Branch
 from ._resolution import resolve_node
 from ._routing import resolve_linear_next
@@ -64,7 +64,7 @@ class Orchestrator:
             return None
 
         next_name, _next_node = next_target
-        next_input = map_output(settled.node.output, settled.output)
+        next_input = bind_output(settled.node.bind_output, settled.output)
         branch.advance_to(next_name)
         return self._create_activation(
             branch,
@@ -117,7 +117,7 @@ class Orchestrator:
         self.run_state._branch_counter += 1
         branch = Branch(
             id=f"branch-{self.run_state._branch_counter}",
-            _current_node_name=current_node_name,
+            current_node_name=current_node_name,
             _is_entry=is_entry,
         )
         self.run_state.branches[branch.id] = branch

@@ -20,9 +20,8 @@ class RunState:
     context_value: BaseModel | None = None
     result: Any = None
     last_output: Any = None
-    outputs: dict[str, list[Any]] = field(default_factory=dict)
+    outputs: dict[str, dict[str, list[Any]]] = field(default_factory=dict)
     branches: dict[str, Branch] = field(default_factory=dict)
     activations: dict[str, Activation] = field(default_factory=dict)
     status: str = "created"
-    _branch_counter: int = 0
-    _activation_counter: int = 0
+    used_branching: bool = False

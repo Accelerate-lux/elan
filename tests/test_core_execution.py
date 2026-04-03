@@ -4,7 +4,7 @@ from elan import Node, Workflow
 
 
 @pytest.mark.asyncio
-async def test_run_workflow_one_async_task(mock_task_factory):
+async def test_run_workflow_one_async_task(mock_task_factory, branch_id):
     async def _hello():
         return "Hello, world!"
 
@@ -16,11 +16,15 @@ async def test_run_workflow_one_async_task(mock_task_factory):
 
     hello.mock.assert_called_once_with()
     assert run.result == "Hello, world!"
-    assert run.outputs == {"_hello": ["Hello, world!"]}
+    assert run.outputs == {
+        branch_id[0]: {
+            "_hello": ["Hello, world!"],
+        }
+    }
 
 
 @pytest.mark.asyncio
-async def test_run_workflow_one_sync_task(mock_task_factory):
+async def test_run_workflow_one_sync_task(mock_task_factory, branch_id):
     def _hello():
         return "Hello, world!"
 
@@ -32,11 +36,15 @@ async def test_run_workflow_one_sync_task(mock_task_factory):
 
     hello.mock.assert_called_once_with()
     assert run.result == "Hello, world!"
-    assert run.outputs == {"_hello": ["Hello, world!"]}
+    assert run.outputs == {
+        branch_id[0]: {
+            "_hello": ["Hello, world!"],
+        }
+    }
 
 
 @pytest.mark.asyncio
-async def test_run_workflow_two_tasks(mock_task_factory):
+async def test_run_workflow_two_tasks(mock_task_factory, branch_id):
     def _prepare():
         return "world"
 
@@ -58,13 +66,15 @@ async def test_run_workflow_two_tasks(mock_task_factory):
     greet.mock.assert_called_once_with("world")
     assert run.result == "Hello, world!"
     assert run.outputs == {
-        "_prepare": ["world"],
-        "_greet": ["Hello, world!"],
+        branch_id[0]: {
+            "_prepare": ["world"],
+            "_greet": ["Hello, world!"],
+        }
     }
 
 
 @pytest.mark.asyncio
-async def test_run_workflow_reserved_result_exports_value(mock_task_factory):
+async def test_run_workflow_reserved_result_exports_value(mock_task_factory, branch_id):
     def _prepare():
         return 2, 3
 
@@ -86,6 +96,9 @@ async def test_run_workflow_reserved_result_exports_value(mock_task_factory):
     add.mock.assert_called_once_with(2, 3)
     assert run.result == 5
     assert run.outputs == {
-        "_prepare": [(2, 3)],
-        "_add": [5],
+        branch_id[0]: {
+            "_prepare": [(2, 3)],
+            "_add": [5],
+        }
     }
+

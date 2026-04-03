@@ -80,10 +80,14 @@ While a `Workflow` acts as a reusable blueprint, a **Run** is a single, concrete
 
 Calling `await workflow.run()` executes the graph and returns a `WorkflowRun` object.
 
-`WorkflowRun.outputs` is the execution report: a dictionary mapping each executed task's name to a list of its outputs. For the single-task workflow above, the run produces:
+`WorkflowRun.outputs` is the execution report: a dictionary grouped first by branch id, then by executed task name. For the single-task workflow above, the run produces:
 
 ```python
-{"hello": ["Hello, world!"]}
+{
+    "branch-1": {
+        "hello": ["Hello, world!"],
+    }
+}
 ```
 
 When the workflow defines the reserved `result` node, its exported value is available on `WorkflowRun.result`.
@@ -100,7 +104,7 @@ A `Node` uses three primary fields to establish its context within the graph:
 
 * **`run`**: Specifies the task to execute.
 * **`next`**: Defines the directed edge to the next node in the workflow.
-* **`output`**: Acts as a data adapter, reshaping the task's result before it moves downstream.
+* **`bind_output`**: Acts as a data adapter, reshaping the task's result before it moves downstream.
 
 By keeping these routing concerns on the `Node` rather than the task itself, Elan ensures your core business logic remains entirely decoupled from the workflow's topology.
 
@@ -140,8 +144,10 @@ This execution produces:
 
 ```python
 {
-    "prepare": ["world"],
-    "greet": ["Hello, world!"],
+    "branch-1": {
+        "prepare": ["world"],
+        "greet": ["Hello, world!"],
+    }
 }
 ```
 
@@ -340,7 +346,7 @@ By using type hints on the receiving task, you have full control over which of t
 
 ### 5. Explicit Output Adaptation
 
-While automatic binding handles the most natural cases, sometimes the output of one task doesn't perfectly match the input signature of the next. Instead of writing boilerplate "adapter tasks," Elan lets you reshape the data directly on the `Node` using the `output` parameter.
+While automatic binding handles the most natural cases, sometimes the output of one task doesn't perfectly match the input signature of the next. Instead of writing boilerplate "adapter tasks," Elan lets you reshape the data directly on the `Node` using the `bind_output` parameter.
 
 ```python
 from elan import Node, Workflow, task
@@ -449,14 +455,85 @@ workflow = Workflow(
 
 `@ref` is only required for field-reference features. Ordinary Pydantic binding still works without it.
 
-## Unsupported Features
+## First-Pass Branching
 
-These features are not supported by the runtime:
+The current runtime supports two first-pass branching forms.
 
-- branching
-- fan-out
-- `next` as `list`
-- `next` as `dict`
-- routing through `route_on`
+Exclusive branching uses `next` as a mapping plus `route_on`:
+
+```python
+from elan import Node, Workflow, task
+
+
+@task
+def prepare():
+    return "world", "formal"
+
+
+@task
+async def greet_formal(name: str):
+    return f"Hello, {name}."
+
+
+@task
+async def greet_casual(name: str):
+    return f"Hey {name}!"
+
+
+workflow = Workflow(
+    "branching_greet",
+    start=Node(
+        run=prepare,
+        bind_output=["name", "style"],
+        route_on="style",
+        next={
+            "formal": "greet_formal",
+            "casual": "greet_casual",
+        },
+    ),
+    greet_formal=greet_formal,
+    greet_casual=greet_casual,
+)
+```
+
+Fan-out uses `next` as a list:
+
+```python
+workflow = Workflow(
+    "fan_out_profile",
+    start=Node(
+        run=prepare,
+        bind_output="name",
+        next=["greet", "badge"],
+    ),
+    greet=greet,
+    badge=badge,
+)
+```
+
+For branched workflows, `run.outputs` stays branch-aware:
+
+```python
+{
+    "branch-1": {
+        "prepare": ["world"],
+    },
+    "branch-2": {
+        "greet": ["Hello, world!"],
+    },
+    "branch-3": {
+        "badge": ["badge:world"],
+    },
+}
+```
+
+If a workflow uses branching forms and does not define the reserved `result` node, `run.result` is `None`.
+
+## Still Unsupported
+
+These features are still not supported by the runtime:
+
+- `When(...)`
+- ref-based `route_on`
 - sub-workflows
 - barriers and joins

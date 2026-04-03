@@ -5,7 +5,7 @@ from elan import Node, Workflow, task
 
 
 @pytest.mark.asyncio
-async def test_run_workflow_start_resolved_by_canonical_key(mock_task_factory):
+async def test_run_workflow_start_resolved_by_canonical_key(mock_task_factory, branch_id):
     async def _hello():
         return "Hello, world!"
 
@@ -17,11 +17,15 @@ async def test_run_workflow_start_resolved_by_canonical_key(mock_task_factory):
 
     hello.mock.assert_called_once_with()
     assert run.result == "Hello, world!"
-    assert run.outputs == {"_hello": ["Hello, world!"]}
+    assert run.outputs == {
+        branch_id[0]: {
+            "_hello": ["Hello, world!"],
+        }
+    }
 
 
 @pytest.mark.asyncio
-async def test_run_workflow_node_resolved_by_canonical_key(mock_task_factory):
+async def test_run_workflow_node_resolved_by_canonical_key(mock_task_factory, branch_id):
     def _prepare():
         return "world"
 
@@ -43,13 +47,15 @@ async def test_run_workflow_node_resolved_by_canonical_key(mock_task_factory):
     greet.mock.assert_called_once_with(name="world")
     assert run.result == "Hello, world!"
     assert run.outputs == {
-        "_prepare": ["world"],
-        "_greet": ["Hello, world!"],
+        branch_id[0]: {
+            "_prepare": ["world"],
+            "_greet": ["Hello, world!"],
+        }
     }
 
 
 @pytest.mark.asyncio
-async def test_run_workflow_resolves_tasks_by_alias(mock_task_factory):
+async def test_run_workflow_resolves_tasks_by_alias(mock_task_factory, branch_id):
     def _prepare():
         return "world"
 
@@ -71,8 +77,10 @@ async def test_run_workflow_resolves_tasks_by_alias(mock_task_factory):
     greet.mock.assert_called_once_with(name="world")
     assert run.result == "Hello, world!"
     assert run.outputs == {
-        "prepare": ["world"],
-        "greet": ["Hello, world!"],
+        branch_id[0]: {
+            "prepare": ["world"],
+            "greet": ["Hello, world!"],
+        }
     }
 
 
@@ -120,3 +128,4 @@ def test_context_instance_is_rejected():
         match="Workflow context must be a Pydantic model class or None",
     ):
         Workflow("hello_world", start="missing.task", context=RunContext())
+

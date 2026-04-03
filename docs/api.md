@@ -109,12 +109,9 @@ Defines a configured task node.
 Supported fields:
 
 - `run: Task | str`
-- `next` as `str`
+- `next` as `str | list[str] | dict[str, str]`
 - `bind_input`
 - `bind_output`
-
-Declared but unsupported fields:
-
 - `route_on`
 
 ## `WorkflowRun`
@@ -122,7 +119,7 @@ Declared but unsupported fields:
 Fields:
 
 - `result: Any`
-- `outputs: dict[str, list[Any]]`
+- `outputs: dict[str, dict[str, list[Any]]]`
 
 ## Binding Rules
 
@@ -132,7 +129,34 @@ Fields:
 
 If no reserved `result` node is defined, `WorkflowRun.result` falls back to the last terminal output of the run.
 
-`WorkflowRun.outputs` stores executed task outputs grouped by task name.
+`WorkflowRun.outputs` stores executed task outputs grouped first by branch id, then by task name.
+
+For linear runs, the shape still uses the initial branch id:
+
+```python
+{
+    "branch-1": {
+        "prepare": ["world"],
+        "greet": ["Hello, world!"],
+    }
+}
+```
+
+For branched runs, sibling outputs are separated by branch id:
+
+```python
+{
+    "branch-1": {
+        "prepare": ["world"],
+    },
+    "branch-2": {
+        "greet": ["Hello, world!"],
+    },
+    "branch-3": {
+        "badge": ["badge:world"],
+    },
+}
+```
 
 Between nodes, Elan binds values using these rules:
 
@@ -144,3 +168,17 @@ Between nodes, Elan binds values using these rules:
 - explicit `Node.bind_output` mapping creates a named adapter payload for downstream binding
 - `Node.bind_input` may provide explicit literal values for target parameters
 - `Node.bind_input` may also read from `Upstream.field`, `Input.field`, and `Context.field`
+
+## Branching Rules
+
+The current runtime supports two first-pass branching forms:
+
+- `next={"formal": "greet_formal", "casual": "greet_casual"}` with `route_on="style"`
+- `next=["a", "b"]` for fan-out
+
+`route_on` is string-only in the current runtime. For mapping-based branching, Elan reads the route selector from:
+
+- named adapter payloads created by `bind_output`
+- raw `dict` outputs
+
+If a workflow uses branching forms and does not define the reserved `result` node, `WorkflowRun.result` is `None`.

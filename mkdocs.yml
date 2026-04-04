@@ -9,6 +9,8 @@ exclude_docs: |
   demo_ideas_catalog.md
 not_in_nav: |
   comparison/baseline_workflow.md
+  api.md
+  basics.md
 
 theme:
   name: material
@@ -40,11 +42,25 @@ markdown_extensions:
 
 nav:
   - Home: index.md
-  - Basics: basics.md
-  - API:
-      - Overview: api.md
-      - Python Reference: reference/python-api.md
-  - Design Philosophy: design_philosophy.md
+  - Learn:
+      - Quickstart: learn/quickstart.md
+      - Core Concepts: learn/core-concepts.md
+  - Guides:
+      - Linear Workflows: guides/linear-workflows.md
+      - Data Binding: guides/data-binding.md
+      - Branching: guides/branching.md
+      - Join on Result: guides/join-result.md
+      - Context: guides/context.md
+      - Composition: guides/composition.md
+      - Dynamic Execution: guides/dynamic-execution.md
+  - Reference:
+      - API Overview: reference/api.md
+      - Runtime Behavior: reference/runtime-behavior.md
+      - Python API: reference/python-api.md
+  - Explanations:
+      - Design Philosophy: design_philosophy.md
+      - Dynamic Model: explanations/dynamic-model.md
+      - Status: explanations/status.md
   - Comparisons:
       - Summary: comparison/summary.md
       - Dynamic Models: comparison/dynamic_models.md

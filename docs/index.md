@@ -51,8 +51,10 @@ print(run.outputs)
 
 ## Start here
 
-- [Basics](basics.md) for the execution model, binding rules, branching, and join behavior
-- [API](api.md) for the compact public surface reference
+- [Quickstart](learn/quickstart.md) for the smallest runnable example
+- [Core Concepts](learn/core-concepts.md) for the Task / Node / Workflow model
+- [Linear Workflows](guides/linear-workflows.md) and [Data Binding](guides/data-binding.md) for the first practical steps
+- [Runtime Behavior](reference/runtime-behavior.md) for exact result, outputs, branching, and join semantics
 - [Python Reference](reference/python-api.md) for generated API docs
 - [Design Philosophy](design_philosophy.md) for the product direction
 

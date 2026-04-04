@@ -1,8 +1,6 @@
 # Elan
 
-Elan is a graph-native orchestration engine for dynamic agent and data workflows.
-
-Traditional DAG orchestrators are strong at static scheduling but awkward once the workflow structure needs to branch, synchronize, or grow at runtime. Many agent runtimes support dynamic control flow, but often with heavy framework ceremony or shared-state-machine abstractions. Elan is trying to sit between those two shapes.
+Elan is a Python workflow orchestration engine for AI agents, data orchestration, and mixed workloads. It gives teams a unified tool to build complex multi-step systems, from data pipelines to agent-driven applications, that stay explicit, composable, and predictable as they grow.
 
 ## What Elan focuses on
 

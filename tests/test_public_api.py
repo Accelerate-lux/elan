@@ -1,3 +1,5 @@
+import asyncio
+
 import pytest
 from pydantic import BaseModel
 
@@ -261,9 +263,11 @@ async def test_join_reducer_with_list_branching(mock_task_factory, branch_id):
         return "world"
 
     async def _greet(name: str):
+        await asyncio.sleep(0)
         return f"Hello, {name}!"
 
     async def _badge(name: str):
+        await asyncio.sleep(0.01)
         return f"badge:{name}"
 
     def _collect(values: list[str]):

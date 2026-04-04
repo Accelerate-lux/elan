@@ -4,7 +4,9 @@ import pytest
 from pydantic import BaseModel
 
 from elan import Join, Node, When, Workflow, ref
+from elan._orchestrator import Orchestrator
 from elan._refs import ModelFieldRef
+from elan._scheduler import Scheduler
 
 
 @ref
@@ -1298,4 +1300,63 @@ def test_run_workflow_multiple_when_matches_can_execute_concurrently(
             "_send_notification": ["notify:world"],
         },
     }
+
+
+def test_scheduler_returns_one_settled_activation_while_sibling_keeps_running(
+    mock_task_factory,
+):
+    async def _scenario():
+        events: list[str] = []
+
+        def _prepare():
+            return "world"
+
+        async def _fast(name: str):
+            events.append("fast-start")
+            await asyncio.sleep(0.01)
+            events.append("fast-end")
+            return f"fast:{name}"
+
+        async def _slow(name: str):
+            events.append("slow-start")
+            await asyncio.sleep(0.05)
+            events.append("slow-end")
+            return f"slow:{name}"
+
+        prepare = mock_task_factory(_prepare)
+        fast = mock_task_factory(_fast)
+        slow = mock_task_factory(_slow)
+
+        workflow = Workflow(
+            "fan_out_profile",
+            start=Node(
+                run=prepare,
+                bind_output="name",
+                next=["fast", "slow"],
+            ),
+            fast=fast,
+            slow=slow,
+        )
+
+        run_state = workflow._create_run_state({})
+        orchestrator = Orchestrator(run_state=run_state)
+        scheduler = Scheduler(orchestrator=orchestrator)
+        orchestrator._seed_run(scheduler, {})
+
+        settled = await orchestrator._next_settled_activation(scheduler)
+        assert settled is not None
+        orchestrator._enqueue_next_activations(scheduler, settled)
+
+        first_sibling = await scheduler.update()
+        assert first_sibling is not None
+        assert first_sibling.node.run.name == "_fast"
+        assert set(events[:2]) == {"fast-start", "slow-start"}
+        assert len(scheduler.state.running) == 1
+
+        second_sibling = await scheduler.update()
+        assert second_sibling is not None
+        assert second_sibling.node.run.name == "_slow"
+        assert len(scheduler.state.running) == 0
+
+    asyncio.run(_scenario())
 

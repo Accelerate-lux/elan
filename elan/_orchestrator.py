@@ -94,15 +94,6 @@ class Orchestrator:
     ) -> Activation:
         return self.run_state.activations[activation_id]
 
-    async def execute_activation(
-        self,
-        activation: Activation,
-    ) -> None:
-        await activation.execute(
-            workflow_input=self.run_state.workflow_input,
-            context=self.run_state.context,
-        )
-
     def _enqueue_next_activations(
         self,
         scheduler: Scheduler,

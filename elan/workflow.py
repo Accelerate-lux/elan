@@ -24,9 +24,7 @@ class Workflow:
         if context is not None and (
             not isinstance(context, type) or not issubclass(context, BaseModel)
         ):
-            raise TypeError(
-                "Workflow context must be a Pydantic model class or None."
-            )
+            raise TypeError("Workflow context must be a Pydantic model class or None.")
         if isinstance(start, Join):
             raise TypeError(
                 f"Workflow '{name}' only allows Join(...) as the reserved result node."
@@ -39,7 +37,7 @@ class Workflow:
 
         self.name = name
         self.start = start
-        self.context_model = context
+        self.context_cls = context
         self.nodes = nodes
 
     async def run(self, **input: Any) -> WorkflowRun:
@@ -55,15 +53,15 @@ class Workflow:
                 nodes=dict(self.nodes),
             ),
             workflow_input=dict(workflow_input),
-            context_value=self._create_context_value(),
+            context=self._create_context(),
             join_state=self._create_join_state(),
         )
 
-    def _create_context_value(self) -> BaseModel | None:
-        if self.context_model is None:
+    def _create_context(self) -> BaseModel | None:
+        if self.context_cls is None:
             return None
 
-        return self.context_model()
+        return self.context_cls()
 
     def _create_join_state(self) -> JoinState | None:
         join_value = self.nodes.get("result")

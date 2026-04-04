@@ -18,7 +18,7 @@ class RunState:
     workflow: "Workflow"
     graph: GraphState
     workflow_input: dict[str, Any] = field(default_factory=dict)
-    context_value: BaseModel | None = None
+    context: BaseModel | None = None
     result: Any = None
     last_output: Any = None
     outputs: dict[str, dict[str, list[Any]]] = field(default_factory=dict)

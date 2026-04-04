@@ -69,7 +69,7 @@ class Scheduler:
                 activation.input_value,
                 input_spec=activation.node.bind_input,
                 workflow_input=run_state.workflow_input,
-                context_value=run_state.context_value,
+                context=run_state.context,
             )
         else:
             args, kwargs = bind_input(
@@ -77,7 +77,7 @@ class Scheduler:
                 activation.input_value,
                 input_spec=activation.node.bind_input,
                 workflow_input=run_state.workflow_input,
-                context_value=run_state.context_value,
+                context=run_state.context,
             )
 
         if activation.node.run.is_async:

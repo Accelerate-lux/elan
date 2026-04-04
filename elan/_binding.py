@@ -19,7 +19,7 @@ def bind_entry_input(
     *,
     input_spec: dict[str, Any] | None = None,
     workflow_input: dict[str, Any] | None = None,
-    context_value: BaseModel | None = None,
+    context: BaseModel | None = None,
 ) -> tuple[tuple[Any, ...], dict[str, Any]]:
     if input_spec is not None:
         return (), _bind_with_input_spec(
@@ -27,7 +27,7 @@ def bind_entry_input(
             input_spec=input_spec,
             fallback_value=value,
             workflow_input=workflow_input or value,
-            context_value=context_value,
+            context=context,
             upstream_value=None,
             treat_dict_as_named_payload=True,
         )
@@ -40,7 +40,7 @@ def bind_input(
     *,
     input_spec: dict[str, Any] | None = None,
     workflow_input: dict[str, Any] | None = None,
-    context_value: BaseModel | None = None,
+    context: BaseModel | None = None,
 ) -> tuple[tuple[Any, ...], dict[str, Any]]:
     if input_spec is not None:
         return (), _bind_with_input_spec(
@@ -48,7 +48,7 @@ def bind_input(
             input_spec=input_spec,
             fallback_value=value,
             workflow_input=workflow_input or {},
-            context_value=context_value,
+            context=context,
             upstream_value=value,
             treat_dict_as_named_payload=False,
         )
@@ -87,7 +87,7 @@ def _bind_with_input_spec(
     input_spec: dict[str, Any],
     fallback_value: Any,
     workflow_input: dict[str, Any],
-    context_value: BaseModel | None,
+    context: BaseModel | None,
     upstream_value: Any,
     treat_dict_as_named_payload: bool,
 ) -> dict[str, Any]:
@@ -104,7 +104,7 @@ def _bind_with_input_spec(
             parameter_name=parameter_name,
             value=value,
             workflow_input=workflow_input,
-            context_value=context_value,
+            context=context,
             upstream_value=upstream_value,
         )
         for parameter_name, value in input_spec.items()
@@ -130,7 +130,7 @@ def _resolve_input_value(
     parameter_name: str,
     value: Any,
     workflow_input: dict[str, Any],
-    context_value: BaseModel | None,
+    context: BaseModel | None,
     upstream_value: Any,
 ) -> Any:
     if isinstance(value, SourceFieldRef):
@@ -139,7 +139,7 @@ def _resolve_input_value(
             parameter_name=parameter_name,
             ref=value,
             workflow_input=workflow_input,
-            context_value=context_value,
+            context=context,
             upstream_value=upstream_value,
         )
     elif isinstance(value, ModelFieldRef):
@@ -160,7 +160,7 @@ def _resolve_source_field_ref(
     parameter_name: str,
     ref: SourceFieldRef,
     workflow_input: dict[str, Any],
-    context_value: BaseModel | None,
+    context: BaseModel | None,
     upstream_value: Any,
 ) -> Any:
     if ref.source == "input":
@@ -171,14 +171,14 @@ def _resolve_source_field_ref(
         return workflow_input[ref.field_name]
 
     if ref.source == "context":
-        if context_value is None:
+        if context is None:
             raise TypeError(
                 f"Task '{target.name}' cannot read Context.{ref.field_name} without workflow context."
             )
         return _resolve_object_field(
             source_name="context",
             field_name=ref.field_name,
-            value=context_value,
+            value=context,
         )
 
     if upstream_value is None:

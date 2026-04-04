@@ -125,6 +125,8 @@ Implementation goal:
 - first implementation only
 - restricted to reserved `result`
 - no mid-graph join work
+- join contribution order follows runtime arrival order
+- reducers should therefore be order-agnostic unless tests or task timing make ordering explicit
 
 Test work:
 - new `tests/test_join_result.py`
@@ -134,6 +136,10 @@ Acceptance:
 - join waits on workflow-scope completion as currently designed
 - exported value lands in `WorkflowRun.result`
 - execution history still lands in `WorkflowRun.outputs`
+
+Current consequence:
+- now that sibling branches execute concurrently, join contribution order is intentionally not guaranteed by declaration order, branch id, or creation order
+- if a reducer depends on ordering, that ordering must be established by the workflow author rather than assumed from the runtime
 
 ### 7. Context and `after`
 Sixth slice.
@@ -228,3 +234,5 @@ Usage rule:
   - `SchedulerState`
   - `GraphState`
 - No new feature work goes back into `Workflow.run()` except thin delegation changes.
+- Scheduler concurrency is currently unlimited for all runnable activations.
+- Concurrency limits, priorities, and graph-execution ordering remain a later scheduler-improvement phase rather than part of the current branching/join slices.

@@ -1,3 +1,5 @@
+import asyncio
+
 import pytest
 
 from elan import Join, Node, When, Workflow, task
@@ -37,9 +39,11 @@ async def test_run_workflow_join_multiple_contributions_follow_arrival_order(
         return "world"
 
     async def _greet(name: str):
+        await asyncio.sleep(0)
         return f"Hello, {name}!"
 
     async def _badge(name: str):
+        await asyncio.sleep(0.01)
         return f"badge:{name}"
 
     prepare = mock_task_factory(_prepare)
@@ -83,9 +87,11 @@ async def test_run_workflow_join_reducer_receives_collected_list(
         return "world"
 
     async def _greet(name: str):
+        await asyncio.sleep(0)
         return f"Hello, {name}!"
 
     async def _badge(name: str):
+        await asyncio.sleep(0.01)
         return f"badge:{name}"
 
     def _collect(values: list[str]):
@@ -220,9 +226,11 @@ async def test_run_workflow_join_with_mixed_target_producer_list(
         return "world", True
 
     async def _greet(name: str):
+        await asyncio.sleep(0)
         return f"Hello, {name}!"
 
     async def _badge(name: str):
+        await asyncio.sleep(0.01)
         return f"badge:{name}"
 
     prepare = mock_task_factory(_prepare)

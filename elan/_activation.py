@@ -1,6 +1,10 @@
+import asyncio
 from dataclasses import dataclass
 from typing import Any, Literal
 
+from pydantic import BaseModel
+
+from ._binding import bind_entry_input, bind_input
 from .node import Node
 
 ActivationStatus = Literal["queued", "running", "settled"]
@@ -16,3 +20,43 @@ class Activation:
     is_entry: bool
     status: ActivationStatus = "queued"
     output: Any = None
+
+    def mark_queued(self) -> None:
+        self.status = "queued"
+
+    def mark_running(self) -> None:
+        self.status = "running"
+
+    def mark_settled(self) -> None:
+        self.status = "settled"
+
+    async def execute(
+        self,
+        *,
+        workflow_input: dict[str, Any],
+        context: BaseModel | None,
+    ) -> Any:
+        if self.is_entry:
+            args, kwargs = bind_entry_input(
+                self.node.run,
+                self.input_value,
+                input_spec=self.node.bind_input,
+                workflow_input=workflow_input,
+                context=context,
+            )
+        else:
+            args, kwargs = bind_input(
+                self.node.run,
+                self.input_value,
+                input_spec=self.node.bind_input,
+                workflow_input=workflow_input,
+                context=context,
+            )
+
+        if self.node.run.is_async:
+            execution = self.node.run.fn(*args, **kwargs)
+        else:
+            execution = asyncio.to_thread(self.node.run.fn, *args, **kwargs)
+
+        self.output = await execution
+        return self.output

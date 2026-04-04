@@ -5,7 +5,6 @@ from uuid import uuid4
 from ._activation import Activation
 from ._binding import bind_output
 from ._branch import Branch
-from .join import Join
 from ._resolution import resolve_node
 from ._routing import (
     ResolvedNext,
@@ -14,6 +13,7 @@ from ._routing import (
 )
 from ._run_state import RunState
 from ._scheduler import Scheduler
+from .join import Join
 from .node import Node
 from .result import WorkflowRun
 from .task import Task
@@ -28,39 +28,89 @@ class Orchestrator:
         self.run_state = run_state
 
     async def run(self, **input: Any) -> WorkflowRun:
-        scheduler = Scheduler()
+        scheduler = Scheduler(orchestrator=self)
+        self._seed_run(scheduler, input)
 
+        while True:
+            settled = await self._next_settled_activation(scheduler)
+            if settled is None:
+                return await self._complete_run_or_raise(scheduler)
+
+            self._record_output(settled)
+            self._enqueue_next_activations(scheduler, settled)
+
+    def _seed_run(
+        self,
+        scheduler: Scheduler,
+        input_value: dict[str, Any],
+    ) -> None:
         initial_branch = self._create_branch(
             current_node_name="start",
             is_entry=True,
         )
         initial_activation = self._create_activation(
             initial_branch,
-            input_value=input,
+            input_value=input_value,
         )
         scheduler.enqueue(initial_activation)
-        self.run_state.status = "running"
+        self.run_state.mark_running()
 
-        while True:
-            settled = scheduler.next_settled(self.run_state)
-            if settled is None:
-                settled = await scheduler.update(self.run_state)
-                if settled is None:
-                    if self._has_active_branches():
-                        raise RuntimeError(
-                            f"Workflow '{self.run_state.workflow.name}' reached quiescence with active branches."
-                        )
-                    await self._finalize_join()
-                    self.run_state.status = "completed"
-                    return WorkflowRun(
-                        result=self._final_result(),
-                        outputs=self.run_state.outputs,
-                    )
+    async def _next_settled_activation(
+        self,
+        scheduler: Scheduler,
+    ) -> Activation | None:
+        settled = scheduler.next_settled()
+        if settled is not None:
+            return settled
 
-            self._record_output(settled)
-            next_activations = self._progress_branch(settled)
-            for next_activation in next_activations:
-                scheduler.enqueue(next_activation)
+        return await scheduler.update()
+
+    async def _complete_run_or_raise(
+        self,
+        scheduler: Scheduler,
+    ) -> WorkflowRun:
+        if not scheduler.is_quiescent():
+            raise RuntimeError(
+                f"Workflow '{self.run_state.workflow.name}' reached a non-quiescent "
+                "state without queued activations."
+            )
+
+        if self._has_active_branches():
+            raise RuntimeError(
+                f"Workflow '{self.run_state.workflow.name}' reached quiescence with "
+                "active branches."
+            )
+
+        await self._finalize_join()
+        self.run_state.mark_completed()
+        return WorkflowRun(
+            result=self._final_result(),
+            outputs=self.run_state.outputs,
+        )
+
+    def activation_for_id(
+        self,
+        activation_id: str,
+    ) -> Activation:
+        return self.run_state.activations[activation_id]
+
+    async def execute_activation(
+        self,
+        activation: Activation,
+    ) -> None:
+        await activation.execute(
+            workflow_input=self.run_state.workflow_input,
+            context=self.run_state.context,
+        )
+
+    def _enqueue_next_activations(
+        self,
+        scheduler: Scheduler,
+        settled: Activation,
+    ) -> None:
+        next_activations = self._progress_branch(settled)
+        for next_activation in next_activations:
+            scheduler.enqueue(next_activation)
 
     def _progress_branch(
         self,
@@ -69,8 +119,10 @@ class Orchestrator:
         branch = self.run_state.branches[settled.branch_id]
         emitted_value = bind_output(settled.node.bind_output, settled.output)
 
-        if isinstance(settled.node.next, dict) or is_target_producer_list(settled.node.next):
-            self.run_state.used_branching = True
+        if isinstance(settled.node.next, dict) or is_target_producer_list(
+            settled.node.next
+        ):
+            self.run_state.mark_branching_used()
 
         if (
             is_target_producer_list(settled.node.next)
@@ -96,7 +148,9 @@ class Orchestrator:
     ) -> None:
         self.run_state.last_output = activation.output
         branch_outputs = self.run_state.outputs.setdefault(activation.branch_id, {})
-        branch_outputs.setdefault(activation.node.run.name, []).append(activation.output)
+        branch_outputs.setdefault(activation.node.run.name, []).append(
+            activation.output
+        )
         if activation.node_name == "result":
             self.run_state.result = activation.output
 
@@ -178,7 +232,9 @@ class Orchestrator:
         return self.run_state.join_state is not None
 
     def _has_active_branches(self) -> bool:
-        return any(not branch.is_complete for branch in self.run_state.branches.values())
+        return any(
+            not branch.is_complete for branch in self.run_state.branches.values()
+        )
 
     async def _run_join_reducer(
         self,

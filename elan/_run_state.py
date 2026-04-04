@@ -1,6 +1,6 @@
-from dataclasses import dataclass, field
-from typing import TYPE_CHECKING
 from typing import Any
+from typing import TYPE_CHECKING, Literal
+from dataclasses import dataclass, field
 
 from pydantic import BaseModel
 
@@ -11,6 +11,8 @@ from ._join_state import JoinState
 
 if TYPE_CHECKING:
     from .workflow import Workflow
+
+RunStatus = Literal["created", "running", "completed"]
 
 
 @dataclass(slots=True)
@@ -24,6 +26,15 @@ class RunState:
     outputs: dict[str, dict[str, list[Any]]] = field(default_factory=dict)
     branches: dict[str, Branch] = field(default_factory=dict)
     activations: dict[str, Activation] = field(default_factory=dict)
-    status: str = "created"
+    status: RunStatus = "created"
     used_branching: bool = False
     join_state: JoinState | None = None
+
+    def mark_running(self) -> None:
+        self.status = "running"
+
+    def mark_completed(self) -> None:
+        self.status = "completed"
+
+    def mark_branching_used(self) -> None:
+        self.used_branching = True

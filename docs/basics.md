@@ -677,6 +677,8 @@ workflow = Workflow(
 - it collects the emitted values routed to `result`
 - `Join()` returns the collected list
 - `Join(run=reducer)` calls the reducer with that list as one value
+- contribution order follows runtime arrival order and is not otherwise guaranteed
+- reducers should therefore be order-agnostic unless the workflow intentionally constrains completion timing
 - the reduced result appears on `run.result`
 - join reduction is not recorded in `run.outputs`
 
@@ -687,3 +689,5 @@ These features are still not supported by the runtime:
 - sub-workflows
 - mid-graph joins
 - general barriers
+
+Scheduler improvements such as concurrency limits, priorities, and graph-execution ordering are also deferred to a later scheduler-focused phase. The current scheduler launches all runnable activations without a limit.

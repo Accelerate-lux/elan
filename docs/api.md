@@ -223,4 +223,6 @@ If `result=Join(...)` is used:
 - non-contributing branches are still awaited
 - `Join()` returns the collected list
 - `Join(run=reducer)` calls the reducer with the collected list as one value
+- contribution order follows runtime arrival order and is not otherwise guaranteed
+- reducers should therefore be order-agnostic unless the workflow explicitly constrains completion order
 - join reduction is not recorded in `WorkflowRun.outputs`

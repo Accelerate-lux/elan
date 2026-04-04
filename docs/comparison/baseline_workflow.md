@@ -51,9 +51,6 @@ That makes it a useful shared test for both `Capabilities` and `Usage`. It is no
 
 ## Provenance
 
-This public comparison set builds on the internal working notes in:
+This page is the stable public reference workflow for the comparison docs in `docs/comparison/`.
 
-- [tool_comparison_plan.md](../internals/tool_comparison_plan.md)
-- [baseline_syntax_comparison.md](../internals/baseline_syntax_comparison.md)
-
-Those internal notes remain source material. This page is the stable public reference for the comparison docs in `docs/comparison/`.
+It is derived from internal working notes, but those internal materials are intentionally not part of the public docs site.

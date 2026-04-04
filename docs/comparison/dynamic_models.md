@@ -114,5 +114,5 @@ That distinction is the clearest explanation for why Elan sits between scheduler
 - Temporal Continue-As-New: [https://docs.temporal.io/develop/python/continue-as-new](https://docs.temporal.io/develop/python/continue-as-new)
 - LangGraph overview: [https://docs.langchain.com/oss/python/langgraph/overview](https://docs.langchain.com/oss/python/langgraph/overview)
 - LangGraph graph API: [https://docs.langchain.com/oss/python/langgraph/graph-api](https://docs.langchain.com/oss/python/langgraph/graph-api)
-- Elan dynamic continuation notes: [interface_design.md](../internals/interface_design.md)
-- Elan type-system notes on dynamic workflows: [type_system_requirements.md](../internals/type_system_requirements.md)
+- Elan public API and behavior overview: [../api.md](../api.md)
+- Elan execution model and branching overview: [../basics.md](../basics.md)

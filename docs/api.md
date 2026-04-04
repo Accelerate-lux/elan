@@ -3,6 +3,7 @@
 This document is a compact reference for the Elan public API.
 
 For an introduction to the model, see [Basics](basics.md).
+For generated API docs from the Python package, see [Python Reference](reference/python-api.md).
 
 ## `@task`
 

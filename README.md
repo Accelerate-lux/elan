@@ -73,7 +73,12 @@ print(run.result)
 # Hello, World!
 
 print(run.outputs)
-# {'prepare': ['World'], 'greet': ['Hello, World!']}
+# {
+#     "branch-1": {
+#         "prepare": ["World"],
+#         "greet": ["Hello, World!"],
+#     }
+# }
 ```
 
 ## Documentation

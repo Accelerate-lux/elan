@@ -1,3 +1,5 @@
+import asyncio
+
 import pytest
 from pydantic import BaseModel
 
@@ -1146,4 +1148,154 @@ async def test_run_workflow_branch_ids_are_distinct_for_siblings(mock_task_facto
 
     assert sorted(run.outputs) == [branch_id[0], branch_id[1], branch_id[2]]
     assert run.outputs[branch_id[1]] != run.outputs[branch_id[2]]
+
+
+def test_run_workflow_fan_out_siblings_can_execute_concurrently(
+    mock_task_factory,
+    branch_id,
+):
+    async def _scenario():
+        started = 0
+        both_started = asyncio.Event()
+
+        async def _prepare():
+            return "world"
+
+        async def _greet(name: str):
+            nonlocal started
+            started += 1
+            if started == 2:
+                both_started.set()
+            try:
+                await asyncio.wait_for(both_started.wait(), timeout=0.05)
+            except TimeoutError as exc:
+                raise AssertionError(
+                    "fan-out sibling branches did not execute concurrently"
+                ) from exc
+            return f"Hello, {name}!"
+
+        async def _badge(name: str):
+            nonlocal started
+            started += 1
+            if started == 2:
+                both_started.set()
+            try:
+                await asyncio.wait_for(both_started.wait(), timeout=0.05)
+            except TimeoutError as exc:
+                raise AssertionError(
+                    "fan-out sibling branches did not execute concurrently"
+                ) from exc
+            return f"badge:{name}"
+
+        prepare = mock_task_factory(_prepare)
+        greet = mock_task_factory(_greet)
+        badge = mock_task_factory(_badge)
+
+        return await Workflow(
+            "fan_out_profile",
+            start=Node(
+                run=prepare,
+                bind_output="name",
+                next=["greet", "badge"],
+            ),
+            greet=greet,
+            badge=badge,
+        ).run()
+
+    run = asyncio.run(_scenario())
+
+    assert run.result is None
+    assert run.outputs == {
+        branch_id[0]: {
+            "_prepare": ["world"],
+        },
+        branch_id[1]: {
+            "_greet": ["Hello, world!"],
+        },
+        branch_id[2]: {
+            "_badge": ["badge:world"],
+        },
+    }
+
+
+def test_run_workflow_multiple_when_matches_can_execute_concurrently(
+    mock_task_factory,
+    branch_id,
+):
+    async def _scenario():
+        started = 0
+        both_started = asyncio.Event()
+
+        def _prepare() -> RoutePayload:
+            return RoutePayload(
+                name="world",
+                style="formal",
+                should_email=True,
+                should_notify=True,
+            )
+
+        async def _send_email(name: str):
+            nonlocal started
+            started += 1
+            if started == 2:
+                both_started.set()
+            try:
+                await asyncio.wait_for(both_started.wait(), timeout=0.05)
+            except TimeoutError as exc:
+                raise AssertionError(
+                    "branches from multiple matching When clauses did not execute concurrently"
+                ) from exc
+            return f"email:{name}"
+
+        async def _send_notification(name: str):
+            nonlocal started
+            started += 1
+            if started == 2:
+                both_started.set()
+            try:
+                await asyncio.wait_for(both_started.wait(), timeout=0.05)
+            except TimeoutError as exc:
+                raise AssertionError(
+                    "branches from multiple matching When clauses did not execute concurrently"
+                ) from exc
+            return f"notify:{name}"
+
+        prepare = mock_task_factory(_prepare)
+        send_email = mock_task_factory(_send_email)
+        send_notification = mock_task_factory(_send_notification)
+
+        return await Workflow(
+            "conditional_routes",
+            start=Node(
+                run=prepare,
+                next=[
+                    When(RoutePayload.should_email, "send_email"),
+                    When(RoutePayload.should_notify, "send_notification"),
+                ],
+            ),
+            send_email=send_email,
+            send_notification=send_notification,
+        ).run()
+
+    run = asyncio.run(_scenario())
+
+    assert run.result is None
+    assert run.outputs == {
+        branch_id[0]: {
+            "_prepare": [
+                RoutePayload(
+                    name="world",
+                    style="formal",
+                    should_email=True,
+                    should_notify=True,
+                )
+            ],
+        },
+        branch_id[1]: {
+            "_send_email": ["email:world"],
+        },
+        branch_id[2]: {
+            "_send_notification": ["notify:world"],
+        },
+    }
 

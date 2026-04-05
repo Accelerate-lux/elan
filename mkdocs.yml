@@ -7,6 +7,9 @@ exclude_docs: |
   internals/
   test_plan.md
   demo_ideas_catalog.md
+  design_philosophy.md
+  explanations/
+  comparison/
 not_in_nav: |
   comparison/baseline_workflow.md
   api.md
@@ -57,16 +60,3 @@ nav:
       - API Overview: reference/api.md
       - Runtime Behavior: reference/runtime-behavior.md
       - Python API: reference/python-api.md
-  - Explanations:
-      - Design Philosophy: design_philosophy.md
-      - Dynamic Model: explanations/dynamic-model.md
-      - Status: explanations/status.md
-  - Comparisons:
-      - Summary: comparison/summary.md
-      - Dynamic Models: comparison/dynamic_models.md
-      - Airflow: comparison/airflow.md
-      - Dagster: comparison/dagster.md
-      - LangGraph: comparison/langgraph.md
-      - Metaflow: comparison/metaflow.md
-      - Prefect: comparison/prefect.md
-      - Temporal: comparison/temporal.md

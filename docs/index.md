@@ -8,17 +8,18 @@ It supports fine-grained routing, branching, synchronization, and dynamic execut
 
 ## Highlights
 
-- **Dynamic Execution:** A core model where branches can expand, recurse, and synchronize at runtime as your workflow emerges.
-- **Unified Execution Model:** Write workflows in pure Python, YAML/JSON config, or HTTP API payloads. They share the same orchestration model and semantics.
-- **Simple Mental Model:** A declarative API that strictly separates pure business logic (Tasks) from routing and orchestration (Workflows).
-- **Intuitive Graph Control:** Branching, fan-out, and conditional routing are declared explicitly at the workflow level.
-- **DAG Opt-In:** Use DAG-shaped workflows when they fit, without making DAG constraints the center of the model.
-- **Native Cycles:** Loops and recursive agent patterns fit the graph model naturally.
-- **Type-Safe Data Flow:** Standard Python type hints and Pydantic models support automatic binding for simple cases and explicit adapters for reshaping inputs and outputs.
-- **Static and Runtime Graph Validation:** Graph integrity is checked before execution and validated again as dynamic structures materialize.
+- **One Tool for Data and Agents:** Build data workflows, AI agents, and mixed systems in one orchestration model.
+- **Plain Python, Reusable Tasks:** Keep business logic in plain Python functions that stay easy to reuse, test, and compose across workflows.
+- **Fine-Grained Workflow Control:** Express fan-out, conditional routing, value-based branching, joins, and dynamic execution directly in the workflow.
+- **Simple Mental Model:** Keep tasks and orchestration separate so workflow structure stays readable.
+- **Unified Execution Model:** Use the same orchestration model across Python code, YAML/JSON config, and HTTP API payloads.
+- **Built for Mixed Workloads:** Use the same model for data workflows, AI agents, service orchestration, and human review steps.
 - **First-Class Composability:** Smaller workflows compose cleanly into larger ones with explicit `result` boundaries.
-- **Testable by Design:** Tasks remain plain Python functions that can be tested without mocking the orchestrator.
-- **Workload Agnostic:** The same orchestration model works across data workflows, agent workflows, and mixed systems.
+- **Predictable Results:** Keep workflow outputs, result boundaries, and synchronization explicit.
+- **DAG Opt-In:** Use DAG-shaped workflows when they fit, without making DAG constraints the center of the model.
+- **Native Cycles:** Support loops and recursive agent patterns as part of the workflow model.
+- **Type-Safe Data Flow:** Use Python type hints and Pydantic models for predictable data movement between steps.
+- **Testable by Design:** Keep business logic easy to test in isolation.
 
 ## Quickstart
 

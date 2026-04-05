@@ -35,8 +35,6 @@ It supports fine-grained routing, branching, synchronization, and dynamic execut
 | Workflow composition | Planned |
 | Dynamic graph expansion | Planned |
 
-See [Status](explanations/status.md) for the current public implementation summary.
-
 ## Quickstart
 
 ```python
@@ -81,11 +79,3 @@ print(run.outputs)
 - [Linear Workflows](guides/linear-workflows.md) and [Data Binding](guides/data-binding.md) for the first practical steps
 - [Runtime Behavior](reference/runtime-behavior.md) for exact result, outputs, branching, and join semantics
 - [Python Reference](reference/python-api.md) for generated API docs
-- [Design Philosophy](design_philosophy.md) for the product direction
-
-## Comparison notes
-
-Elan is also documented against adjacent workflow tools to clarify what it means by dynamic execution and graph-native orchestration.
-
-- [Comparison summary](comparison/summary.md)
-- [Dynamic models taxonomy](comparison/dynamic_models.md)

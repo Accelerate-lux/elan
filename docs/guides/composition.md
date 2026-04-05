@@ -18,5 +18,5 @@ This page will eventually document:
 
 See:
 
-- [Status](../explanations/status.md)
-- [Design Philosophy](../design_philosophy.md)
+- [Join on Result](join-result.md)
+- [Runtime Behavior](../reference/runtime-behavior.md)

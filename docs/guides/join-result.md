@@ -63,4 +63,3 @@ That means reducers should be order-agnostic unless the workflow intentionally c
 ## Next steps
 
 - [Runtime Behavior](../reference/runtime-behavior.md)
-- [Status](../explanations/status.md)

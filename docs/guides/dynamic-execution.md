@@ -19,5 +19,5 @@ This page will eventually document:
 
 See:
 
-- [Status](../explanations/status.md)
-- [Dynamic Model](../explanations/dynamic-model.md)
+- [Branching](branching.md)
+- [Runtime Behavior](../reference/runtime-behavior.md)

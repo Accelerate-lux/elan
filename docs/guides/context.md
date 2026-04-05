@@ -27,4 +27,3 @@ See:
 
 - [Data Binding](data-binding.md)
 - [Runtime Behavior](../reference/runtime-behavior.md)
-- [Status](../explanations/status.md)

@@ -12,6 +12,7 @@ Designed with developer experience in mind, Elan bridges this gap by offering a 
 - **Unified Execution Model:** Write workflows in pure Python, YAML/JSON config, or HTTP API payloads—all share the exact same orchestration model and semantics.
 - **Simple Mental Model:** A declarative API that strictly separates pure business logic (Tasks) from routing and orchestration (Workflows).
 - **Intuitive Graph Control:** Branching, fan-out, and conditional routing are declared explicitly at the workflow level. You maintain full control over the graph's behavior without hiding routing logic inside your tasks.
+- **DAG Opt-In:** Elan supports DAG-shaped workflows when they fit, without making DAG constraints the center of the model.
 - **Native Cycles:** Unlike traditional DAGs, cycles are a first-class concept. Loops and recursive agent patterns are just natural cycles in the graph, requiring no special syntax or workarounds.
 - **Type-Safe Data Flow:** Built around standard Python type hints and Pydantic models. It automatically binds data for simple cases and provides explicit adapters to reshape inputs and outputs.
 - **Static and Runtime Graph Validation:** Ensures graph integrity through static validation before execution, and applies semi-static runtime validation as dynamic structures materialize.

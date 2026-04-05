@@ -2,13 +2,23 @@
 
 Elan is a Python workflow orchestration engine for AI agents, data orchestration, and mixed workloads. It gives teams a unified tool to build complex multi-step systems, from data pipelines to agent-driven applications, that stay explicit, composable, and predictable as they grow.
 
-## What Elan focuses on
+Elan separates tasks from orchestration. Tasks stay plain Python, while routing, branching, joins, and workflow structure are defined explicitly in the workflow layer.
 
-- Dynamic execution where graph structure can branch, fan out, synchronize, and later expand at runtime
-- A unified workflow model across Python code, config, and future API submissions
-- Strict separation between pure task logic and orchestration/runtime logic
-- Explicit routing rather than hidden control flow inside tasks
-- A small interface that stays readable for simple workflows
+It supports workflows from simple linear flows to richer branching, synchronization, and dynamic execution models, without changing the programming model.
+
+## Highlights
+
+- **Dynamic Execution:** A core model where branches can expand, recurse, and synchronize at runtime as your workflow emerges.
+- **Unified Execution Model:** Write workflows in pure Python, YAML/JSON config, or HTTP API payloads. They share the same orchestration model and semantics.
+- **Simple Mental Model:** A declarative API that strictly separates pure business logic (Tasks) from routing and orchestration (Workflows).
+- **Intuitive Graph Control:** Branching, fan-out, and conditional routing are declared explicitly at the workflow level.
+- **DAG Opt-In:** Use DAG-shaped workflows when they fit, without making DAG constraints the center of the model.
+- **Native Cycles:** Loops and recursive agent patterns fit the graph model naturally.
+- **Type-Safe Data Flow:** Standard Python type hints and Pydantic models support automatic binding for simple cases and explicit adapters for reshaping inputs and outputs.
+- **Static and Runtime Graph Validation:** Graph integrity is checked before execution and validated again as dynamic structures materialize.
+- **First-Class Composability:** Smaller workflows compose cleanly into larger ones with explicit `result` boundaries.
+- **Testable by Design:** Tasks remain plain Python functions that can be tested without mocking the orchestrator.
+- **Workload Agnostic:** The same orchestration model works across data workflows, agent workflows, and mixed systems.
 
 ## Quickstart
 

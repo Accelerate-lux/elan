@@ -4,23 +4,24 @@
 
 Elan is a graph-native orchestration engine for dynamic agent and data workflows.
 
-While traditional DAG-based orchestrators excel at static scheduling, they struggle when a workflow's structure isn't fully known ahead of time. Conversely, many agent frameworks offer dynamic execution but introduce heavy boilerplate, rigid patterns, and unpredictable behaviors. 
+While traditional DAG-based orchestrators excel at static scheduling, they struggle when a workflow's structure isn't fully known ahead of time. Conversely, many agent frameworks offer dynamic execution but introduce heavy boilerplate, rigid patterns, and unpredictable behaviors.
 
 Designed with developer experience in mind, Elan bridges this gap by offering a simple, predictable orchestration model:
 
-- **Dynamic Execution:** A core model where branches can expand, recurse, and synchronize at runtime as your workflow emerges.
-- **Unified Execution Model:** Write workflows in pure Python, YAML/JSON config, or HTTP API payloads—all share the exact same orchestration model and semantics.
-- **Simple Mental Model:** A declarative API that strictly separates pure business logic (Tasks) from routing and orchestration (Workflows).
-- **Intuitive Graph Control:** Branching, fan-out, and conditional routing are declared explicitly at the workflow level. You maintain full control over the graph's behavior without hiding routing logic inside your tasks.
-- **DAG Opt-In:** Elan supports DAG-shaped workflows when they fit, without making DAG constraints the center of the model.
-- **Native Cycles:** Unlike traditional DAGs, cycles are a first-class concept. Loops and recursive agent patterns are just natural cycles in the graph, requiring no special syntax or workarounds.
-- **Type-Safe Data Flow:** Built around standard Python type hints and Pydantic models. It automatically binds data for simple cases and provides explicit adapters to reshape inputs and outputs.
-- **Static and Runtime Graph Validation:** Ensures graph integrity through static validation before execution, and applies semi-static runtime validation as dynamic structures materialize.
-- **First-Class Composability:** Sub-workflows compose cleanly as standard nodes. Build complex graphs by nesting smaller, reusable workflows with explicit `result` boundaries.
-- **Testable by Design:** Because tasks are just plain Python functions that know nothing about the graph, you can unit test your business logic without mocking the orchestrator.
-- **Workload & Framework Agnostic:** Whether you are coordinating standard Python data tasks or complex agent loops, Elan provides a consistent interface that doesn't lock you into a proprietary LLM ecosystem.
+- **One Tool for Data and Agents:** Build data workflows, AI agents, and mixed systems in one orchestration model.
+- **Plain Python, Reusable Tasks:** Keep business logic in plain Python functions that stay easy to reuse, test, and compose across workflows.
+- **Fine-Grained Workflow Control:** Express fan-out, conditional routing, value-based branching, joins, and dynamic execution directly in the workflow.
+- **Simple Mental Model:** Keep tasks and orchestration separate so workflow structure stays readable.
+- **Unified Execution Model:** Write workflows in pure Python, YAML/JSON config, or HTTP API payloads while keeping one orchestration model and semantics.
+- **Built for Mixed Workloads:** Use the same model for data workflows, AI agents, service orchestration, and human review steps.
+- **First-Class Composability:** Compose smaller workflows into larger systems with explicit `result` boundaries.
+- **Predictable Results:** Keep workflow outputs, result boundaries, and synchronization explicit.
+- **DAG Opt-In:** Use DAG-shaped workflows when they fit, without making DAG constraints the center of the model.
+- **Native Cycles:** Support loops and recursive agent patterns as part of the workflow model.
+- **Type-Safe Data Flow:** Use Python type hints and Pydantic models for predictable data movement between steps.
+- **Testable by Design:** Keep business logic easy to test in isolation.
 
-The name—pronounced "ay-lan"—comes from the French word "élan" which mean both momentum and moose.
+The name, pronounced "ay-lan", comes from the French word "elan", which means both momentum and moose.
 
 ## Why Elan?
 

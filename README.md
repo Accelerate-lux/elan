@@ -21,6 +21,20 @@ Designed with developer experience in mind, Elan bridges this gap by offering a 
 - **Type-Safe Data Flow:** Use Python type hints and Pydantic models for predictable data movement between steps.
 - **Testable by Design:** Keep business logic easy to test in isolation.
 
+## Implementation Status
+
+| Feature area | Status |
+| :--- | :--- |
+| Basic workflows | Available |
+| Data binding | Available |
+| Structured payloads | Available |
+| Branching and routing | Available |
+| Workflow synchronization | Available |
+| Concurrent execution | Available |
+| Shared workflow context | Planned |
+| Workflow composition | Planned |
+| Dynamic graph expansion | Planned |
+
 The name, pronounced "ay-lan", comes from the French word "elan", which means both momentum and moose.
 
 ## Why Elan?

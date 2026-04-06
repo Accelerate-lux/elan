@@ -40,7 +40,7 @@ It supports fine-grained routing, branching, synchronization, and dynamic execut
 ## Installation
 
 ```bash
-pip install elan
+pip install git+https://github.com/Accelerate-lux/elan.git
 ```
 
 ## Example

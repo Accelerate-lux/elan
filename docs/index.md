@@ -85,14 +85,15 @@ If you run that workflow:
 
 What happens in this example:
 
-- `prepare` and `greet` are plain Python functions decorated with `@task`
-- `Workflow` defines the graph
-- `Node(run=prepare, next="greet")` says to run `prepare` first, then route to `greet`
-- `run.result` returns the final exported value for this linear workflow
-- `run.outputs` records emitted values grouped by branch id and task name
+- The plain Python functions `prepare` and `greet` are decorated with `@task` to make them discoverable by Elan
+- The `start=` keyword defines the workflow entrypoint, so Elan begins execution at `prepare`
+- The `Workflow` object defines the execution graph and names the downstream `greet` node
+- The `Node(run=prepare, next="greet")` declaration tells Elan to run `prepare` first and then route its output to `greet`
+- For linear workflows with only one terminal step, the return value of the terminal node is automatically mapped into `run.result` 
+- The `run.outputs` mapping records emitted values by branch id first and then by task name
 
 !!! note "Terminal tasks"
-    For terminal nodes, passing the task directly is fine. Elan will automatically wrap it into a node when no routing configuration is needed.
+    For terminal nodes, if you don't need to configure anything, passing the task directly is fine. Elan will automatically wrap it into a node.
 
 ## Start here
 

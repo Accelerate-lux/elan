@@ -1,8 +1,8 @@
-# Your First Workflow
+# Getting Started
 
-This page walks through one small Elan workflow in detail.
+This guide walks through one small Elan workflow in detail.
 
-Use it after the Quickstart when you want to understand what each part is doing and which forms are recommended first.
+Use it after the homepage example when you want to understand what each part is doing and which forms are recommended first.
 
 ```python
 import asyncio

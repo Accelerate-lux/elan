@@ -4,7 +4,7 @@ The original `Basics` page has been split into the new public docs structure.
 
 Use these pages instead:
 
-- [Quickstart](learn/quickstart.md)
+- [Getting Started](learn/getting-started.md)
 - [Core Concepts](learn/core-concepts.md)
 - [Linear Workflows](guides/linear-workflows.md)
 - [Data Binding](guides/data-binding.md)

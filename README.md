@@ -35,6 +35,12 @@ Designed with developer experience in mind, Elan bridges this gap by offering a 
 | Workflow composition | ☐ Planned |
 | Dynamic graph expansion | ☐ Planned |
 
+## Installation
+
+```bash
+pip install elan
+```
+
 The name, pronounced "ay-lan", comes from the French word "elan", which means both momentum and moose.
 
 ## Why Elan?

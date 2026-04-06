@@ -37,7 +37,13 @@ It supports fine-grained routing, branching, synchronization, and dynamic execut
 | Dynamic graph expansion  | ☐ Planned      |
 
 
-## Quickstart
+## Installation
+
+```bash
+pip install elan
+```
+
+## Example
 
 ```python
 import asyncio
@@ -77,10 +83,20 @@ If you run that workflow:
 }
 ```
 
+What happens in this example:
+
+- `prepare` and `greet` are plain Python functions decorated with `@task`
+- `Workflow` defines the graph
+- `Node(run=prepare, next="greet")` says to run `prepare` first, then route to `greet`
+- `run.result` returns the final exported value for this linear workflow
+- `run.outputs` records emitted values grouped by branch id and task name
+
+!!! note "Terminal tasks"
+    For terminal nodes, passing the task directly is fine. Elan will automatically wrap it into a node when no routing configuration is needed.
+
 ## Start here
 
-- [Quickstart](learn/quickstart.md) for the smallest runnable example
-- [Your First Workflow](learn/your-first-workflow.md) for a line-by-line walkthrough of the first two-step workflow
+- [Getting Started](learn/getting-started.md) for a line-by-line walkthrough of the first two-step workflow
 - [Core Concepts](learn/core-concepts.md) for the Task / Node / Workflow model
 - [Recommended Patterns](learn/recommended-patterns.md) for the preferred first-use forms
 - [Linear Workflows](guides/linear-workflows.md) and [Data Binding](guides/data-binding.md) for the first practical steps

@@ -62,8 +62,7 @@ extra_css:
 nav:
   - Home: index.md
   - Learn:
-      - Quickstart: learn/quickstart.md
-      - Your First Workflow: learn/your-first-workflow.md
+      - Getting Started: learn/getting-started.md
       - Core Concepts: learn/core-concepts.md
       - Recommended Patterns: learn/recommended-patterns.md
       - Next Steps: learn/next-steps.md

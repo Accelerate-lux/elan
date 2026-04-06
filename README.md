@@ -25,15 +25,15 @@ Designed with developer experience in mind, Elan bridges this gap by offering a 
 
 | Feature area | Status |
 | :--- | :--- |
-| Basic workflows | Available |
-| Data binding | Available |
-| Structured payloads | Available |
-| Branching and routing | Available |
-| Workflow synchronization | Available |
-| Concurrent execution | Available |
-| Shared workflow context | Planned |
-| Workflow composition | Planned |
-| Dynamic graph expansion | Planned |
+| Basic workflows | ✅ Available |
+| Data binding | ✅ Available |
+| Structured payloads | ✅ Available |
+| Branching and routing | ✅ Available |
+| Workflow synchronization | ✅ Available |
+| Concurrent execution | ✅ Available |
+| Shared workflow context | ☐ Planned |
+| Workflow composition | ☐ Planned |
+| Dynamic graph expansion | ☐ Planned |
 
 The name, pronounced "ay-lan", comes from the French word "elan", which means both momentum and moose.
 
@@ -84,17 +84,20 @@ workflow = Workflow(
 
 # 3. Execute the graph
 run = asyncio.run(workflow.run())
+```
 
-print(run.result)
-# Hello, World!
+If you run that workflow:
 
-print(run.outputs)
-# {
-#     "branch-1": {
-#         "prepare": ["World"],
-#         "greet": ["Hello, World!"],
-#     }
-# }
+```pycon
+>>> run.result
+'Hello, World!'
+>>> run.outputs
+{
+    "branch-<uuid>": {
+        "prepare": ["World"],
+        "greet": ["Hello, World!"],
+    }
+}
 ```
 
 ## Documentation

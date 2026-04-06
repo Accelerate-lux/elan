@@ -17,7 +17,7 @@ Linear example:
 
 ```python
 {
-    "branch-1": {
+    "branch-<uuid>": {
         "prepare": ["world"],
         "greet": ["Hello, world!"],
     }
@@ -28,13 +28,13 @@ Branched example:
 
 ```python
 {
-    "branch-1": {
+    "branch-<uuid-1>": {
         "prepare": ["world"],
     },
-    "branch-2": {
+    "branch-<uuid-2>": {
         "greet": ["Hello, world!"],
     },
-    "branch-3": {
+    "branch-<uuid-3>": {
         "badge": ["badge:world"],
     },
 }

@@ -64,13 +64,13 @@ Branched workflows keep outputs separated by branch id:
 
 ```python
 {
-    "branch-1": {
+    "branch-<uuid-1>": {
         "prepare": ["world"],
     },
-    "branch-2": {
+    "branch-<uuid-2>": {
         "greet": ["Hello, world!"],
     },
-    "branch-3": {
+    "branch-<uuid-3>": {
         "badge": ["badge:world"],
     },
 }

@@ -17,6 +17,15 @@ not_in_nav: |
 
 theme:
   name: material
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: custom
+      accent: custom
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: custom
+      accent: custom
   features:
     - navigation.sections
     - navigation.expand
@@ -39,15 +48,25 @@ plugins:
 markdown_extensions:
   - admonition
   - tables
-  - pymdownx.highlight
+  - pymdownx.highlight:
+      use_pygments: true
+      pygments_style: github-dark
+      pygments_lang_class: true
   - pymdownx.superfences
   - pymdownx.inlinehilite
+
+extra_css:
+  - stylesheets/extra.css
+  - stylesheets/pygments-github-dark.css
 
 nav:
   - Home: index.md
   - Learn:
       - Quickstart: learn/quickstart.md
+      - Your First Workflow: learn/your-first-workflow.md
       - Core Concepts: learn/core-concepts.md
+      - Recommended Patterns: learn/recommended-patterns.md
+      - Next Steps: learn/next-steps.md
   - Guides:
       - Linear Workflows: guides/linear-workflows.md
       - Data Binding: guides/data-binding.md

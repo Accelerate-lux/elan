@@ -1,0 +1,260 @@
+[data-md-color-primary="custom"] {
+  --brand-accent-soft: #d96a86;
+  --brand-accent-soft-hover: #e586a2;
+  --brand-accent-soft-muted: #b55870;
+  --brand-accent-strong: #800020;
+  --brand-accent-strong-light: #a31c3f;
+  --brand-dark: #111111;
+  --brand-dark-muted: #2a2a2a;
+  --brand-dark-soft: #444444;
+}
+
+[data-md-color-scheme="default"] {
+  --md-primary-fg-color: var(--brand-dark);
+  --md-primary-fg-color--light: #2a2a2a;
+  --md-primary-fg-color--dark: #000000;
+  --md-primary-bg-color: #ffffff;
+  --md-primary-bg-color--light: #ffffff;
+  --md-accent-fg-color: var(--brand-accent-soft);
+  --md-accent-fg-color--transparent: rgba(217, 106, 134, 0.12);
+  --md-typeset-a-color: var(--brand-accent-soft);
+  --md-default-fg-color--light: rgba(17, 17, 17, 0.72);
+  --md-default-fg-color--lighter: rgba(17, 17, 17, 0.42);
+  --md-typeset-color: var(--brand-dark);
+}
+
+[data-md-color-scheme="slate"] {
+  --md-primary-fg-color: #ffffff;
+  --md-primary-fg-color--light: #e0e0e0;
+  --md-primary-fg-color--dark: #ffffff;
+  --md-primary-bg-color: var(--brand-dark);
+  --md-primary-bg-color--light: #1a1a1a;
+  --md-accent-fg-color: var(--brand-accent-soft);
+  --md-accent-fg-color--transparent: rgba(217, 106, 134, 0.14);
+  --md-typeset-a-color: var(--brand-accent-soft-hover);
+  --md-typeset-color: #e0e0e0;
+}
+
+.md-header {
+  border-bottom: 1px solid rgba(128, 0, 32, 0.18);
+  background: var(--brand-dark);
+}
+
+.md-tabs {
+  background-color: var(--brand-dark);
+  border-bottom: 1px solid rgba(128, 0, 32, 0.28);
+}
+
+.md-header__button.md-logo,
+.md-header__title,
+.md-tabs__link,
+.md-search__form,
+.md-search__input,
+.md-header__topic {
+  color: #ffffff;
+}
+
+.md-search__form {
+  background-color: rgba(255, 255, 255, 0.08);
+}
+
+.md-typeset .md-button--primary {
+  background-color: var(--brand-accent-strong);
+  border-color: var(--brand-accent-strong);
+}
+
+.md-typeset .md-button--primary:hover,
+.md-typeset .md-button--primary:focus {
+  background-color: #5f0018;
+  border-color: #5f0018;
+}
+
+.md-nav__link--active,
+.md-nav__link:focus,
+.md-nav__link:hover {
+  color: var(--brand-accent-soft);
+}
+
+.md-nav__item .md-nav__link--active {
+  font-weight: 700;
+}
+
+.md-typeset .admonition,
+.md-typeset details {
+  border-color: rgba(128, 0, 32, 0.2);
+}
+
+.md-typeset .admonition-title,
+.md-typeset summary {
+  background-color: rgba(128, 0, 32, 0.08);
+}
+
+/* --- Typography Variants --- */
+
+/* Headings */
+.md-typeset h1 {
+  color: var(--brand-dark);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.md-typeset h2 {
+  color: var(--brand-accent-strong);
+  border-bottom: 2px solid rgba(217, 106, 134, 0.2);
+  padding-bottom: 0.3em;
+}
+
+.md-typeset h3 {
+  color: var(--brand-accent-strong-light);
+}
+
+.md-typeset h4 {
+  color: var(--brand-accent-soft-muted);
+}
+
+.md-typeset h5,
+.md-typeset h6 {
+  color: var(--brand-dark-soft);
+  text-transform: uppercase;
+  font-size: 0.85em;
+  letter-spacing: 0.05em;
+}
+
+[data-md-color-scheme="slate"] .md-typeset h1 {
+  color: #ffffff;
+}
+
+[data-md-color-scheme="slate"] .md-typeset h2 {
+  color: var(--brand-accent-soft-hover);
+  border-bottom-color: rgba(217, 106, 134, 0.3);
+}
+
+[data-md-color-scheme="slate"] .md-typeset h3 {
+  color: var(--brand-accent-soft);
+}
+
+[data-md-color-scheme="slate"] .md-typeset h4 {
+  color: var(--brand-accent-soft-muted);
+}
+
+[data-md-color-scheme="slate"] .md-typeset h5,
+[data-md-color-scheme="slate"] .md-typeset h6 {
+  color: #aaaaaa;
+}
+
+/* Links */
+.md-typeset a {
+  color: var(--brand-accent-strong-light);
+  transition: color 0.2s;
+}
+
+.md-typeset a:hover {
+  color: var(--brand-accent-strong);
+}
+
+[data-md-color-scheme="slate"] .md-typeset a {
+  color: var(--brand-accent-soft);
+}
+
+[data-md-color-scheme="slate"] .md-typeset a:hover {
+  color: #ffffff;
+}
+
+/* Bold & Emphasis */
+.md-typeset strong,
+.md-typeset b {
+  color: var(--brand-accent-strong-light);
+  font-weight: 700;
+}
+
+[data-md-color-scheme="slate"] .md-typeset strong,
+[data-md-color-scheme="slate"] .md-typeset b {
+  color: var(--brand-accent-soft-hover);
+}
+
+.md-typeset em,
+.md-typeset i {
+  color: var(--brand-dark-soft);
+}
+
+[data-md-color-scheme="slate"] .md-typeset em,
+[data-md-color-scheme="slate"] .md-typeset i {
+  color: #cccccc;
+}
+
+/* Blockquotes */
+.md-typeset blockquote {
+  border-left: 4px solid var(--brand-accent-strong-light);
+  color: var(--brand-dark-soft);
+  background: linear-gradient(to right, rgba(163, 28, 63, 0.05), transparent);
+  padding-right: 0.6rem;
+  border-radius: 0 0.2rem 0.2rem 0;
+}
+
+[data-md-color-scheme="slate"] .md-typeset blockquote {
+  border-left-color: var(--brand-accent-soft);
+  color: #cccccc;
+  background: linear-gradient(to right, rgba(217, 106, 134, 0.08), transparent);
+}
+
+/* Inline Code */
+.md-typeset code {
+  color: #24292f;
+  background-color: rgba(17, 17, 17, 0.05);
+  border: 1px solid rgba(17, 17, 17, 0.1);
+  border-radius: 0.2rem;
+  padding: 0.1em 0.3em;
+  font-size: 0.85em;
+}
+
+[data-md-color-scheme="slate"] .md-typeset code {
+  color: #c9d1d9;
+  background-color: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.md-typeset pre code {
+  color: inherit;
+  background-color: transparent;
+  border: none !important;
+  padding: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+
+.md-typeset .highlight {
+  border-radius: 0.2rem;
+  overflow: hidden;
+  background-color: #0d1117 !important;
+  padding: 0 !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+.md-typeset .highlight pre,
+.md-typeset .highlight pre code,
+.md-typeset .highlight code {
+  border: none !important;
+  box-shadow: none !important;
+  outline: none !important;
+}
+
+.md-typeset table:not([class]) {
+  display: table !important;
+  width: 100% !important;
+  max-width: 100% !important;
+}
+
+.md-typeset__table {
+  display: block !important;
+  width: 100% !important;
+  padding: 0 !important;
+}
+
+html .md-typeset__table table {
+  width: 100% !important;
+}
+
+.md-sidebar__scrollwrap {
+  scrollbar-color: rgba(128, 0, 32, 0.35) transparent;
+}

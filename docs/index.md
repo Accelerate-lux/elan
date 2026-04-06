@@ -1,6 +1,6 @@
 # Elan
 
-Elan is a Python workflow orchestration engine for AI agents, data orchestration, and mixed workloads. It gives teams a unified tool to build complex multi-step systems, from data pipelines to agent-driven applications, that stay explicit, composable, and predictable as they grow.
+Elan is a workflow orchestration engine for AI agents, data orchestration, and mixed workloads. It gives teams a unified tool to build complex multi-step systems, from data pipelines to agent-driven applications, that stay explicit, composable, and predictable as they grow.
 
 Elan separates tasks from orchestration. Tasks stay plain Python, while routing, branching, joins, and workflow structure are defined explicitly in the workflow layer.
 
@@ -23,17 +23,19 @@ It supports fine-grained routing, branching, synchronization, and dynamic execut
 
 ## Implementation Status
 
-| Feature area | Status |
-| :--- | :--- |
-| Basic workflows | Available |
-| Data binding | Available |
-| Structured payloads | Available |
-| Branching and routing | Available |
-| Workflow synchronization | Available |
-| Concurrent execution | Available |
-| Shared workflow context | Planned |
-| Workflow composition | Planned |
-| Dynamic graph expansion | Planned |
+
+| Feature area             | Status         |
+| ------------------------ | -------------- |
+| Basic workflows          | ✅ Available   |
+| Data binding             | ✅ Available   |
+| Structured payloads      | ✅ Available   |
+| Branching and routing    | ✅ Available   |
+| Workflow synchronization | ✅ Available   |
+| Concurrent execution     | ✅ Available   |
+| Shared workflow context  | ☐ Planned      |
+| Workflow composition     | ☐ Planned      |
+| Dynamic graph expansion  | ☐ Planned      |
+
 
 ## Quickstart
 
@@ -59,23 +61,28 @@ workflow = Workflow(
 )
 
 run = asyncio.run(workflow.run())
+```
 
-print(run.result)
-# Hello, World!
+If you run that workflow:
 
-print(run.outputs)
-# {
-#     "branch-1": {
-#         "prepare": ["World"],
-#         "greet": ["Hello, World!"],
-#     }
-# }
+```pycon
+>>> run.result
+'Hello, World!'
+>>> run.outputs
+{
+    "branch-<uuid>": {
+        "prepare": ["World"],
+        "greet": ["Hello, World!"],
+    }
+}
 ```
 
 ## Start here
 
 - [Quickstart](learn/quickstart.md) for the smallest runnable example
+- [Your First Workflow](learn/your-first-workflow.md) for a line-by-line walkthrough of the first two-step workflow
 - [Core Concepts](learn/core-concepts.md) for the Task / Node / Workflow model
+- [Recommended Patterns](learn/recommended-patterns.md) for the preferred first-use forms
 - [Linear Workflows](guides/linear-workflows.md) and [Data Binding](guides/data-binding.md) for the first practical steps
 - [Runtime Behavior](reference/runtime-behavior.md) for exact result, outputs, branching, and join semantics
 - [Python Reference](reference/python-api.md) for generated API docs

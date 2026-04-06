@@ -31,7 +31,7 @@ This produces:
 
 ```python
 {
-    "branch-1": {
+    "branch-<uuid>": {
         "prepare": ["world"],
         "greet": ["Hello, world!"],
     }

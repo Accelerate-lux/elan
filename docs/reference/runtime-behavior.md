@@ -54,6 +54,30 @@ Between nodes, Elan currently binds values using these rules:
 - `Node.bind_output` may create a named adapter payload
 - `Node.bind_input` may provide literal values or read from `Upstream.field`, `Input.field`, and `Context.field`
 
+## Context behavior
+
+Current context semantics:
+
+- workflow context is declared as a Pydantic model class on `Workflow(..., context=...)`
+- each workflow run starts with a fresh instance of that model
+- context is branch-local, not one shared mutable object for the whole run
+- child branches inherit the parent branch context at branch creation time
+- sibling branches do not observe each other's later context writes
+
+Current write phases:
+
+- `Node.context` runs before task execution
+- `Node.context` may read the previous node's emitted value through `Upstream.field` on non-entry nodes
+
+Current supported context sources are intentionally narrow:
+
+- literals
+- `Input.field`
+- `Context.field`
+- `Upstream.field` for non-entry nodes
+
+Context updates are partial merges into the current branch scope. Unknown fields and invalid values fail clearly.
+
 ## Branching behavior
 
 Current supported routing forms:
@@ -73,6 +97,7 @@ Current `Join` semantics:
 - branches routed to `result` contribute their emitted values
 - `Join()` returns the collected list
 - `Join(run=reducer)` calls the reducer with the collected list as one value
+- `Join(...)` does not merge branch-local context in the current runtime
 
 ## Concurrency behavior
 

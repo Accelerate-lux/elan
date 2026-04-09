@@ -37,7 +37,7 @@ Parameters:
 
 Runs the workflow and returns a `WorkflowRun`.
 
-## `Node(run, next=None, bind_input=None, bind_output=None, route_on=None)`
+## `Node(run, next=None, bind_input=None, bind_output=None, context=None, route_on=None)`
 
 Defines a configured task node.
 
@@ -47,6 +47,7 @@ Supported fields:
 - `next` as `str | list[str | When] | dict[str, str]`
 - `bind_input`
 - `bind_output`
+- `context`
 - `route_on`
 
 ## `When(condition, target)`

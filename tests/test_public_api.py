@@ -84,6 +84,18 @@ class GreetingRoute(BaseModel):
     style: str
 
 
+class PublishContext(BaseModel):
+    locale: str = "en"
+    prefix: str = "draft"
+    published_url: str | None = None
+
+
+@ref
+class PublishResult(BaseModel):
+    slug: str
+    url: str
+
+
 @pytest.mark.asyncio
 async def test_ref_backed_binding(mock_task_factory, branch_id):
     def _prepare() -> GreetingRefPayload:
@@ -307,6 +319,76 @@ async def test_join_reducer_with_list_branching(mock_task_factory, branch_id):
         branch_id[2]: {
             "_badge": ["badge:world"],
         },
+    }
+
+
+@pytest.mark.asyncio
+async def test_context_preparation_with_upstream_and_input(mock_task_factory, branch_id):
+    def _prepare_article(title: str):
+        return title.strip().lower().replace(" ", "-")
+
+    def _publish_article(slug: str, locale: str, prefix: str) -> PublishResult:
+        return PublishResult(
+            slug=slug,
+            url=f"https://example.com/{locale}/{prefix}/{slug}",
+        )
+
+    def _notify_team(slug: str, published_url: str):
+        return f"published:{slug}:{published_url}"
+
+    prepare_article = mock_task_factory(_prepare_article)
+    publish_article = mock_task_factory(_publish_article)
+    notify_team = mock_task_factory(_notify_team)
+
+    run = await Workflow(
+        "publish_article",
+        context=PublishContext,
+        start=Node(
+            run=prepare_article,
+            context={"prefix": Input.prefix},
+            next="publish",
+        ),
+        publish=Node(
+            run=publish_article,
+            bind_input={
+                "locale": Context.locale,
+                "prefix": Context.prefix,
+            },
+            next="notify",
+        ),
+        notify=Node(
+            context={"published_url": Upstream.url},
+            run=notify_team,
+            bind_input={
+                "published_url": Context.published_url,
+            },
+        ),
+    ).run(title="Launch Post", prefix="blog")
+
+    prepare_article.mock.assert_called_once_with(title="Launch Post")
+    publish_article.mock.assert_called_once_with(
+        slug="launch-post",
+        locale="en",
+        prefix="blog",
+    )
+    notify_team.mock.assert_called_once_with(
+        slug="launch-post",
+        published_url="https://example.com/en/blog/launch-post",
+    )
+    assert run.result == "published:launch-post:https://example.com/en/blog/launch-post"
+    assert run.outputs == {
+        branch_id[0]: {
+            "_prepare_article": ["launch-post"],
+            "_publish_article": [
+                PublishResult(
+                    slug="launch-post",
+                    url="https://example.com/en/blog/launch-post",
+                )
+            ],
+            "_notify_team": [
+                "published:launch-post:https://example.com/en/blog/launch-post"
+            ],
+        }
     }
 
 

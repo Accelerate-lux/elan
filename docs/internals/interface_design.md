@@ -150,7 +150,7 @@ That ref concept is used for:
 
 - workflow context model ids
 - structured return-model field references in `When(...)`
-- structured return-model field references in `after`
+- possible future structured return-model field references in deferred post-execution hooks
 
 Intended shape:
 
@@ -188,7 +188,6 @@ Use a `Node` when the workflow needs to define:
 - input adaptation
 - output adaptation
 - context preparation
-- post-execution behavior
 - routing
 
 The intended `Node` surface is:
@@ -197,7 +196,6 @@ The intended `Node` surface is:
 - `input`
 - `context`
 - `output`
-- `after`
 - `next`
 - `route_on`
 
@@ -240,8 +238,7 @@ For one node execution, Elan applies these phases in order:
 2. `context`: prepare scoped context when the workflow needs to shape the context visible during task execution
 3. `run`: execute the task and produce its result
 4. `output`: adapt the result when the workflow needs to reshape what the node emits
-5. `after`: apply post-execution behavior when the workflow needs small follow-up actions before routing continues
-6. `next`: route execution when the workflow continues beyond the current node
+5. `next`: route execution when the workflow continues beyond the current node
 
 These phases are optional. A node only declares the parts it needs.
 
@@ -256,7 +253,7 @@ and lets complexity appear only when the workflow actually needs it.
 This ordering also makes the phase boundaries explicit:
 
 - `input` and `context` are pre-execution
-- `output` and `after` are post-execution
+- `output` is post-execution
 - `next` routes the execution that remains after those phases have completed
 
 ## Type System
@@ -279,7 +276,6 @@ The type system is designed around workflow surfaces Elan can reason about:
 - `input`
 - `output`
 - `context`
-- `after.context`
 - routing
 - composition boundaries
 - `Join(...)`
@@ -494,15 +490,13 @@ nodes:
 
 Ordinary nodes read freely from context through `Node.bind_input`. `Node.context` prepares scoped context before the task runs.
 
-## After
+## Deferred Post-Execution Hooks
 
-`after` is the post-execution phase of a node.
+Post-execution node hooks such as `after` are currently deferred.
 
-It runs after the task has executed and after output adaptation, but before routing continues through `next`.
+If Elan adds them later, they should remain declarative, run after successful execution, and stay separate from callback-style runtime hooks.
 
-`after` is the place for small post-execution behaviors that belong to the workflow model.
-
-Intended shape:
+One possible future shape:
 
 ```python
 import elan as el
@@ -548,13 +542,13 @@ workflow = Workflow(
 )
 ```
 
-`after` is phase-specific:
+If this surface is added later, it should stay phase-specific:
 
 - it runs only after successful execution
 - it sees the adapted output
 - `after.context` may update multiple context keys
 
-The important distinction is that `after` is declarative in the core design. Callback-style hooks are deferred.
+The important distinction is that any future `after` surface should stay declarative. Callback-style hooks remain deferred.
 
 ## Workflow Composition
 
@@ -1192,7 +1186,7 @@ The important points are:
 - workflow invocation carries an explicit `input` object
 - workflows may declare a context model
 - workflows may declare a reserved `result` node
-- nodes may declare `input`, `output`, `context`, `after`, and `next`
+- nodes may declare `input`, `output`, `context`, and `next`
 
 Config references follow the same model as the Python API:
 
@@ -1220,7 +1214,7 @@ nodes:
       surname: $input.surname
 ```
 
-The design also allows a post-execution phase in config:
+If Elan adds post-execution hooks later, a possible config shape could be:
 
 ```yaml
 after:
@@ -1277,11 +1271,7 @@ Example create-run request with input adaptation and context preparation:
         "context": {
           "surname": "$input.surname"
         },
-        "after": {
-          "context": {
-            "key": "$RoutePayload.key"
-          }
-        }
+        "next": "some_node"
       }
     }
   },

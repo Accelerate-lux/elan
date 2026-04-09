@@ -17,12 +17,12 @@ This page summarizes the current public implementation status of Elan.
 
 ## Not implemented yet
 
-- mutable context updates through `after`
 - workflow composition
 - dynamic expansion
 - callable continuation growth
 - cycles and broader dynamic graph materialization
 - mid-graph joins and general barriers
+- post-execution workflow hooks or context update phases
 
 ## Current behavioral caveats
 

@@ -141,14 +141,15 @@ Current consequence:
 - now that sibling branches execute concurrently, join contribution order is intentionally not guaranteed by declaration order, branch id, or creation order
 - if a reducer depends on ordering, that ordering must be established by the workflow author rather than assumed from the runtime
 
-### 7. Context and `after`
+### 7. Context
 Sixth slice.
 
 Implementation goal:
 - workflow-level context model
 - node context preparation
-- post-execution updates through `after`
 - all state changes go through run/orchestration state, not ad hoc payload mutation
+- keep the first slice to pre-execution context preparation only
+- leave post-execution hooks or context update phases as a possible later addition
 
 Test work:
 - new `tests/test_context_and_after.py`
@@ -157,7 +158,7 @@ Test work:
 Acceptance:
 - branch-local context behavior is covered
 - unknown or invalid writes fail clearly
-- post-execution timing is explicit in tests
+- context-preparation timing is explicit in tests
 
 ### 8. Composition
 Seventh slice.
@@ -222,7 +223,7 @@ Usage rule:
   - structured payloads / refs
   - branching
   - terminal `Join`
-  - context / `after`
+  - context
   - composition
   - dynamic expansion / cycles
 - Docs are updated in the same feature slice when public behavior changes.

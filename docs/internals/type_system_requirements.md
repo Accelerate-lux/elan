@@ -87,7 +87,6 @@ The static type system must reason over these surfaces:
 - `Node.bind_input`
 - `Node.bind_output`
 - `Node.context`
-- `after.context`
 - `route_on`
 - `When(...)`
 - `Expand(...)`
@@ -117,10 +116,11 @@ The validator must verify:
 
 - that `Context.foo` refers to a valid field on the declared context model
 - that `Node.context` writes only valid context fields
-- that `after.context` writes only valid context fields
 - that written values are compatible with the context field types
 
 Unknown context fields must be invalid.
+
+If post-execution context hooks are added later, they should follow the same field and type validation rules.
 
 ### Routing Contracts
 

@@ -24,9 +24,9 @@ This phase covers task registration, canonical keys, aliases, workflow declarati
 
 This phase covers structured payload binding, `@el.ref`, named field access, workflow result boundaries, and how registered payloads participate in routing, context updates, and config/API references.
 
-### Phase 4. Context And Post-Execution Updates
+### Phase 4. Context
 
-This phase covers workflow context models, `Node.context`, `after.context`, merge semantics, unknown-field rejection, timing rules, and branch-local context behavior before join or workflow completion.
+This phase covers workflow context models, `Node.context`, merge semantics, unknown-field rejection, timing rules, and branch-local context behavior before join or workflow completion.
 
 ### Phase 5. Routing And Branching
 

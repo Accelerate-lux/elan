@@ -3,7 +3,7 @@ requires = ["hatchling>=1.27.0"]
 build-backend = "hatchling.build"
 
 [project]
-name = "elan"
+name = "elan-workflow"
 version = "0.1.0"
 description = "Graph-native orchestration for dynamic agent and data workflows."
 readme = "README.md"

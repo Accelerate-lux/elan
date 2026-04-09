@@ -38,7 +38,7 @@ Designed with developer experience in mind, Elan bridges this gap by offering a 
 ## Installation
 
 ```bash
-pip install git+https://github.com/Accelerate-lux/elan.git
+pip install elan-workflow
 ```
 
 The name, pronounced "ay-lan", comes from the French word "elan", which means both momentum and moose.

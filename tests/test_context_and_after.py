@@ -45,6 +45,48 @@ async def test_node_context_writes_literals_before_task_runs(mock_task_factory):
 
 
 @pytest.mark.asyncio
+async def test_task_can_receive_whole_context_by_annotation(mock_task_factory):
+    async def _show(ctx: RunContext):
+        return ctx.locale
+
+    show = mock_task_factory(_show)
+
+    run = await Workflow(
+        "show_context",
+        context=RunContext,
+        start=Node(
+            run=show,
+            context={"locale": "fr"},
+        ),
+    ).run()
+
+    show.mock.assert_called_once()
+    assert show.mock.call_args.kwargs["ctx"] == RunContext(locale="fr")
+    assert run.result == "fr"
+
+
+@pytest.mark.asyncio
+async def test_explicit_binding_overrides_whole_context_injection(mock_task_factory):
+    async def _show(ctx: RunContext):
+        return ctx.locale
+
+    show = mock_task_factory(_show)
+
+    run = await Workflow(
+        "show_context",
+        context=RunContext,
+        start=Node(
+            run=show,
+            bind_input={"ctx": {"locale": "de"}},
+        ),
+    ).run()
+
+    show.mock.assert_called_once()
+    assert show.mock.call_args.kwargs["ctx"] == RunContext(locale="de")
+    assert run.result == "de"
+
+
+@pytest.mark.asyncio
 async def test_node_context_reads_from_input(mock_task_factory):
     async def _format_label(label: str):
         return label
@@ -219,6 +261,26 @@ async def test_invalid_bare_model_field_ref_fails_clearly(mock_task_factory):
     )
 
     with pytest.raises(TypeError, match="cannot use bare model field reference 'ContextRoutePayload.name'"):
+        await workflow.run()
+
+
+@pytest.mark.asyncio
+async def test_multiple_whole_context_parameters_fail_clearly(mock_task_factory):
+    async def _show(left: RunContext, right: RunContext):
+        return left.locale, right.locale
+
+    show = mock_task_factory(_show)
+
+    workflow = Workflow(
+        "show_context",
+        context=RunContext,
+        start=Node(run=show),
+    )
+
+    with pytest.raises(
+        TypeError,
+        match="defines multiple parameters annotated with workflow context model 'RunContext'",
+    ):
         await workflow.run()
 
 

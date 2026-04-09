@@ -20,19 +20,26 @@ def bind_entry_input(
     input_spec: dict[str, Any] | None = None,
     lookup: RefLookup | None = None,
 ) -> tuple[tuple[Any, ...], dict[str, Any]]:
+    effective_lookup = lookup or RefLookup(
+        workflow_input=value,
+        context=None,
+        upstream_value=None,
+    )
     if input_spec is not None:
         return (), _bind_with_input_spec(
             target,
             input_spec=input_spec,
             fallback_value=value,
-            lookup=lookup or RefLookup(
-                workflow_input=value,
-                context=None,
-                upstream_value=None,
-            ),
+            lookup=effective_lookup,
             treat_dict_as_named_payload=True,
         )
-    return (), _bind_named_payload(target, value)
+    return (), _bind_remaining_parameters(
+        target,
+        parameters=target.parameters,
+        value=value,
+        lookup=effective_lookup,
+        treat_dict_as_named_payload=True,
+    )
 
 
 def bind_input(
@@ -42,16 +49,26 @@ def bind_input(
     input_spec: dict[str, Any] | None = None,
     lookup: RefLookup | None = None,
 ) -> tuple[tuple[Any, ...], dict[str, Any]]:
+    effective_lookup = lookup or RefLookup(
+        workflow_input={},
+        context=None,
+        upstream_value=value,
+    )
     if input_spec is not None:
         return (), _bind_with_input_spec(
             target,
             input_spec=input_spec,
             fallback_value=value,
-            lookup=lookup or RefLookup(
-                workflow_input={},
-                context=None,
-                upstream_value=value,
-            ),
+            lookup=effective_lookup,
+            treat_dict_as_named_payload=False,
+        )
+
+    if _requires_context_injection(target, target.parameters, effective_lookup.context):
+        return (), _bind_remaining_parameters(
+            target,
+            parameters=target.parameters,
+            value=value,
+            lookup=effective_lookup,
             treat_dict_as_named_payload=False,
         )
 
@@ -117,6 +134,7 @@ def _bind_with_input_spec(
         target,
         parameters=remaining_parameters,
         value=fallback_value,
+        lookup=lookup,
         treat_dict_as_named_payload=treat_dict_as_named_payload,
     )
     return {**automatic, **explicit}
@@ -148,35 +166,66 @@ def _bind_remaining_parameters(
     *,
     parameters: tuple[inspect.Parameter, ...],
     value: Any,
+    lookup: RefLookup,
     treat_dict_as_named_payload: bool,
 ) -> dict[str, Any]:
     if not parameters:
         return {}
 
+    context_bound, remaining_parameters = _bind_context_parameters(
+        target,
+        parameters=parameters,
+        context=lookup.context,
+    )
+    if not remaining_parameters:
+        return context_bound
+
     if isinstance(value, _MappedPayload):
-        return _bind_named_payload_for_parameters(target, parameters, value.values)
+        return {
+            **_bind_named_payload_for_parameters(
+                target, remaining_parameters, value.values
+            ),
+            **context_bound,
+        }
 
     if treat_dict_as_named_payload and isinstance(value, dict):
-        return _bind_named_payload_for_parameters(target, parameters, value)
+        return {
+            **_bind_named_payload_for_parameters(target, remaining_parameters, value),
+            **context_bound,
+        }
 
     if isinstance(value, BaseModel):
-        if len(parameters) == 1 and _parameter_accepts_model(parameters[0], value):
-            parameter = parameters[0]
+        if len(remaining_parameters) == 1 and _parameter_accepts_model(
+            remaining_parameters[0], value
+        ):
+            parameter = remaining_parameters[0]
             return {
                 parameter.name: _validate_value(
                     target,
                     parameter.name,
                     parameter.annotation,
                     value,
-                )
+                ),
+                **context_bound,
             }
 
-        return _bind_named_payload_for_parameters(target, parameters, value.model_dump())
+        return {
+            **_bind_named_payload_for_parameters(
+                target, remaining_parameters, value.model_dump()
+            ),
+            **context_bound,
+        }
 
     if isinstance(value, tuple):
-        return _bind_tuple_for_parameters(target, parameters, value)
+        return {
+            **_bind_tuple_for_parameters(target, remaining_parameters, value),
+            **context_bound,
+        }
 
-    return _bind_scalar_for_parameters(target, parameters, value)
+    return {
+        **_bind_scalar_for_parameters(target, remaining_parameters, value),
+        **context_bound,
+    }
 
 
 def _bind_named_payload_for_parameters(
@@ -289,6 +338,75 @@ def _parameter_accepts_model(
         return isinstance(value, annotation)
     except TypeError:
         return False
+
+
+def _bind_context_parameters(
+    target: Task,
+    *,
+    parameters: tuple[inspect.Parameter, ...],
+    context: BaseModel | None,
+) -> tuple[dict[str, Any], tuple[inspect.Parameter, ...]]:
+    if context is None:
+        return {}, parameters
+
+    context_parameters = tuple(
+        parameter
+        for parameter in parameters
+        if _parameter_requests_context(parameter, context)
+    )
+    if not context_parameters:
+        return {}, parameters
+
+    if len(context_parameters) > 1:
+        raise TypeError(
+            f"Task '{target.name}' defines multiple parameters annotated with workflow context model "
+            f"'{type(context).__name__}'."
+        )
+
+    context_parameter = context_parameters[0]
+    return {
+        context_parameter.name: _validate_value(
+            target,
+            context_parameter.name,
+            context_parameter.annotation,
+            context,
+        )
+    }, tuple(
+        parameter
+        for parameter in parameters
+        if parameter.name != context_parameter.name
+    )
+
+
+def _requires_context_injection(
+    target: Task,
+    parameters: tuple[inspect.Parameter, ...],
+    context: BaseModel | None,
+) -> bool:
+    if context is None:
+        return False
+
+    context_parameters = tuple(
+        parameter
+        for parameter in parameters
+        if _parameter_requests_context(parameter, context)
+    )
+    if len(context_parameters) > 1:
+        raise TypeError(
+            f"Task '{target.name}' defines multiple parameters annotated with workflow context model "
+            f"'{type(context).__name__}'."
+        )
+    return bool(context_parameters)
+
+
+def _parameter_requests_context(
+    parameter: inspect.Parameter,
+    context: BaseModel,
+) -> bool:
+    annotation = parameter.annotation
+    if annotation is inspect.Signature.empty:
+        return False
+    return annotation is type(context)
 
 
 def _bind_tuple_payload(

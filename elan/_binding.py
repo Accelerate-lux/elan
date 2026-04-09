@@ -18,17 +18,18 @@ def bind_entry_input(
     value: dict[str, Any],
     *,
     input_spec: dict[str, Any] | None = None,
-    workflow_input: dict[str, Any] | None = None,
-    context: BaseModel | None = None,
+    lookup: RefLookup | None = None,
 ) -> tuple[tuple[Any, ...], dict[str, Any]]:
     if input_spec is not None:
         return (), _bind_with_input_spec(
             target,
             input_spec=input_spec,
             fallback_value=value,
-            workflow_input=workflow_input or value,
-            context=context,
-            upstream_value=None,
+            lookup=lookup or RefLookup(
+                workflow_input=value,
+                context=None,
+                upstream_value=None,
+            ),
             treat_dict_as_named_payload=True,
         )
     return (), _bind_named_payload(target, value)
@@ -39,17 +40,18 @@ def bind_input(
     value: Any,
     *,
     input_spec: dict[str, Any] | None = None,
-    workflow_input: dict[str, Any] | None = None,
-    context: BaseModel | None = None,
+    lookup: RefLookup | None = None,
 ) -> tuple[tuple[Any, ...], dict[str, Any]]:
     if input_spec is not None:
         return (), _bind_with_input_spec(
             target,
             input_spec=input_spec,
             fallback_value=value,
-            workflow_input=workflow_input or {},
-            context=context,
-            upstream_value=value,
+            lookup=lookup or RefLookup(
+                workflow_input={},
+                context=None,
+                upstream_value=value,
+            ),
             treat_dict_as_named_payload=False,
         )
 
@@ -86,9 +88,7 @@ def _bind_with_input_spec(
     *,
     input_spec: dict[str, Any],
     fallback_value: Any,
-    workflow_input: dict[str, Any],
-    context: BaseModel | None,
-    upstream_value: Any,
+    lookup: RefLookup,
     treat_dict_as_named_payload: bool,
 ) -> dict[str, Any]:
     parameter_names = {parameter.name for parameter in target.parameters}
@@ -103,9 +103,7 @@ def _bind_with_input_spec(
             target,
             parameter_name=parameter_name,
             value=value,
-            workflow_input=workflow_input,
-            context=context,
-            upstream_value=upstream_value,
+            lookup=lookup,
         )
         for parameter_name, value in input_spec.items()
     }
@@ -129,19 +127,10 @@ def _resolve_input_value(
     *,
     parameter_name: str,
     value: Any,
-    workflow_input: dict[str, Any],
-    context: BaseModel | None,
-    upstream_value: Any,
+    lookup: RefLookup,
 ) -> Any:
     if isinstance(value, SourceFieldRef):
-        resolved = value.eval(
-            RefLookup(
-                workflow_input=workflow_input,
-                context=context,
-                upstream_value=upstream_value,
-            ),
-            owner=f"task '{target.name}'",
-        )
+        resolved = value.eval(lookup, owner=f"task '{target.name}'")
     elif isinstance(value, ModelFieldRef):
         raise TypeError(
             f"Model field reference '{value.model.__name__}.{value.field_name}' "

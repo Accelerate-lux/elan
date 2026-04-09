@@ -5,6 +5,7 @@ from typing import Any, Literal
 from pydantic import BaseModel
 
 from ._binding import bind_entry_input, bind_input
+from ._refs import RefLookup
 from .node import Node
 
 ActivationStatus = Literal["queued", "running", "settled"]
@@ -36,21 +37,24 @@ class Activation:
         workflow_input: dict[str, Any],
         context: BaseModel | None,
     ) -> Any:
+        lookup = RefLookup(
+            workflow_input=workflow_input,
+            context=context,
+            upstream_value=None if self.is_entry else self.input_value,
+        )
         if self.is_entry:
             args, kwargs = bind_entry_input(
                 self.node.run,
                 self.input_value,
                 input_spec=self.node.bind_input,
-                workflow_input=workflow_input,
-                context=context,
+                lookup=lookup,
             )
         else:
             args, kwargs = bind_input(
                 self.node.run,
                 self.input_value,
                 input_spec=self.node.bind_input,
-                workflow_input=workflow_input,
-                context=context,
+                lookup=lookup,
             )
 
         if self.node.run.is_async:

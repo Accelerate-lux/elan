@@ -14,4 +14,5 @@ class Node:
     next: str | list[str | When] | dict[str, str] | None = None
     bind_input: dict[str, Any] | None = None
     bind_output: str | list[Any] | None = None
+    context: dict[str, Any] | None = None
     route_on: str | ModelFieldRef | None = None

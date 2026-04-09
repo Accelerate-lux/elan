@@ -5,6 +5,8 @@ from uuid import uuid4
 from ._activation import Activation
 from ._binding import bind_output
 from ._branch import Branch
+from ._context import prepare_context
+from ._refs import RefLookup
 from ._resolution import resolve_node
 from ._routing import (
     ResolvedNext,
@@ -93,6 +95,26 @@ class Orchestrator:
         activation_id: str,
     ) -> Activation:
         return self.run_state.activations[activation_id]
+
+    def context_for_activation(
+        self,
+        activation: Activation,
+    ) -> Any:
+        branch_context = self.run_state.context_for_branch(activation.branch_id)
+        lookup = RefLookup(
+            workflow_input=self.run_state.workflow_input,
+            context=branch_context,
+            upstream_value=None if activation.is_entry else activation.input_value,
+        )
+        prepared_context = prepare_context(
+            workflow_name=self.run_state.workflow.name,
+            branch_context=branch_context,
+            mapping=activation.node.context,
+            lookup=lookup,
+            phase_name="Node.context",
+        )
+        self.run_state.set_context_for_branch(activation.branch_id, prepared_context)
+        return prepared_context
 
     def _enqueue_next_activations(
         self,
@@ -200,13 +222,14 @@ class Orchestrator:
             child_branch = self._create_branch(
                 current_node_name=next_name,
                 is_entry=False,
+                parent_branch_id=branch.id,
             )
             activations.append(
                 self._create_activation(
                     child_branch,
                     input_value=emitted_value,
                 )
-            )
+        )
         return activations
 
     def _register_join_contribution(
@@ -261,6 +284,7 @@ class Orchestrator:
         *,
         current_node_name: str | None,
         is_entry: bool,
+        parent_branch_id: str | None = None,
     ) -> Branch:
         branch = Branch(
             id=f"branch-{uuid4()}",
@@ -268,6 +292,13 @@ class Orchestrator:
             _is_entry=is_entry,
         )
         self.run_state.branches[branch.id] = branch
+        if parent_branch_id is None:
+            self.run_state.initialize_branch_context(branch.id)
+        else:
+            self.run_state.inherit_branch_context(
+                branch.id,
+                parent_branch_id=parent_branch_id,
+            )
         return branch
 
     def _resolve_current_node(self, node_name: str | None) -> Task | str | Node | Join:

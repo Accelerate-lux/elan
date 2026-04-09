@@ -6,6 +6,7 @@ from pydantic import BaseModel
 
 from ._activation import Activation
 from ._branch import Branch
+from ._context import copy_context
 from ._graph_state import GraphState
 from ._join_state import JoinState
 
@@ -25,6 +26,7 @@ class RunState:
     last_output: Any = None
     outputs: dict[str, dict[str, list[Any]]] = field(default_factory=dict)
     branches: dict[str, Branch] = field(default_factory=dict)
+    branch_contexts: dict[str, BaseModel | None] = field(default_factory=dict)
     activations: dict[str, Activation] = field(default_factory=dict)
     status: RunStatus = "created"
     used_branching: bool = False
@@ -38,3 +40,26 @@ class RunState:
 
     def mark_branching_used(self) -> None:
         self.used_branching = True
+
+    def initialize_branch_context(self, branch_id: str) -> None:
+        self.branch_contexts[branch_id] = copy_context(self.context)
+
+    def inherit_branch_context(
+        self,
+        branch_id: str,
+        *,
+        parent_branch_id: str,
+    ) -> None:
+        self.branch_contexts[branch_id] = copy_context(
+            self.context_for_branch(parent_branch_id)
+        )
+
+    def context_for_branch(self, branch_id: str) -> BaseModel | None:
+        return self.branch_contexts[branch_id]
+
+    def set_context_for_branch(
+        self,
+        branch_id: str,
+        context: BaseModel | None,
+    ) -> None:
+        self.branch_contexts[branch_id] = context

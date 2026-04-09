@@ -88,7 +88,7 @@ class Scheduler:
     ) -> None:
         await activation.execute(
             workflow_input=self.orchestrator.run_state.workflow_input,
-            context=self.orchestrator.run_state.context,
+            context=self.orchestrator.context_for_activation(activation),
         )
 
     async def wait_next_completed(self) -> Activation | None:

@@ -4,7 +4,7 @@ from typing import Any
 
 from pydantic import BaseModel, TypeAdapter, ValidationError
 
-from ._refs import ModelFieldRef, SourceFieldRef
+from ._refs import ModelFieldRef, RefLookup, SourceFieldRef
 from .task import Task
 
 
@@ -134,13 +134,13 @@ def _resolve_input_value(
     upstream_value: Any,
 ) -> Any:
     if isinstance(value, SourceFieldRef):
-        resolved = _resolve_source_field_ref(
-            target,
-            parameter_name=parameter_name,
-            ref=value,
-            workflow_input=workflow_input,
-            context=context,
-            upstream_value=upstream_value,
+        resolved = value.eval(
+            RefLookup(
+                workflow_input=workflow_input,
+                context=context,
+                upstream_value=upstream_value,
+            ),
+            owner=f"task '{target.name}'",
         )
     elif isinstance(value, ModelFieldRef):
         raise TypeError(
@@ -152,88 +152,6 @@ def _resolve_input_value(
 
     parameter = _parameter_by_name(target, parameter_name)
     return _validate_value(target, parameter.name, parameter.annotation, resolved)
-
-
-def _resolve_source_field_ref(
-    target: Task,
-    *,
-    parameter_name: str,
-    ref: SourceFieldRef,
-    workflow_input: dict[str, Any],
-    context: BaseModel | None,
-    upstream_value: Any,
-) -> Any:
-    if ref.source == "input":
-        if ref.field_name not in workflow_input:
-            raise TypeError(
-                f"Workflow input does not provide field '{ref.field_name}' for task '{target.name}'."
-            )
-        return workflow_input[ref.field_name]
-
-    if ref.source == "context":
-        if context is None:
-            raise TypeError(
-                f"Task '{target.name}' cannot read Context.{ref.field_name} without workflow context."
-            )
-        return _resolve_object_field(
-            source_name="context",
-            field_name=ref.field_name,
-            value=context,
-        )
-
-    if upstream_value is None:
-        raise TypeError(
-            f"Task '{target.name}' cannot read Upstream.{ref.field_name} at workflow entry."
-        )
-
-    return _resolve_upstream_field(
-        target,
-        parameter_name=parameter_name,
-        field_name=ref.field_name,
-        value=upstream_value,
-    )
-
-
-def _resolve_upstream_field(
-    target: Task,
-    parameter_name: str,
-    field_name: str,
-    value: Any,
-) -> Any:
-    if isinstance(value, _MappedPayload):
-        if field_name not in value.values:
-            raise TypeError(
-                f"Upstream payload does not provide field '{field_name}' for task '{target.name}'."
-            )
-        return value.values[field_name]
-
-    if isinstance(value, BaseModel):
-        return _resolve_object_field(
-            source_name="upstream",
-            field_name=field_name,
-            value=value,
-            target_name=target.name,
-        )
-
-    raise TypeError(
-        f"Task '{target.name}' cannot read Upstream.{field_name} from value of type {type(value).__name__}."
-    )
-
-
-def _resolve_object_field(
-    *,
-    source_name: str,
-    field_name: str,
-    value: BaseModel,
-    target_name: str | None = None,
-) -> Any:
-    if field_name not in type(value).model_fields:
-        if target_name is None:
-            raise TypeError(f"{source_name.title()} does not provide field '{field_name}'.")
-        raise TypeError(
-            f"{source_name.title()} does not provide field '{field_name}' for task '{target_name}'."
-        )
-    return getattr(value, field_name)
 
 
 def _bind_remaining_parameters(

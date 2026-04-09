@@ -9,6 +9,7 @@ def resolve_node(workflow_name: str, value: Task | str | Node) -> Node:
             next=value.next,
             bind_input=value.bind_input,
             bind_output=value.bind_output,
+            context=value.context,
             route_on=value.route_on,
         )
 

@@ -67,7 +67,7 @@ Examples:
 
 - unknown field write
 - incompatible value written to a context field
-- invalid `after.context` update
+- invalid future post-execution context update
 
 Current direction:
 

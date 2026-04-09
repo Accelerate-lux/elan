@@ -111,14 +111,13 @@ The simple loop is:
 10. wait for task completion
 11. store the raw task outcome on the activation
 12. apply `output`
-13. apply `after`
-14. resolve `next`
-15. if a next node exists:
+13. resolve `next`
+14. if a next node exists:
     - update the branch position
     - create the next activation
     - enqueue it
-16. only then is the previous activation fully settled
-17. repeat until no continuation remains
+15. only then is the previous activation fully settled
+16. repeat until no continuation remains
 
 The key rule is that continuation must be enqueued before the previous activation is fully settled. Otherwise the engine can observe a false terminal state with no queued work, no running work, and no next activation yet materialized.
 

@@ -1303,6 +1303,329 @@ Run response:
 
 The final run response shape still needs to be updated once the execution and result model is fully locked down.
 
+## Production Runtime Design Notes
+
+These notes capture production runtime design direction beyond the core workflow authoring model.
+They are split between decisions already taken and open topics that still need requirements-driven refinement.
+
+Design choices in this area should be evaluated against Elan's existing goals:
+
+- workflows stay centered on explicit graph structure, routing, and result boundaries
+- tasks stay plain Python, reusable, and decoupled from orchestration machinery
+- runtime concerns should not leak into business logic
+- simple local execution should remain simple
+- the same workflow should be able to grow from local usage to production usage without being rewritten
+- the model should work for data workflows, agent workflows, service orchestration, and mixed workloads
+
+### Current Decisions
+
+#### Production Runtime Model
+
+The first production execution path uses a server plus worker model with Taskiq as the first execution backend.
+This is an implementation choice for distributed task execution, not the semantic owner of Elan workflows.
+
+Elan owns:
+
+- the logical activation queue
+- workflow state
+- branch progression
+- routing
+- joins
+- context
+- result recording
+- scheduling decisions
+
+Taskiq is used to run selected activations outside the orchestrator process.
+
+#### Activation Execution Contract
+
+Elan submits executable activations, not workflow graphs, to workers.
+
+An activation call identifies:
+
+- run
+- workflow
+- node
+- branch
+- activation
+- task name
+- attempt
+- resolved arguments
+- execution context needed by the task signature
+
+Workers resolve stable task names to executable Python callables.
+Task execution remains based on ordinary Python function signatures.
+Workers report execution outcome, output or error, timing, worker identity, and backend task identity when available.
+
+Elan remains responsible for recording completion and advancing routing, joins, context, and workflow result.
+
+#### Result And Value Reference Model
+
+Remote activation results should be represented as addressable value references by default.
+Workers should not have to send full returned values back through the orchestrator unless the workflow runtime needs to materialize them.
+
+Elan should distinguish:
+
+- activation output, which is the value produced by one node execution
+- activation outcome, which includes success, failure, cancellation, output reference, error reference, and observed type metadata
+- workflow result, which is the explicit value exported by the workflow definition
+
+The orchestrator should mostly operate on references and metadata.
+In a simple linear workflow, the output of one activation should be passable to the next activation as a reference without loading the full value into orchestrator memory.
+
+When Elan needs a value to evaluate workflow semantics, it should be able to resolve only the part it needs.
+This applies to routing, binding, joins, result materialization, and later observability.
+
+Refs are the public and internal abstraction for this addressing model.
+A `Ref` is an accessor into a runtime value source, not just a marker for where a value came from.
+Evaluating a ref should resolve the narrowest required value or metadata supported by the current backend.
+
+Examples of things refs should be able to address:
+
+- a field or path inside an upstream output
+- selected context or workflow input fields
+- observed output type metadata
+- failure or exception type metadata
+
+This keeps task code ordinary while allowing distributed execution to keep large values in the data plane instead of the orchestration control plane.
+
+#### Activation Status Model
+
+Activation status stays thin at first:
+
+- queued
+- running
+- succeeded
+- failed
+- cancelled
+
+`running` means the activation has been handed to the execution backend.
+
+#### Persistence Boundary
+
+Elan persists the current durable state needed to continue a run:
+
+- run identity
+- workflow identity
+- workflow input
+- workflow result
+- branch state
+- branch context
+- activation state
+- activation input
+- activation output reference or error reference
+- attempt count
+- basic timestamps
+
+## Open Production Capability Topics
+
+These are practical capability areas that still need refinement.
+They should be specified from requirements, use cases, and Elan's design goals rather than from a preferred infrastructure shape alone.
+
+### Deployments
+
+Deployments are the topic of how a workflow definition becomes a repeatable way to run something.
+
+Requirements to satisfy:
+
+- direct `Workflow.run(...)` must remain enough for local and embedded usage
+- the same workflow definition should be reusable in more than one runtime setting
+- runtime settings should not pollute task bodies or graph structure
+- a repeatable run target should have a stable name or identity
+- deployment should leave room for local runs, process workers, containers, remote execution, scheduled runs, and manual/API-triggered runs
+- operational defaults such as input defaults, tags, retry policies, timeouts, schedules, or worker targeting should have a place if those features exist
+- deployment should not force users into a server/control-plane model for simple usage
+
+Shapes to evaluate:
+
+- no deployment object
+- lightweight deployment metadata
+- Python deployment object
+- config-defined deployment
+- registered runtime deployment
+- server-side deployment resource
+
+Questions to refine:
+
+- what is the minimum useful deployment concept for Elan?
+- what belongs to a workflow definition versus a deployment?
+- should one workflow support multiple deployments with different inputs, schedules, or environments?
+- how much should Elan know about Docker, Kubernetes, workers, schedules, or APIs?
+
+### Reliability Controls
+
+Reliability controls are the topic of making workflow execution predictable when tasks fail, hang, or need to be stopped.
+
+Requirements to satisfy:
+
+- failure behavior should be explicit enough that workflow authors can reason about it
+- retries should not require task code to know about orchestration policy
+- timeouts and cancellation should be expressible without wrapping task business logic
+- policies should work for linear workflows, branched workflows, and composed workflows
+- branch failure behavior should be understandable: fail the branch, fail the workflow, retry the node, or continue through an explicit path
+- policies should not make simple workflows verbose
+
+Shapes to evaluate:
+
+- node-level policies
+- workflow-level defaults
+- deployment-level defaults
+- named reusable policies
+- failure routing as part of the workflow graph
+- failure handling as runtime policy outside the graph
+
+Questions to refine:
+
+- where should reliability policy live by default?
+- should failure behavior be graph-visible or runtime-only?
+- how cancellation propagates across branches and child workflows
+- what the default failure behavior should be
+- how retries interact with non-idempotent task side effects
+- what retry, cancellation, and timeout behavior belongs to Elan versus Taskiq?
+
+### Durable Execution
+
+Durable execution is the topic of preserving workflow progress beyond one uninterrupted Python process.
+
+Requirements to satisfy:
+
+- a run should be able to survive process loss if durability is enabled
+- resumability should not require task business logic to implement its own checkpoint system
+- long-running workflows should be able to wait without occupying a running task forever
+- durability must make branch and activation state recoverable enough to continue correctly
+- the model should distinguish safe replay/resume from re-running side-effectful tasks blindly
+- durability should support agent and human-in-the-loop workflows without turning every workflow into an agent runtime
+
+Shapes to evaluate:
+
+- in-memory only
+- optional persistence backend
+- persisted run log
+- checkpointed run state
+- event-sourced execution history
+- durable wait states
+
+Questions to refine:
+
+- what state must be persisted to resume safely
+- whether durability is core runtime behavior or an optional backend
+- how resumability interacts with task side effects
+- what parts of the workflow model must become deterministic, if any
+
+### Observability
+
+Observability is the topic of understanding what happened during a workflow run and why.
+
+Requirements to satisfy:
+
+- users should be able to inspect a run without reconstructing behavior from logs alone
+- branch and activation structure should be visible
+- inputs and outputs should be traceable at node level when safe to record
+- failures should point to the workflow node and execution attempt that failed
+- dynamic routing and future graph growth should remain understandable after the run
+- observability should support both debugging and production operation
+- sensitive values should not be exposed accidentally
+
+Shapes to evaluate:
+
+- run timeline
+- branch and activation view
+- inputs and outputs per node
+- logs and metadata
+- artifacts
+- lineage records
+- search/filter by workflow, run, and state
+
+Questions to refine:
+
+- what the canonical runtime event model should be
+- what should be visible by default versus opt-in
+- whether lineage and artifacts are first-class concepts or derived records
+- how observability should represent branches, joins, retries, and future dynamic expansion
+
+### Production Runtime Refinements
+
+Production runtime refinements are the remaining questions around the server, worker, and backend execution model after the first Taskiq-backed direction.
+
+Requirements to satisfy:
+
+- local library usage must remain valid
+- production usage should have a clear path beyond `await workflow.run(...)`
+- execution should be able to move out of the authoring process when needed
+- API-triggered runs should be possible without rewriting workflows
+- workers should execute task calls based on stable task names and resolved function signatures
+- Elan should be able to schedule queued activations itself, including future policies such as waiting-time based priority
+- the execution backend should not become the durable source of truth for workflow progress
+- the runtime model should leave room for self-hosted operation before any cloud-specific assumptions
+- the production model should not make the core authoring API feel like a scheduler DSL
+
+Questions to refine:
+
+- what production story should exist before cloud is considered?
+- what should be possible with only the Python package versus the server package?
+- what is the minimal activation message passed from Elan to Taskiq?
+- how should workers register or advertise executable task names?
+- how much status metadata belongs in the activation execution contract?
+- how should Elan-owned queue priority map onto Taskiq and broker-specific capabilities?
+
+### Composition
+
+Composition is the topic of building larger systems from smaller workflows.
+
+Requirements to satisfy:
+
+- a child workflow should expose a clear result boundary
+- parent workflows should not need to know every internal node of the child
+- composed workflows should preserve task reuse and graph readability
+- context and input crossing should be explicit enough to reason about
+- composition should work with deployment, reliability, durability, and observability concerns
+- composition should not become a shortcut for hiding arbitrary orchestration side effects
+
+Shapes to evaluate:
+
+- reusable workflow units
+- `Node(run=child_workflow)`
+- workflow fragments
+- nested runs
+- inline expansion
+- shared runtime and deployment concerns across composed workflows
+
+Questions to refine:
+
+- how parent and child workflow runs are represented
+- how context, inputs, and results cross workflow boundaries
+- how composition appears in observability and failure handling
+- whether composition should be purely runtime composition or also graph materialization
+
+### Practical Use Cases
+
+Practical use cases are the topic of grounding design choices in workflows people actually want to build.
+
+Requirements to satisfy:
+
+- use cases should pressure the API instead of merely demonstrating it
+- examples should cover data workflows, agent workflows, and mixed workloads
+- scenarios should reveal which features are actually necessary
+- use cases should identify where durability, reliability, observability, or human-in-the-loop become unavoidable
+- examples should stay concrete enough to prevent generic platform design
+
+Candidate scenarios:
+
+- document or content publishing pipeline
+- customer onboarding or approval workflow
+- support triage and escalation
+- ETL plus enrichment plus notification
+- human-reviewed agent workflow
+- multi-step research or report generation workflow
+- incident investigation workflow
+
+Questions to refine:
+
+- which use cases should become canonical examples
+- which use cases require durability or human-in-the-loop support
+- which use cases are too broad for the first production runtime design pass
+- which use cases can be supported with the current core plus small extensions
+
 ## Later Topics
 
 These topics are part of the broader interface design and remain for later work:

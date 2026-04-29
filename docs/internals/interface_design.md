@@ -1359,6 +1359,27 @@ Workers report execution outcome, output or error, timing, worker identity, and 
 
 Elan remains responsible for recording completion and advancing routing, joins, context, and workflow result.
 
+#### Task Identity And Registration
+
+Remote execution uses registered task names.
+Elan should expose its own task identity and registration surface, but keep it close to the Taskiq and Celery mental model so developers can rely on familiar behavior.
+
+Task names are Elan task names.
+The first Taskiq backend maps Elan task names directly to Taskiq task names.
+
+Tasks may be referenced locally by Python callable or remotely by stable name:
+
+- `Node(run=extract_metadata)`
+- `Node(run="content.extract_metadata")`
+
+The default task name should be derived from the Python import path for convenience.
+Explicit task names should be supported and recommended for production:
+
+- `@task(name="content.extract_metadata")`
+
+Workers register the task names they can execute.
+The orchestrator should not need to import task implementation code just to dispatch remote activations by name.
+
 #### Result And Value Reference Model
 
 Remote activation results should be represented as addressable value references by default.

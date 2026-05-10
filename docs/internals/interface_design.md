@@ -140,6 +140,28 @@ All context updates follow the same base rule:
 - they merge field by field into the current branch scope
 - unknown fields are invalid by schema
 
+Workflow-level `bind_context` prepares the initial context before `start` runs.
+It uses the same reference model as node context preparation, but only has access
+to workflow input, literals, and context defaults. It may provide required
+context fields from workflow input.
+
+Intended shape:
+
+```python
+from elan import Input, Workflow
+
+
+workflow = Workflow(
+    "example",
+    context=RunContext,
+    bind_context={
+        "user_id": Input.user_id,
+        "locale": Input.locale,
+    },
+    start=...,
+)
+```
+
 ## Refs
 
 Elan uses registered ref classes for typed field references in the workflow DSL.

@@ -64,6 +64,7 @@ async def test_literal_input_mapping(mock_task_factory, branch_id):
 
 class GreetingContext(BaseModel):
     punctuation: str = "!"
+    title: str = "Mx"
 
 
 @ref
@@ -132,6 +133,50 @@ async def test_ref_backed_binding(mock_task_factory, branch_id):
         branch_id[0]: {
             "_prepare": [GreetingRefPayload(name="world")],
             "_greet": ["Hello, Dr world!"],
+        }
+    }
+
+
+@pytest.mark.asyncio
+async def test_workflow_bind_context_from_input(mock_task_factory, branch_id):
+    def _prepare() -> GreetingRefPayload:
+        return GreetingRefPayload(name="world")
+
+    async def _greet(name: str, title: str, punctuation: str):
+        return f"Hello, {title} {name}{punctuation}"
+
+    prepare = mock_task_factory(_prepare)
+    greet = mock_task_factory(_greet)
+
+    run = await Workflow(
+        "greet_world",
+        context=GreetingContext,
+        bind_context={
+            "title": Input.title,
+            "punctuation": Input.punctuation,
+        },
+        start=Node(run=prepare, next="greet"),
+        greet=Node(
+            run=greet,
+            bind_input={
+                "name": Upstream.name,
+                "title": Context.title,
+                "punctuation": Context.punctuation,
+            },
+        ),
+    ).run(title="Dr", punctuation="?")
+
+    prepare.mock.assert_called_once_with()
+    greet.mock.assert_called_once_with(
+        name="world",
+        title="Dr",
+        punctuation="?",
+    )
+    assert run.result == "Hello, Dr world?"
+    assert run.outputs == {
+        branch_id[0]: {
+            "_prepare": [GreetingRefPayload(name="world")],
+            "_greet": ["Hello, Dr world?"],
         }
     }
 
@@ -481,4 +526,3 @@ async def test_registry_resolution_with_reserved_result(mock_task_factory, branc
             "add": [5],
         }
     }
-

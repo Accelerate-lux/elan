@@ -22,7 +22,7 @@ Registers a Pydantic model class for field-reference features.
 
 Ordinary Pydantic binding does not require `@ref`.
 
-## `Workflow(name, start, context=None, **nodes)`
+## `Workflow(name, start, context=None, bind_context=None, **nodes)`
 
 Defines a workflow.
 
@@ -31,6 +31,7 @@ Parameters:
 - `name: str`
 - `start: Task | str | Node`
 - `context: type[BaseModel] | None`
+- `bind_context: dict[str, Any] | None`
 - `**nodes: Task | str | Node | Join`
 
 ## `await workflow.run(**input)`

@@ -12,6 +12,10 @@ class RunContext(BaseModel):
     published_url: str | None = None
 
 
+class RequiredRunContext(BaseModel):
+    label: str
+
+
 @ref
 class PublishPayload(BaseModel):
     slug: str
@@ -208,6 +212,114 @@ async def test_context_updates_partially_merge(mock_task_factory):
 
     show.mock.assert_called_once_with(prefix="published", punctuation="!")
     assert run.result == "published!"
+
+
+@pytest.mark.asyncio
+async def test_workflow_bind_context_initializes_from_input(mock_task_factory):
+    async def _show(prefix: str, punctuation: str):
+        return f"{prefix}{punctuation}"
+
+    show = mock_task_factory(_show)
+
+    run = await Workflow(
+        "show",
+        context=RunContext,
+        bind_context={
+            "prefix": Input.prefix,
+            "punctuation": Input.punctuation,
+        },
+        start=Node(
+            run=show,
+            bind_input={
+                "prefix": Context.prefix,
+                "punctuation": Context.punctuation,
+            },
+        ),
+    ).run(prefix="published", punctuation="?")
+
+    show.mock.assert_called_once_with(prefix="published", punctuation="?")
+    assert run.result == "published?"
+
+
+@pytest.mark.asyncio
+async def test_workflow_bind_context_accepts_literals(mock_task_factory):
+    async def _show(prefix: str, punctuation: str):
+        return f"{prefix}{punctuation}"
+
+    show = mock_task_factory(_show)
+
+    run = await Workflow(
+        "show",
+        context=RunContext,
+        bind_context={
+            "prefix": "published",
+            "punctuation": "?",
+        },
+        start=Node(
+            run=show,
+            bind_input={
+                "prefix": Context.prefix,
+                "punctuation": Context.punctuation,
+            },
+        ),
+    ).run()
+
+    show.mock.assert_called_once_with(prefix="published", punctuation="?")
+    assert run.result == "published?"
+
+
+@pytest.mark.asyncio
+async def test_workflow_bind_context_can_initialize_required_context_fields(mock_task_factory):
+    async def _show(ctx: RequiredRunContext):
+        return ctx.label
+
+    show = mock_task_factory(_show)
+
+    run = await Workflow(
+        "show",
+        context=RequiredRunContext,
+        bind_context={"label": Input.label},
+        start=Node(run=show),
+    ).run(label="urgent")
+
+    show.mock.assert_called_once()
+    assert show.mock.call_args.kwargs["ctx"] == RequiredRunContext(label="urgent")
+    assert run.result == "urgent"
+
+
+@pytest.mark.asyncio
+async def test_workflow_bind_context_rejects_unknown_keys(mock_task_factory):
+    async def _show(label: str):
+        return label
+
+    show = mock_task_factory(_show)
+
+    workflow = Workflow(
+        "show",
+        context=RunContext,
+        bind_context={"missing": "value"},
+        start=Node(run=show, bind_input={"label": "unused"}),
+    )
+
+    with pytest.raises(TypeError, match="does not define fields: missing"):
+        await workflow.run()
+
+
+@pytest.mark.asyncio
+async def test_workflow_bind_context_without_workflow_context_fails(mock_task_factory):
+    async def _show():
+        return "ok"
+
+    show = mock_task_factory(_show)
+
+    workflow = Workflow(
+        "show",
+        bind_context={"label": "value"},
+        start=Node(run=show),
+    )
+
+    with pytest.raises(TypeError, match="cannot use Workflow.bind_context without workflow context"):
+        await workflow.run()
 
 
 @pytest.mark.asyncio

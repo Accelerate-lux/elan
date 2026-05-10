@@ -32,6 +32,39 @@ workflow = Workflow(
 
 Each workflow run starts with a fresh instance of that model.
 
+## Initialize context from workflow input
+
+Use `Workflow.bind_context` when the initial context should be prepared from
+workflow input or literals before `start` runs.
+
+```python
+from elan import Context, Input, Node, Workflow
+
+
+workflow = Workflow(
+    "publish_article",
+    context=PublishContext,
+    bind_context={
+        "locale": Input.locale,
+        "prefix": "draft",
+    },
+    start=Node(
+        run=prepare_article,
+        bind_input={"locale": Context.locale},
+    ),
+)
+```
+
+`bind_context` runs once, before the first activation is created. It may provide
+required context fields from workflow input. The initialized context is then
+copied into the entry branch.
+
+Supported sources in `Workflow.bind_context` are:
+
+- literals
+- `Input.field`
+- `Context.field`
+
 ## Prepare context before a node runs
 
 Use `Node.context` when a node needs to shape the context visible during its own execution.

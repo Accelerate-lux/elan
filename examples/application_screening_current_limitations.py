@@ -1,22 +1,21 @@
-"""Toy application screening workflow used to expose current integration limits.
+"""Toy application screening workflow using yield-based batch fan-out.
 
 The process is deliberately small:
-1. Load application rows outside the workflow.
-2. Run one workflow per application.
-3. Prepare a typed application record from the row fields.
+1. Load fake application rows inside the workflow.
+2. Yield one typed application per row.
+3. Screen each yielded application on its own branch.
 4. Reject applications without tax/contact verification, over the request cap,
    or missing enough budget/problem detail.
 5. Stop early on hard-gate failure, or continue into scoring layers.
 6. Score priority category fit, pilot/usage traction, delivery owner/timeline,
    and contradiction count.
 7. Convert the layer scores into a final bucket.
-8. Aggregate the batch outside the workflow.
+8. Join all screened applications and aggregate the batch inside the workflow.
 
-This is not the target refactor. It keeps the awkward shape visible:
-- applications are loaded and looped outside Elan
+The yield and aggregation refactor is now visible, but some remaining limitations
+are still deliberate:
 - provider-like settings are passed through workflow context
-- independent review layers are serialized
-- aggregation happens after the workflow runs
+- gates and scoring layers inside one application are still serialized
 - concurrency is controlled nowhere in the workflow/runtime contract
 """
 
@@ -25,7 +24,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
-from elan import Input, Node, Workflow, ref, task
+from elan import Input, Join, Node, Workflow, ref, task
 
 
 class ToyApplication(BaseModel):
@@ -170,9 +169,10 @@ def toy_screening_config() -> dict[str, Any]:
 
 
 @task
-async def prepare_application(row_number: int, fields: dict[str, Any]) -> ToyReviewState:
-    return ToyReviewState(
-        app=ToyApplication(
+async def load_applications():
+    for row_number, fields in enumerate(toy_rows(), start=2):
+        await asyncio.sleep(0)
+        yield ToyApplication(
             row_number=row_number,
             applicant_name=fields["Applicant"],
             tax_id_present=fields["tax_id_present"],
@@ -187,7 +187,11 @@ async def prepare_application(row_number: int, fields: dict[str, Any]) -> ToyRev
             delivery_timeline_weeks=fields["delivery_timeline_weeks"],
             contradiction_count=fields["contradiction_count"],
         )
-    )
+
+
+@task
+async def prepare_application(app: ToyApplication) -> ToyReviewState:
+    return ToyReviewState(app=app)
 
 
 @task
@@ -243,11 +247,6 @@ async def decide_review_route(
         else "continue"
     )
     return state.model_copy(update={"review_route": route})
-
-
-@task
-async def finish_review(state: ToyReviewState) -> ToyReviewState:
-    return state
 
 
 @task
@@ -334,51 +333,8 @@ async def score_application(
     )
 
 
-toy_current_application_workflow = Workflow(
-    "toy_current_application_screening",
-    context=ToyScreeningContext,
-    bind_context={
-        "provider": Input.provider,
-        "model": Input.model,
-        "temperature": Input.temperature,
-        "stop_on_hard_gate_fail": Input.stop_on_hard_gate_fail,
-        "a_threshold": Input.a_threshold,
-        "b_threshold": Input.b_threshold,
-        "max_requested_amount_usd": Input.max_requested_amount_usd,
-        "min_budget_line_items": Input.min_budget_line_items,
-        "min_problem_statement_words": Input.min_problem_statement_words,
-        "min_pilot_users": Input.min_pilot_users,
-        "min_monthly_active_users": Input.min_monthly_active_users,
-        "max_delivery_timeline_weeks": Input.max_delivery_timeline_weeks,
-    },
-    start=Node(run=prepare_application, next="identity"),
-    identity=Node(run=review_identity_gate, next="budget"),
-    budget=Node(run=review_budget_gate, next="submission"),
-    submission=Node(
-        run=review_submission_gate,
-        next="hard_gate_route",
-    ),
-    hard_gate_route=Node(
-        run=decide_review_route,
-        route_on=ToyReviewState.review_route,
-        next={
-            "continue": "category_fit",
-            "stop": "score",
-        },
-    ),
-    category_fit=Node(run=review_category_fit, next="traction"),
-    traction=Node(run=review_traction, next="delivery_readiness"),
-    delivery_readiness=Node(
-        run=review_delivery_readiness,
-        next="consistency",
-    ),
-    consistency=Node(run=review_consistency, next="score"),
-    score=Node(run=score_application, next="result"),
-    result=Node(run=finish_review),
-)
-
-
-def aggregate_outside_workflow(states: list[ToyReviewState]) -> ToyBatchSummary:
+@task
+def summarize_batch(states: list[ToyReviewState]) -> ToyBatchSummary:
     accepted = sum(
         1 for state in states if state.final and state.final.bucket in {"A", "B"}
     )
@@ -396,17 +352,58 @@ def aggregate_outside_workflow(states: list[ToyReviewState]) -> ToyBatchSummary:
     )
 
 
+class ApplicationScreeningWorkflow(Workflow):
+    name = "toy_current_application_screening"
+    context = ToyScreeningContext
+    bind_context = {
+        "provider": Input.provider,
+        "model": Input.model,
+        "temperature": Input.temperature,
+        "stop_on_hard_gate_fail": Input.stop_on_hard_gate_fail,
+        "a_threshold": Input.a_threshold,
+        "b_threshold": Input.b_threshold,
+        "max_requested_amount_usd": Input.max_requested_amount_usd,
+        "min_budget_line_items": Input.min_budget_line_items,
+        "min_problem_statement_words": Input.min_problem_statement_words,
+        "min_pilot_users": Input.min_pilot_users,
+        "min_monthly_active_users": Input.min_monthly_active_users,
+        "max_delivery_timeline_weeks": Input.max_delivery_timeline_weeks,
+    }
+
+    start = Node(run=load_applications, next="prepare")
+    prepare = Node(run=prepare_application, next="identity")
+    identity = Node(run=review_identity_gate, next="budget")
+    budget = Node(run=review_budget_gate, next="submission")
+    submission = Node(
+        run=review_submission_gate,
+        next="hard_gate_route",
+    )
+    hard_gate_route = Node(
+        run=decide_review_route,
+        route_on=ToyReviewState.review_route,
+        next={
+            "continue": "category_fit",
+            "stop": "score",
+        },
+    )
+    category_fit = Node(run=review_category_fit, next="traction")
+    traction = Node(run=review_traction, next="delivery_readiness")
+    delivery_readiness = Node(
+        run=review_delivery_readiness,
+        next="consistency",
+    )
+    consistency = Node(run=review_consistency, next="score")
+    score = Node(run=score_application, next="result")
+    result = Join(run=summarize_batch)
+
+
+toy_current_application_workflow = ApplicationScreeningWorkflow()
+
+
 async def run_toy_application_screening() -> ToyBatchSummary:
-    states = []
     screening_config = toy_screening_config()
-    for row_number, fields in enumerate(toy_rows(), start=2):
-        run = await toy_current_application_workflow.run(
-            row_number=row_number,
-            fields=fields,
-            **screening_config,
-        )
-        states.append(run.result)
-    return aggregate_outside_workflow(states)
+    run = await toy_current_application_workflow.run(**screening_config)
+    return run.result
 
 
 if __name__ == "__main__":

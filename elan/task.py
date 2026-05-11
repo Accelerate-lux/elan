@@ -10,6 +10,8 @@ class Task:
     signature: inspect.Signature
     parameters: tuple[inspect.Parameter, ...]
     is_async: bool
+    is_generator: bool
+    is_async_generator: bool
     alias: str | None = None
 
     @property
@@ -44,6 +46,8 @@ def _create_task(fn: Callable[..., Any], *, alias: str | None = None) -> Task:
         signature=signature,
         parameters=parameters,
         is_async=inspect.iscoroutinefunction(fn),
+        is_generator=inspect.isgeneratorfunction(fn),
+        is_async_generator=inspect.isasyncgenfunction(fn),
         alias=alias,
     )
 

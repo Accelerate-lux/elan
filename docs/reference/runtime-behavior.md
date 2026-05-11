@@ -53,6 +53,7 @@ Between nodes, Elan currently binds values using these rules:
 - Pydantic model outputs may pass through as one value or auto-unpack by field name
 - `Node.bind_output` may create a named adapter payload
 - `Node.bind_input` may provide literal values or read from `Upstream.field`, `Input.field`, and `Context.field`
+- generator task outputs are collected as one list in `WorkflowRun.outputs`; each yielded item is routed independently
 
 ## Context behavior
 
@@ -84,8 +85,17 @@ Current supported routing forms:
 
 - exclusive branching with `next={...}` and `route_on`
 - fan-out with `next=[...]`
+- yield-based fan-out from sync and async generator tasks
 - conditional multi-routing with `When(...)`
 - mixed `next=[str | When, ...]` target-producer lists
+
+For yield-based fan-out, every yielded item is treated like one node output packet:
+
+- `Node.bind_output` is applied per yielded item
+- `next`, `When(...)`, and `route_on` are resolved per yielded item
+- downstream branches may start before the generator task has finished
+- the generator activation completes only after the generator is exhausted
+- yielding into reserved `result=Node(...)` is unsupported; use `result=Join(...)`
 
 Ref-based `route_on` currently applies to exclusive branching only.
 

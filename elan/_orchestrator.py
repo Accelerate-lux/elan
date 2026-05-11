@@ -125,11 +125,32 @@ class Orchestrator:
         for next_activation in next_activations:
             scheduler.enqueue(next_activation)
 
+    def handle_yielded_output(
+        self,
+        *,
+        scheduler: Scheduler,
+        activation: Activation,
+        yielded_output: Any,
+    ) -> None:
+        next_activations = self._progress_yielded_output(
+            activation,
+            yielded_output,
+        )
+        for next_activation in next_activations:
+            scheduler.enqueue(next_activation)
+        scheduler.launch_ready()
+
     def _progress_branch(
         self,
         settled: Activation,
     ) -> list[Activation]:
         branch = self.run_state.branches[settled.branch_id]
+        if settled.yielded:
+            if settled.node.next is not None:
+                self.run_state.mark_branching_used()
+            branch.complete()
+            return []
+
         emitted_value = bind_output(settled.node.bind_output, settled.output)
 
         if isinstance(settled.node.next, dict) or is_target_producer_list(
@@ -154,6 +175,35 @@ class Orchestrator:
             nodes=self.run_state.graph.nodes,
         )
         return self._create_next_activations(branch, emitted_value, next_targets)
+
+    def _progress_yielded_output(
+        self,
+        activation: Activation,
+        yielded_output: Any,
+    ) -> list[Activation]:
+        branch = self.run_state.branches[activation.branch_id]
+        emitted_value = bind_output(activation.node.bind_output, yielded_output)
+
+        if activation.node.next is not None:
+            self.run_state.mark_branching_used()
+
+        if (
+            activation.node.next is not None
+            and "result" in self.run_state.graph.nodes
+            and not self._uses_join_result()
+        ):
+            raise NotImplementedError(
+                "Yield-based branching with reserved result is not implemented before Join."
+            )
+
+        next_targets = resolve_next_targets(
+            self.run_state.workflow.name,
+            next_value=activation.node.next,
+            route_on=activation.node.route_on,
+            emitted_value=emitted_value,
+            nodes=self.run_state.graph.nodes,
+        )
+        return self._create_yielded_activations(branch, emitted_value, next_targets)
 
     def _record_output(
         self,
@@ -230,6 +280,34 @@ class Orchestrator:
                     input_value=emitted_value,
                 )
         )
+        return activations
+
+    def _create_yielded_activations(
+        self,
+        branch: Branch,
+        emitted_value: Any,
+        next_targets: ResolvedNext,
+    ) -> list[Activation]:
+        if next_targets is None:
+            return []
+
+        targets = next_targets if isinstance(next_targets, list) else [next_targets]
+        activations: list[Activation] = []
+        for next_name, _next_node in targets:
+            if self._uses_join_result() and next_name == "result":
+                self._register_join_contribution(emitted_value)
+                continue
+            child_branch = self._create_branch(
+                current_node_name=next_name,
+                is_entry=False,
+                parent_branch_id=branch.id,
+            )
+            activations.append(
+                self._create_activation(
+                    child_branch,
+                    input_value=emitted_value,
+                )
+            )
         return activations
 
     def _register_join_contribution(

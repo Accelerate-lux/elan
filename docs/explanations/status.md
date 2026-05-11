@@ -5,12 +5,14 @@ This page summarizes the current public implementation status of Elan.
 ## Implemented today
 
 - linear workflows
+- `Workflow` subclass authoring
 - `bind_output`
 - `bind_input`
 - structured payload binding
 - `@ref` field-reference features
 - exclusive branching
 - fan-out
+- yield-based fan-out
 - `When(...)`
 - terminal `Join` on reserved `result`
 - concurrent execution of sibling runnable branches

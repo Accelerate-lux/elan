@@ -86,9 +86,17 @@ class Scheduler:
         self,
         activation: Activation,
     ) -> None:
+        async def _on_yield(item: Any) -> None:
+            self.orchestrator.handle_yielded_output(
+                scheduler=self,
+                activation=activation,
+                yielded_output=item,
+            )
+
         await activation.execute(
             workflow_input=self.orchestrator.run_state.workflow_input,
             context=self.orchestrator.context_for_activation(activation),
+            on_yield=_on_yield,
         )
 
     async def wait_next_completed(self) -> Activation | None:

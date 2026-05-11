@@ -526,3 +526,85 @@ async def test_registry_resolution_with_reserved_result(mock_task_factory, branc
             "add": [5],
         }
     }
+
+
+@pytest.mark.asyncio
+async def test_yield_fan_out_with_join_result(branch_id):
+    from elan import task
+
+    @task
+    def load_values():
+        yield 1
+        yield 2
+        yield 3
+
+    @task
+    async def square(value: int) -> int:
+        return value * value
+
+    @task
+    def sum_values(values: list[int]) -> int:
+        return sum(values)
+
+    run = await Workflow(
+        "yield_square_values",
+        start=Node(run=load_values, next="square"),
+        square=Node(run=square, next="result"),
+        result=Join(run=sum_values),
+    ).run()
+
+    assert run.result == 14
+    assert run.outputs == {
+        branch_id[0]: {
+            "load_values": [[1, 2, 3]],
+        },
+        branch_id[1]: {
+            "square": [1],
+        },
+        branch_id[2]: {
+            "square": [4],
+        },
+        branch_id[3]: {
+            "square": [9],
+        },
+    }
+
+
+@pytest.mark.asyncio
+async def test_workflow_subclass_yield_fan_out_with_join_result(branch_id):
+    from elan import task
+
+    @task
+    def load_values():
+        yield 2
+        yield 3
+
+    @task
+    def multiply(value: int) -> int:
+        return value * 10
+
+    @task
+    def sum_values(values: list[int]) -> int:
+        return sum(values)
+
+    multiply_task = multiply
+
+    class MultiplyValues(Workflow):
+        start = Node(run=load_values, next="multiply")
+        multiply = Node(run=multiply_task, next="result")
+        result = Join(run=sum_values)
+
+    run = await MultiplyValues().run()
+
+    assert run.result == 50
+    assert run.outputs == {
+        branch_id[0]: {
+            "load_values": [[2, 3]],
+        },
+        branch_id[1]: {
+            "multiply": [20],
+        },
+        branch_id[2]: {
+            "multiply": [30],
+        },
+    }

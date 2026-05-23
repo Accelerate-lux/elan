@@ -382,6 +382,7 @@ class ApplicationScreeningWorkflow(Workflow):
         "max_delivery_timeline_weeks": Input.max_delivery_timeline_weeks,
     }
 
+    # ruff: disable[F821]
     start = Node(run=load_applications, next=prepare)
     prepare = Node(run=prepare_application, next=identity)
     identity = Node(run=review_identity_gate, next=budget)
@@ -407,6 +408,7 @@ class ApplicationScreeningWorkflow(Workflow):
     consistency = Node(run=review_consistency, next=score)
     score = Node(run=score_application, next=result)
     result = Join(run=summarize_batch)
+    # ruff: enable[F821]
 
 
 toy_current_application_workflow = ApplicationScreeningWorkflow()

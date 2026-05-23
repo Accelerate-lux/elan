@@ -55,7 +55,7 @@ A `Workflow` is a reusable graph blueprint. It defines:
 - optional workflow context model
 
 ```python
-from elan import Workflow, task
+from elan import Node, Workflow, task
 
 
 @task
@@ -63,10 +63,27 @@ async def hello():
     return "Hello, world!"
 
 
-workflow = Workflow("hello_world", start=hello)
+class HelloWorkflow(Workflow):
+    start = Node(run=hello)
+
+
+workflow = HelloWorkflow()
 ```
 
 A workflow is the orchestration layer. It connects tasks, names nodes, and defines how values move between steps.
+
+Subclass authoring is the preferred style for application workflows because the
+graph has a stable Python home. The constructor form,
+`Workflow("hello_world", start=hello)`, remains useful for tests, tiny examples,
+REPL work, and generated graphs.
+
+When a subclass workflow uses annotation-only forward declarations such as
+`review: Node` and then references `review` in `next=review`, keep that workflow
+class in a dedicated module and use file-level Ruff `F821` suppression. This
+keeps the intentional authoring pattern explicit without spreading per-line
+`# noqa` comments through the file. If the workflow must share a module with
+unrelated code, use a narrower Ruff disable/enable block around the wiring
+section instead.
 
 ## Workflow Runs
 

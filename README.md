@@ -31,7 +31,9 @@ Designed with developer experience in mind, Elan bridges this gap by offering a 
 | Branching and routing | ✅ Available |
 | Workflow synchronization | ✅ Available |
 | Concurrent execution | ✅ Available |
-| Shared workflow context | ☐ Planned |
+| Workflow subclass authoring | ✅ Available |
+| Yield fan-out | ✅ Available |
+| Shared workflow context | ✅ Available |
 | Workflow composition | ☐ Planned |
 | Dynamic graph expansion | ☐ Planned |
 
@@ -91,6 +93,10 @@ workflow = Workflow(
 # 3. Execute the graph
 run = asyncio.run(workflow.run())
 ```
+
+The constructor form above is compact for small examples and generated graphs.
+For application workflows, prefer a dedicated `Workflow` subclass so the graph
+has a stable Python home.
 
 If you run that workflow:
 

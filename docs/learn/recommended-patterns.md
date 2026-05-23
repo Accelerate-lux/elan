@@ -27,6 +27,78 @@ Use a bare task directly for:
 
 `Node(...)` makes orchestration visible without polluting the task itself.
 
+## Workflow subclass vs constructor form
+
+### Recommended
+
+Use `class MyWorkflow(Workflow)` for application workflows.
+
+Use this when:
+
+- the workflow is part of the application codebase
+- the graph has several named nodes
+- the workflow benefits from forward-declared node references
+- you want a stable file/module for documentation, review, and lint scoping
+
+For larger workflows, prefer one workflow class per dedicated file. Put models,
+tasks, and helper functions above the class or import them from adjacent modules.
+
+### Alternative
+
+Use `Workflow("name", start=..., **nodes)` for:
+
+- tests
+- short examples
+- REPL exploration
+- generated or programmatic graph construction
+
+### Why this is the default
+
+Subclass authoring matches normal Python expectations for application objects:
+instantiating the class validates and builds a reusable workflow object, while
+`run()` only executes it.
+
+## Forward node references and Ruff
+
+### Recommended
+
+When subclass workflows use annotation-only forward declarations, put the
+workflow in a dedicated module and use file-level Ruff `F821` suppression.
+
+```python
+# ruff: noqa: F821
+
+class ReviewWorkflow(Workflow):
+    review: Node
+    result: Join
+
+    start = Node(run=load_item, next=review)
+    review = Node(run=review_item, next=result)
+    result = Join(run=summarize)
+```
+
+Use this when:
+
+- you want IDE navigation from `next=review` to the declared class member
+- you want to avoid stringly typed edges in application workflow code
+- the workflow lives in its own module
+
+### Alternative
+
+Use string node names, such as `next="review"`, when avoiding any lint
+suppression matters more than IDE-connected node references.
+
+If a workflow must live in a mixed module, use a narrower
+`# ruff: disable[F821]` / `# ruff: enable[F821]` block around the wiring section
+instead of suppressing the whole file.
+
+### Why this is the default
+
+The forward-reference names are valid at runtime because `Workflow` subclasses
+provide a custom class namespace. Ruff cannot infer that metaclass behavior, so a
+file-level suppression is clear when the module is dedicated to workflow
+authoring, and it avoids adding `# noqa: F821` to every edge.
+
 ## Plain Pydantic model vs `@ref`
 
 ### Recommended

@@ -6,6 +6,8 @@ This page summarizes the current public implementation status of Elan.
 
 - linear workflows
 - `Workflow` subclass authoring
+- workflow context and `bind_context`
+- subclass forward node references
 - `bind_output`
 - `bind_input`
 - structured payload binding

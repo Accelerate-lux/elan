@@ -71,7 +71,14 @@ This allows upstream tasks to return meaningful models once, while downstream ta
 
 ## Step 3: define the workflow graph
 
-Workflows are defined by creating a `Workflow` object and passing it a set of `Nodes` as keyword arguments. The keyword arguments passed to the workflow define the node names, and Elan uses those names to resolve the graph edges. Some keywords, like `start` are reserved for specific Nodes in the workflow.
+Workflows can be defined as `Workflow` subclasses or by constructing a
+`Workflow` object directly. For this first guide, the constructor form keeps the
+example compact. For application workflows, prefer a dedicated `Workflow`
+subclass once the graph grows beyond a small inline example.
+
+In constructor form, the keyword arguments passed to the workflow define the
+node names, and Elan uses those names to resolve the graph edges. Some keywords,
+like `start` are reserved for specific Nodes in the workflow.
 
 ```python
 from elan import Node, Workflow

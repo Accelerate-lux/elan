@@ -24,17 +24,19 @@ It supports fine-grained routing, branching, synchronization, and dynamic execut
 ## Implementation Status
 
 
-| Feature area             | Status         |
-| ------------------------ | -------------- |
-| Basic workflows          | ✅ Available   |
-| Data binding             | ✅ Available   |
-| Structured payloads      | ✅ Available   |
-| Branching and routing    | ✅ Available   |
-| Workflow synchronization | ✅ Available   |
-| Concurrent execution     | ✅ Available   |
-| Shared workflow context  | ☐ Planned      |
-| Workflow composition     | ☐ Planned      |
-| Dynamic graph expansion  | ☐ Planned      |
+| Feature area                 | Status       |
+| ---------------------------- | ------------ |
+| Basic workflows              | ✅ Available |
+| Data binding                 | ✅ Available |
+| Structured payloads          | ✅ Available |
+| Branching and routing        | ✅ Available |
+| Workflow synchronization     | ✅ Available |
+| Concurrent execution         | ✅ Available |
+| Workflow subclass authoring  | ✅ Available |
+| Yield fan-out                | ✅ Available |
+| Shared workflow context      | ✅ Available |
+| Workflow composition         | ☐ Planned    |
+| Dynamic graph expansion      | ☐ Planned    |
 
 
 ## Installation
@@ -68,6 +70,9 @@ workflow = Workflow(
 
 run = asyncio.run(workflow.run())
 ```
+
+The constructor form keeps short examples compact. For application workflows,
+prefer a dedicated `Workflow` subclass so the graph has a stable Python home.
 
 If you run that workflow:
 

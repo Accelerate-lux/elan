@@ -54,6 +54,30 @@ used as forward declarations. Within `Workflow` subclasses, those names can be
 used anywhere a `next` target is expected, including lists, `When(...)` targets,
 and route mappings.
 
+Because these names are resolved by the `Workflow` subclass authoring runtime,
+static linters do not see them as normal Python assignments. If you use
+forward-declared node references, keep the workflow declaration in a dedicated
+module and use file-level Ruff `F821` suppression:
+
+```python
+# ruff: noqa: F821
+
+class GreetingWorkflow(Workflow):
+    greet: Node
+    result: Join
+
+    start = Node(run=prepare_name, next=greet)
+    greet = Node(run=greet_name, next=result)
+    result = Join()
+```
+
+For larger application workflows, prefer one workflow class per file. Keep task
+functions, models, and helper constants above the class or import them from
+nearby modules. That makes the intentional workflow-DSL section obvious and
+keeps the file-level lint suppression honest. If a workflow must live in a mixed
+module, use a narrower `# ruff: disable[F821]` / `# ruff: enable[F821]` block
+around the wiring section instead.
+
 Instantiate the subclass to validate and build the runnable workflow object:
 
 ```python

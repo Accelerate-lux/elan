@@ -353,6 +353,18 @@ def summarize_batch(states: list[ToyReviewState]) -> ToyBatchSummary:
 
 
 class ApplicationScreeningWorkflow(Workflow):
+    prepare: Node
+    identity: Node
+    budget: Node
+    submission: Node
+    hard_gate_route: Node
+    category_fit: Node
+    traction: Node
+    delivery_readiness: Node
+    consistency: Node
+    score: Node
+    result: Join
+
     name = "toy_current_application_screening"
     context = ToyScreeningContext
     bind_context = {
@@ -370,30 +382,30 @@ class ApplicationScreeningWorkflow(Workflow):
         "max_delivery_timeline_weeks": Input.max_delivery_timeline_weeks,
     }
 
-    start = Node(run=load_applications, next="prepare")
-    prepare = Node(run=prepare_application, next="identity")
-    identity = Node(run=review_identity_gate, next="budget")
-    budget = Node(run=review_budget_gate, next="submission")
+    start = Node(run=load_applications, next=prepare)
+    prepare = Node(run=prepare_application, next=identity)
+    identity = Node(run=review_identity_gate, next=budget)
+    budget = Node(run=review_budget_gate, next=submission)
     submission = Node(
         run=review_submission_gate,
-        next="hard_gate_route",
+        next=hard_gate_route,
     )
     hard_gate_route = Node(
         run=decide_review_route,
         route_on=ToyReviewState.review_route,
         next={
-            "continue": "category_fit",
-            "stop": "score",
+            "continue": category_fit,
+            "stop": score,
         },
     )
-    category_fit = Node(run=review_category_fit, next="traction")
-    traction = Node(run=review_traction, next="delivery_readiness")
+    category_fit = Node(run=review_category_fit, next=traction)
+    traction = Node(run=review_traction, next=delivery_readiness)
     delivery_readiness = Node(
         run=review_delivery_readiness,
-        next="consistency",
+        next=consistency,
     )
-    consistency = Node(run=review_consistency, next="score")
-    score = Node(run=score_application, next="result")
+    consistency = Node(run=review_consistency, next=score)
+    score = Node(run=score_application, next=result)
     result = Join(run=summarize_batch)
 
 

@@ -1,3 +1,4 @@
+from dataclasses import replace
 from typing import Any
 
 from pydantic import BaseModel
@@ -13,11 +14,47 @@ from .join import Join
 from .node import Node
 from .result import WorkflowRun
 from .task import Task, task
+from .when import When
 
 _UNSET = object()
 
 
-class Workflow:
+class _ForwardNodeRef:
+    def __init__(self, name: str) -> None:
+        self.name = name
+
+    def __repr__(self) -> str:
+        return self.name
+
+
+class _WorkflowClassNamespace(dict[str, Any]):
+    def __getitem__(self, key: str) -> Any:
+        try:
+            return super().__getitem__(key)
+        except KeyError:
+            if self._is_forward_declared_node(key):
+                ref = _ForwardNodeRef(key)
+                self[key] = ref
+                return ref
+            raise
+
+    def _is_forward_declared_node(self, key: str) -> bool:
+        annotations = super().get("__annotations__", {})
+        return key in annotations and _is_node_annotation(annotations[key])
+
+
+class _WorkflowMeta(type):
+    @classmethod
+    def __prepare__(
+        mcls,
+        name: str,
+        bases: tuple[type, ...],
+        **kwargs: Any,
+    ) -> _WorkflowClassNamespace:
+        return _WorkflowClassNamespace()
+
+
+class Workflow(metaclass=_WorkflowMeta):
     def __init__(
         self,
         name: str | object = _UNSET,
@@ -69,10 +106,12 @@ class Workflow:
         declared_context: type[BaseModel] | None = None
         declared_bind_context: dict[str, Any] | None = None
         declared_nodes: dict[str, Task | str | Node | Join] = {}
+        forward_declarations: set[str] = set()
 
         for declaration_cls in reversed(cls.mro()):
             if declaration_cls in (object, Workflow):
                 continue
+            forward_declarations.update(_node_annotations(declaration_cls))
             for declaration_name, value in declaration_cls.__dict__.items():
                 if declaration_name.startswith("_"):
                     continue
@@ -93,6 +132,29 @@ class Workflow:
 
         if declared_start is _UNSET:
             raise TypeError(f"Workflow subclass '{cls.__name__}' must declare 'start'.")
+
+        missing_forward_declarations = sorted(
+            name for name in forward_declarations if name not in declared_nodes
+        )
+        if missing_forward_declarations:
+            raise TypeError(
+                f"Workflow subclass '{cls.__name__}' forward declares nodes that are not assigned: "
+                f"{', '.join(missing_forward_declarations)}."
+            )
+
+        declared_start = _resolve_forward_refs(
+            cls.__name__,
+            declared_start,
+            declared_nodes=declared_nodes,
+        )
+        declared_nodes = {
+            node_name: _resolve_forward_refs(
+                cls.__name__,
+                node_value,
+                declared_nodes=declared_nodes,
+            )
+            for node_name, node_value in declared_nodes.items()
+        }
 
         return (
             cls.__name__ if declared_name is None else declared_name,
@@ -188,6 +250,123 @@ class Workflow:
 
 def _is_node_declaration(value: Any) -> bool:
     return isinstance(value, (Task, str, Node, Join))
+
+
+def _is_node_annotation(annotation: Any) -> bool:
+    if annotation in (Node, Join):
+        return True
+    if isinstance(annotation, str):
+        return annotation in {"Node", "Join"}
+    return False
+
+
+def _node_annotations(cls: type) -> set[str]:
+    annotations = cls.__dict__.get("__annotations__", {})
+    return {
+        name
+        for name, annotation in annotations.items()
+        if not name.startswith("_")
+        and name not in {"name", "context", "bind_context", "start"}
+        and _is_node_annotation(annotation)
+    }
+
+
+def _resolve_forward_refs(
+    workflow_class_name: str,
+    value: Any,
+    *,
+    declared_nodes: dict[str, Task | str | Node | Join],
+) -> Any:
+    if isinstance(value, _ForwardNodeRef):
+        return _resolve_forward_ref(
+            workflow_class_name,
+            value,
+            declared_nodes=declared_nodes,
+        )
+
+    if isinstance(value, Node):
+        return replace(
+            value,
+            next=_resolve_next_forward_refs(
+                workflow_class_name,
+                value.next,
+                declared_nodes=declared_nodes,
+            ),
+        )
+
+    return value
+
+
+def _resolve_next_forward_refs(
+    workflow_class_name: str,
+    next_value: Any,
+    *,
+    declared_nodes: dict[str, Task | str | Node | Join],
+) -> Any:
+    if isinstance(next_value, _ForwardNodeRef):
+        return _resolve_forward_ref(
+            workflow_class_name,
+            next_value,
+            declared_nodes=declared_nodes,
+        )
+
+    if isinstance(next_value, list):
+        return [
+            _resolve_when_forward_refs(
+                workflow_class_name,
+                item,
+                declared_nodes=declared_nodes,
+            )
+            if isinstance(item, When)
+            else _resolve_next_forward_refs(
+                workflow_class_name,
+                item,
+                declared_nodes=declared_nodes,
+            )
+            for item in next_value
+        ]
+
+    if isinstance(next_value, dict):
+        return {
+            key: _resolve_next_forward_refs(
+                workflow_class_name,
+                target,
+                declared_nodes=declared_nodes,
+            )
+            for key, target in next_value.items()
+        }
+
+    return next_value
+
+
+def _resolve_when_forward_refs(
+    workflow_class_name: str,
+    when: When,
+    *,
+    declared_nodes: dict[str, Task | str | Node | Join],
+) -> When:
+    return replace(
+        when,
+        target=_resolve_next_forward_refs(
+            workflow_class_name,
+            when.target,
+            declared_nodes=declared_nodes,
+        ),
+    )
+
+
+def _resolve_forward_ref(
+    workflow_class_name: str,
+    ref: _ForwardNodeRef,
+    *,
+    declared_nodes: dict[str, Task | str | Node | Join],
+) -> str:
+    if ref.name not in declared_nodes:
+        raise TypeError(
+            f"Workflow subclass '{workflow_class_name}' references forward-declared node "
+            f"'{ref.name}' before assigning it."
+        )
+    return ref.name
 
 
 __all__ = ["Workflow", "task"]

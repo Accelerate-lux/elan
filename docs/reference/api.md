@@ -32,8 +32,10 @@ Preferred authoring form for application workflows.
 
 ```python
 class GreetingWorkflow(Workflow):
-    start = Node(run=prepare_name, next="greet")
-    greet = greet_name
+    greet: Node
+
+    start = Node(run=prepare_name, next=greet)
+    greet = Node(run=greet_name)
 ```
 
 Supported class declarations:
@@ -46,6 +48,11 @@ Supported class declarations:
 
 If `name` is omitted, the workflow name defaults to the class name.
 Subclass attributes override inherited declarations.
+
+Annotation-only class attributes such as `greet: Node` or `result: Join` may be
+used as forward declarations. Within `Workflow` subclasses, those names can be
+used anywhere a `next` target is expected, including lists, `When(...)` targets,
+and route mappings.
 
 Instantiate the subclass to validate and build the runnable workflow object:
 

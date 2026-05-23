@@ -1,7 +1,7 @@
 import pytest
 from pydantic import BaseModel
 
-from elan import Input, Join, Node, Workflow, task
+from elan import Input, Join, Node, When, Workflow, task
 
 
 @pytest.mark.asyncio
@@ -212,3 +212,135 @@ def test_workflow_subclass_invalid_join_placement_reuses_constructor_validation(
 
     with pytest.raises(TypeError, match="only allows Join"):
         InvalidJoin()
+
+
+@pytest.mark.asyncio
+async def test_workflow_subclass_forward_declared_next_target(branch_id):
+    @task
+    def prepare():
+        return "world"
+
+    @task
+    def greet(name: str):
+        return f"Hello, {name}!"
+
+    greet_task = greet
+
+    class GreetingWorkflow(Workflow):
+        greet: Node
+
+        start = Node(run=prepare, next=greet)
+        greet = Node(run=greet_task)
+
+    workflow = GreetingWorkflow()
+    run = await workflow.run()
+
+    assert workflow.start.next == "greet"
+    assert run.result == "Hello, world!"
+    assert run.outputs == {
+        branch_id[0]: {
+            "prepare": ["world"],
+            "greet": ["Hello, world!"],
+        }
+    }
+
+
+@pytest.mark.asyncio
+async def test_workflow_subclass_forward_declared_when_targets(branch_id):
+    @task
+    def prepare():
+        return {"name": "world", "should_email": True}
+
+    @task
+    def send_email(payload: dict):
+        return f"email:{payload['name']}"
+
+    @task
+    def audit(payload: dict):
+        return f"audit:{payload['name']}"
+
+    send_email_task = send_email
+    audit_task = audit
+
+    class NotificationWorkflow(Workflow):
+        send_email: Node
+        audit: Node
+
+        start = Node(run=prepare, next=[When("should_email", [send_email, audit])])
+        send_email = Node(run=send_email_task)
+        audit = Node(run=audit_task)
+
+    run = await NotificationWorkflow().run()
+
+    assert run.result is None
+    assert run.outputs == {
+        branch_id[0]: {
+            "prepare": [{"name": "world", "should_email": True}],
+        },
+        branch_id[1]: {
+            "send_email": ["email:world"],
+        },
+        branch_id[2]: {
+            "audit": ["audit:world"],
+        },
+    }
+
+
+@pytest.mark.asyncio
+async def test_workflow_subclass_forward_declared_mapping_targets(branch_id):
+    @task
+    def prepare():
+        return {"name": "world", "route": "review"}
+
+    @task
+    def review(payload: dict):
+        return f"review:{payload['name']}"
+
+    @task
+    def reject(payload: dict):
+        return f"reject:{payload['name']}"
+
+    review_task = review
+    reject_task = reject
+
+    class ReviewWorkflow(Workflow):
+        review: Node
+        reject: Node
+
+        start = Node(
+            run=prepare,
+            route_on="route",
+            next={
+                "review": review,
+                "reject": reject,
+            },
+        )
+        review = Node(run=review_task)
+        reject = Node(run=reject_task)
+
+    run = await ReviewWorkflow().run()
+
+    assert run.result is None
+    assert run.outputs == {
+        branch_id[0]: {
+            "prepare": [{"name": "world", "route": "review"}],
+            "review": ["review:world"],
+        }
+    }
+
+
+def test_workflow_subclass_unassigned_forward_declaration_fails_clearly():
+    @task
+    def prepare():
+        return "world"
+
+    class MissingForwardTarget(Workflow):
+        review: Node
+
+        start = Node(run=prepare, next=review)
+
+    with pytest.raises(
+        TypeError,
+        match="forward declares nodes that are not assigned: review",
+    ):
+        MissingForwardTarget()

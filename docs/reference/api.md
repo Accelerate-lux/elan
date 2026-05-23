@@ -85,6 +85,18 @@ Instantiate the subclass to validate and build the runnable workflow object:
 workflow = GreetingWorkflow()
 ```
 
+Application workflow subclasses may override `run(...)` to expose a real Python
+signature. Custom `run(...)` methods should call `await self._run(...)`, which is
+the protected runtime entrypoint.
+
+```python
+class GreetingWorkflow(Workflow):
+    start = greet
+
+    async def run(self, *, name: str = "world"):
+        return await self._run(name=name)
+```
+
 ## `Workflow(name, start, context=None, bind_context=None, policy=None, **nodes)`
 
 Programmatic and inline authoring form. This remains supported for tests,
@@ -164,9 +176,13 @@ Reference namespaces for explicit bindings.
 - `Policy.field` reads immutable run policy
 - `Upstream.field` reads the previous node's emitted value
 
-## `await workflow.run(**input)`
+## `await workflow.run(**input)` and `await workflow._run(**input)`
 
-Runs the workflow and returns a `WorkflowRun`.
+`run(...)` is the public callable interface. The base implementation accepts
+arbitrary keyword input for constructor-authored workflows.
+
+`_run(...)` is the protected runtime entrypoint. Subclasses that override
+`run(...)` for a typed Python signature should delegate to `_run(...)`.
 
 ## `Node(run, next=None, bind_input=None, bind_output=None, context=None, route_on=None)`
 

@@ -58,6 +58,17 @@ Subclass authoring matches normal Python expectations for application objects:
 instantiating the class validates and builds a reusable workflow object, while
 `run()` only executes it.
 
+When an application workflow needs a typed public input surface, override
+`run(...)` with a normal Python signature and delegate to `await self._run(...)`.
+
+```python
+class ReviewWorkflow(Workflow):
+    start = Node(run=review)
+
+    async def run(self, *, item_id: str, reviewer: str = "default"):
+        return await self._run(item_id=item_id, reviewer=reviewer)
+```
+
 ## Forward node references and Ruff
 
 ### Recommended
@@ -203,6 +214,29 @@ Use a raw dictionary for compact examples, tests, and generated workflows.
 `Binder` keeps the authoring surface explicit without changing runtime
 semantics. It is still a dictionary, but it carries the intended binding target
 and validates keys early.
+
+## Domain config vs context vs policy
+
+### Recommended
+
+Keep domain configuration as ordinary user data.
+
+Use Pydantic models and workflow input for application knobs such as:
+
+- thresholds
+- scoring weights
+- feature flags
+- business rules
+
+Use `WorkflowPolicy` only for runtime governance, such as concurrency limits and
+graph-shape permissions. Use workflow context for branch-local runtime state or
+metadata that tasks should read through `Context.field`.
+
+### Why this is the default
+
+Domain configuration belongs to the application. Elan should not need a
+framework-level concept for every kind of user setting, and context is clearest
+when it is not overloaded with static business configuration.
 
 ## `result=Node(...)` vs `result=Join(...)`
 

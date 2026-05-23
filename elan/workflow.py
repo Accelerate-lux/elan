@@ -251,6 +251,9 @@ class Workflow(metaclass=_WorkflowMeta):
         self.nodes = dict(nodes)
 
     async def run(self, **input: Any) -> WorkflowRun:
+        return await self._run(**input)
+
+    async def _run(self, **input: Any) -> WorkflowRun:
         run_state = self._create_run_state(
             input,
             workflow_input=dict(input),

@@ -16,7 +16,8 @@ The process is deliberately small:
 
 The yield, composition, and aggregation refactor is now visible, but some
 remaining limitations are still deliberate:
-- provider-like settings are passed through workflow context
+- domain configuration is ordinary user data, not Elan context or policy
+- provider-like run metadata is passed through workflow context
 - concurrency is governed by a minimal workflow policy
 """
 
@@ -58,6 +59,9 @@ class ToyScreeningContext(BaseModel):
     provider: str = "deterministic"
     model: str = "toy-reviewer"
     temperature: float = 0.0
+
+
+class ToyScreeningConfig(BaseModel):
     stop_on_hard_gate_fail: bool = True
     a_threshold: int = 80
     b_threshold: int = 60
@@ -75,6 +79,7 @@ class ToyScreeningContext(BaseModel):
 @ref
 class ToyReviewState(BaseModel):
     app: ToyApplication
+    config: ToyScreeningConfig
     hard_gate_failures: list[str] = Field(default_factory=list)
     review_route: Literal["continue", "stop"] = "continue"
     category_fit_score: int = 0
@@ -169,30 +174,37 @@ def toy_screening_config() -> dict[str, Any]:
     }
 
 
+def toy_screening_settings() -> ToyScreeningConfig:
+    return ToyScreeningConfig.model_validate(toy_screening_config())
+
+
 @task
-async def load_applications():
+async def load_applications(config: ToyScreeningConfig):
     for row_number, fields in enumerate(toy_rows(), start=2):
         await asyncio.sleep(0)
-        yield ToyApplication(
-            row_number=row_number,
-            applicant_name=fields["Applicant"],
-            tax_id_present=fields["tax_id_present"],
-            contact_email_verified=fields["contact_email_verified"],
-            requested_amount_usd=fields["requested_amount_usd"],
-            budget_line_items=fields["budget_line_items"],
-            problem_statement_words=fields["problem_statement_words"],
-            category=fields["category"],
-            pilot_users=fields["pilot_users"],
-            monthly_active_users=fields["monthly_active_users"],
-            delivery_owner_named=fields["delivery_owner_named"],
-            delivery_timeline_weeks=fields["delivery_timeline_weeks"],
-            contradiction_count=fields["contradiction_count"],
+        yield ToyReviewState(
+            app=ToyApplication(
+                row_number=row_number,
+                applicant_name=fields["Applicant"],
+                tax_id_present=fields["tax_id_present"],
+                contact_email_verified=fields["contact_email_verified"],
+                requested_amount_usd=fields["requested_amount_usd"],
+                budget_line_items=fields["budget_line_items"],
+                problem_statement_words=fields["problem_statement_words"],
+                category=fields["category"],
+                pilot_users=fields["pilot_users"],
+                monthly_active_users=fields["monthly_active_users"],
+                delivery_owner_named=fields["delivery_owner_named"],
+                delivery_timeline_weeks=fields["delivery_timeline_weeks"],
+                contradiction_count=fields["contradiction_count"],
+            ),
+            config=config,
         )
 
 
 @task
-async def prepare_application(app: ToyApplication) -> ToyReviewState:
-    return ToyReviewState(app=app)
+async def prepare_application(state: ToyReviewState) -> ToyReviewState:
+    return state
 
 
 @task
@@ -219,7 +231,7 @@ async def review_budget_gate(
     screening: ToyScreeningContext,
 ) -> ToyReviewState:
     _ = screening.provider, screening.model, screening.temperature
-    if state.app.requested_amount_usd <= screening.max_requested_amount_usd:
+    if state.app.requested_amount_usd <= state.config.max_requested_amount_usd:
         return state
     return state.model_copy(
         update={"hard_gate_failures": [*state.hard_gate_failures, "budget"]}
@@ -233,8 +245,9 @@ async def review_submission_gate(
 ) -> ToyReviewState:
     _ = screening.provider, screening.model, screening.temperature
     if (
-        state.app.budget_line_items >= screening.min_budget_line_items
-        and state.app.problem_statement_words >= screening.min_problem_statement_words
+        state.app.budget_line_items >= state.config.min_budget_line_items
+        and state.app.problem_statement_words
+        >= state.config.min_problem_statement_words
     ):
         return state
     return state.model_copy(
@@ -245,11 +258,10 @@ async def review_submission_gate(
 @task
 async def decide_review_route(
     state: ToyReviewState,
-    screening: ToyScreeningContext,
 ) -> ToyReviewState:
     route = (
         "stop"
-        if screening.stop_on_hard_gate_fail and state.hard_gate_failures
+        if state.config.stop_on_hard_gate_fail and state.hard_gate_failures
         else "continue"
     )
     return state.model_copy(update={"review_route": route})
@@ -261,7 +273,7 @@ async def review_category_fit(
     screening: ToyScreeningContext,
 ) -> ToyReviewState:
     _ = screening.provider, screening.model, screening.temperature
-    score = 25 if state.app.category in screening.priority_categories else 0
+    score = 25 if state.app.category in state.config.priority_categories else 0
     return state.model_copy(update={"category_fit_score": score})
 
 
@@ -273,8 +285,8 @@ async def review_traction(
     _ = screening.provider, screening.model, screening.temperature
     score = (
         25
-        if state.app.pilot_users >= screening.min_pilot_users
-        or state.app.monthly_active_users >= screening.min_monthly_active_users
+        if state.app.pilot_users >= state.config.min_pilot_users
+        or state.app.monthly_active_users >= state.config.min_monthly_active_users
         else 0
     )
     return state.model_copy(update={"traction_score": score})
@@ -289,7 +301,8 @@ async def review_delivery_readiness(
     score = (
         25
         if state.app.delivery_owner_named
-        and state.app.delivery_timeline_weeks <= screening.max_delivery_timeline_weeks
+        and state.app.delivery_timeline_weeks
+        <= state.config.max_delivery_timeline_weeks
         else 0
     )
     return state.model_copy(update={"delivery_readiness_score": score})
@@ -308,7 +321,6 @@ async def review_consistency(
 @task
 async def score_application(
     state: ToyReviewState,
-    screening: ToyScreeningContext,
 ) -> ToyReviewState:
     composite = (
         state.category_fit_score
@@ -318,9 +330,9 @@ async def score_application(
     )
     if state.hard_gate_failures:
         bucket = "D"
-    elif composite >= screening.a_threshold:
+    elif composite >= state.config.a_threshold:
         bucket = "A"
-    elif composite >= screening.b_threshold:
+    elif composite >= state.config.b_threshold:
         bucket = "B"
     else:
         bucket = "C"
@@ -342,9 +354,7 @@ async def score_application(
 @task
 def merge_hard_gate_results(states: list[ToyReviewState]) -> ToyReviewState:
     base = states[0]
-    failures = {
-        failure for state in states for failure in state.hard_gate_failures
-    }
+    failures = {failure for state in states for failure in state.hard_gate_failures}
     ordered_failures = [
         failure
         for failure in ("identity", "budget", "submission")
@@ -462,20 +472,30 @@ class ApplicationScreeningWorkflow(Workflow):
         provider=Input.provider,
         model=Input.model,
         temperature=Input.temperature,
-        stop_on_hard_gate_fail=Input.stop_on_hard_gate_fail,
-        a_threshold=Input.a_threshold,
-        b_threshold=Input.b_threshold,
-        max_requested_amount_usd=Input.max_requested_amount_usd,
-        min_budget_line_items=Input.min_budget_line_items,
-        min_problem_statement_words=Input.min_problem_statement_words,
-        min_pilot_users=Input.min_pilot_users,
-        min_monthly_active_users=Input.min_monthly_active_users,
-        max_delivery_timeline_weeks=Input.max_delivery_timeline_weeks,
     )
 
-    start = Node(run=load_applications, next=screen_application)
+    start = Node(
+        run=load_applications,
+        bind_input=Binder[load_applications](config=Input.config),
+        next=screen_application,
+    )
     screen_application = Node(run=ScreenApplicationWorkflow(), next=result)
     result = Join(run=summarize_batch)
+
+    async def run(
+        self,
+        *,
+        provider: str = "deterministic",
+        model: str = "toy-reviewer",
+        temperature: float = 0.0,
+        config: ToyScreeningConfig | None = None,
+    ):
+        return await self._run(
+            provider=provider,
+            model=model,
+            temperature=temperature,
+            config=config,
+        )
 
 
 toy_current_application_workflow = ApplicationScreeningWorkflow()
@@ -483,7 +503,12 @@ toy_current_application_workflow = ApplicationScreeningWorkflow()
 
 async def run_toy_application_screening() -> ToyBatchSummary:
     screening_config = toy_screening_config()
-    run = await toy_current_application_workflow.run(**screening_config)
+    run = await toy_current_application_workflow.run(
+        provider=screening_config["provider"],
+        model=screening_config["model"],
+        temperature=screening_config["temperature"],
+        config=toy_screening_settings(),
+    )
     return run.result
 
 

@@ -80,6 +80,34 @@ async def test_workflow_subclass_context_and_bind_context(branch_id):
 
 
 @pytest.mark.asyncio
+async def test_workflow_subclass_can_override_run_signature(branch_id):
+    @task
+    def greet(name: str, punctuation: str) -> str:
+        return f"Hello, {name}{punctuation}"
+
+    class GreetingWorkflow(Workflow):
+        start = greet
+
+        async def run(
+            self,
+            *,
+            name: str = "world",
+            punctuation: str = "!",
+        ):
+            return await self._run(name=name, punctuation=punctuation)
+
+    workflow = GreetingWorkflow()
+    run = await workflow.run(name="Ada")
+
+    assert run.result == "Hello, Ada!"
+    assert run.outputs == {
+        branch_id[0]: {
+            "greet": ["Hello, Ada!"],
+        }
+    }
+
+
+@pytest.mark.asyncio
 async def test_workflow_subclass_inherits_and_overrides_declarations(branch_id):
     @task
     def prepare():

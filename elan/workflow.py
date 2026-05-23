@@ -9,6 +9,7 @@ from ._join_state import JoinState
 from ._orchestrator import Orchestrator
 from ._refs import RefLookup
 from ._resolution import resolve_task_ref
+from .binding import Binder
 from ._run_state import RunState
 from .join import Join
 from .node import Node
@@ -60,7 +61,7 @@ class Workflow(metaclass=_WorkflowMeta):
         name: str | object = _UNSET,
         start: Task | str | Node | object = _UNSET,
         context: type[BaseModel] | None | object = _UNSET,
-        bind_context: dict[str, Any] | None | object = _UNSET,
+        bind_context: dict[str, Any] | Binder[Any] | None | object = _UNSET,
         **nodes: Task | str | Node | Join,
     ) -> None:
         if type(self) is not Workflow:
@@ -98,13 +99,13 @@ class Workflow(metaclass=_WorkflowMeta):
         str,
         Task | str | Node,
         type[BaseModel] | None,
-        dict[str, Any] | None,
+        dict[str, Any] | Binder[Any] | None,
         dict[str, Task | str | Node | Join],
     ]:
         declared_name: str | None = None
         declared_start: Task | str | Node | object = _UNSET
         declared_context: type[BaseModel] | None = None
-        declared_bind_context: dict[str, Any] | None = None
+        declared_bind_context: dict[str, Any] | Binder[Any] | None = None
         declared_nodes: dict[str, Task | str | Node | Join] = {}
         forward_declarations: set[str] = set()
 
@@ -170,7 +171,7 @@ class Workflow(metaclass=_WorkflowMeta):
         name: str,
         start: Task | str | Node,
         context: type[BaseModel] | None,
-        bind_context: dict[str, Any] | None,
+        bind_context: dict[str, Any] | Binder[Any] | None,
         nodes: dict[str, Task | str | Node | Join],
     ) -> None:
         if context is not None and (
@@ -181,6 +182,43 @@ class Workflow(metaclass=_WorkflowMeta):
             raise TypeError(
                 f"Workflow '{name}' only allows Join(...) as the reserved result node."
             )
+        if isinstance(bind_context, Binder) and (
+            bind_context.target_kind == "task"
+        ):
+            raise TypeError(
+                f"Workflow '{name}' cannot use Binder[{bind_context.target_name}] "
+                "for Workflow.bind_context; use Binder[ContextModel] instead."
+            )
+        if isinstance(bind_context, Binder) and (
+            bind_context.model_cls is not None
+            and context is not None
+            and bind_context.model_cls is not context
+        ):
+            raise TypeError(
+                f"Workflow '{name}' cannot use Binder[{bind_context.model_cls.__name__}] "
+                f"with workflow context '{context.__name__}'."
+            )
+        for node_name, node_value in {"start": start, **nodes}.items():
+            if (
+                isinstance(node_value, Node)
+                and isinstance(node_value.context, Binder)
+                and node_value.context.target_kind == "task"
+            ):
+                raise TypeError(
+                    f"Workflow '{name}' cannot use Binder[{node_value.context.target_name}] "
+                    f"as context for node '{node_name}'; use Binder[ContextModel] instead."
+                )
+            if (
+                isinstance(node_value, Node)
+                and isinstance(node_value.context, Binder)
+                and node_value.context.model_cls is not None
+                and context is not None
+                and node_value.context.model_cls is not context
+            ):
+                raise TypeError(
+                    f"Workflow '{name}' cannot use Binder[{node_value.context.model_cls.__name__}] "
+                    f"as context for node '{node_name}' with workflow context '{context.__name__}'."
+                )
         for node_name, node_value in nodes.items():
             if isinstance(node_value, Join) and node_name != "result":
                 raise TypeError(

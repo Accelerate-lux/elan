@@ -52,6 +52,7 @@ Between nodes, Elan currently binds values using these rules:
 - raw `dict` outputs remain opaque values
 - Pydantic model outputs may pass through as one value or auto-unpack by field name
 - `Node.bind_output` may create a named adapter payload
+- `Node.bind_input` may be a raw dictionary or `Binder[task]`
 - `Node.bind_input` may provide literal values or read from `Upstream.field`, `Input.field`, and `Context.field`
 - generator task outputs are collected as one list in `WorkflowRun.outputs`; each yielded item is routed independently
 
@@ -61,6 +62,8 @@ Current context semantics:
 
 - workflow context is declared as a Pydantic model class on `Workflow(..., context=...)`
 - each workflow run starts with a fresh instance of that model
+- `Workflow.bind_context` may be a raw dictionary or `Binder[ContextModel]`
+- `Node.context` may be a raw dictionary or `Binder[ContextModel]`
 - context is branch-local, not one shared mutable object for the whole run
 - child branches inherit the parent branch context at branch creation time
 - sibling branches do not observe each other's later context writes

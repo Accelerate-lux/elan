@@ -87,18 +87,28 @@ Use `bind_input` to prepare explicit downstream inputs.
 Literal example:
 
 ```python
-greet=Node(run=greet, bind_input={"punctuation": "!"})
+from elan import Binder, Node
+
+
+greet=Node(run=greet, bind_input=Binder[greet](punctuation="!"))
 ```
 
 Reference example:
 
 ```python
-bind_input={
-    "name": Upstream.name,
-    "title": Input.title,
-    "punctuation": Context.punctuation,
-}
+from elan import Binder, Context, Input, Upstream
+
+
+bind_input=Binder[greet](
+    name=Upstream.name,
+    title=Input.title,
+    punctuation=Context.punctuation,
+)
 ```
+
+Raw dictionaries are still accepted for compact examples and generated
+workflows. `Binder[greet](...)` is preferred in application code because it
+validates binding keys against the target task parameters when declared.
 
 Current supported sources:
 

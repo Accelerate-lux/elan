@@ -38,16 +38,16 @@ Use `Workflow.bind_context` when the initial context should be prepared from
 workflow input or literals before `start` runs.
 
 ```python
-from elan import Context, Input, Node, Workflow
+from elan import Binder, Context, Input, Node, Workflow
 
 
 workflow = Workflow(
     "publish_article",
     context=PublishContext,
-    bind_context={
-        "locale": Input.locale,
-        "prefix": "draft",
-    },
+    bind_context=Binder[PublishContext](
+        locale=Input.locale,
+        prefix="draft",
+    ),
     start=Node(
         run=prepare_article,
         bind_input={"locale": Context.locale},
@@ -58,6 +58,10 @@ workflow = Workflow(
 `bind_context` runs once, before the first activation is created. It may provide
 required context fields from workflow input. The initialized context is then
 copied into the entry branch.
+
+`Binder[PublishContext](...)` validates the context field names when the
+workflow is declared. A raw dictionary is still accepted for compact examples,
+tests, and generated workflows.
 
 Supported sources in `Workflow.bind_context` are:
 
@@ -70,17 +74,21 @@ Supported sources in `Workflow.bind_context` are:
 Use `Node.context` when a node needs to shape the context visible during its own execution.
 
 ```python
-from elan import Context, Input, Node
+from elan import Binder, Context, Input, Node
 
 
 start=Node(
     run=prepare_article,
-    context={"prefix": Input.prefix},
+    context=Binder[PublishContext](prefix=Input.prefix),
     next="publish",
 )
 ```
 
 That update happens before the task executes. If the node or a later node reads `Context.prefix`, it sees the prepared branch-local value.
+
+`Node.context` accepts raw dictionaries too. `Binder[PublishContext](...)`
+is preferred in application workflows because it validates context field names
+when the node is declared.
 
 Supported sources in `Node.context` are:
 

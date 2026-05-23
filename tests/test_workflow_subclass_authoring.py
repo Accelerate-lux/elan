@@ -1,7 +1,7 @@
 import pytest
 from pydantic import BaseModel
 
-from elan import Input, Join, Node, When, Workflow, task
+from elan import Binder, Input, Join, Node, When, Workflow, task
 
 
 @pytest.mark.asyncio
@@ -66,7 +66,7 @@ async def test_workflow_subclass_context_and_bind_context(branch_id):
 
     class ContextWorkflow(Workflow):
         context = RunContext
-        bind_context = {"label": Input.label}
+        bind_context = Binder[RunContext](label=Input.label)
         start = show
 
     run = await ContextWorkflow().run(label="ready")

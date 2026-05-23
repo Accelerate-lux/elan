@@ -1,3 +1,4 @@
+from .binding import Binder, BindingDict
 from .join import Join
 from .node import Node
 from ._refs import Context, Input, Upstream, ref
@@ -12,6 +13,8 @@ __all__ = [
     "Task",
     "Node",
     "Join",
+    "Binder",
+    "BindingDict",
     "Upstream",
     "Input",
     "Context",

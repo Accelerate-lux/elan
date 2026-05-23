@@ -1,7 +1,7 @@
 import pytest
 from pydantic import BaseModel
 
-from elan import Context, Input, Node, Upstream, Workflow, ref
+from elan import Binder, Context, Input, Node, Upstream, Workflow, ref
 
 
 @pytest.mark.asyncio
@@ -218,7 +218,7 @@ async def test_run_workflow_raw_dict_output_does_not_unpack(mock_task_factory):
 
 
 @pytest.mark.asyncio
-async def test_run_workflow_literal_input_injection(mock_task_factory):
+async def test_run_workflow_bind_input_accepts_raw_dict_for_compatibility(mock_task_factory):
     def _prepare():
         return "world"
 
@@ -242,6 +242,107 @@ async def test_run_workflow_literal_input_injection(mock_task_factory):
 
 
 @pytest.mark.asyncio
+async def test_run_workflow_bind_input_accepts_typed_binding_dict(
+    mock_task_factory,
+    branch_id,
+):
+    def _prepare():
+        return "world"
+
+    async def _greet(name: str, punctuation: str):
+        return f"Hello, {name}{punctuation}"
+
+    prepare = mock_task_factory(_prepare)
+    greet = mock_task_factory(_greet)
+
+    workflow = Workflow(
+        "greet_world",
+        start=Node(run=prepare, next="greet"),
+        greet=Node(run=greet, bind_input=Binder[greet](punctuation="!")),
+    )
+
+    run = await workflow.run()
+
+    greet.mock.assert_called_once_with(name="world", punctuation="!")
+    assert run.result == "Hello, world!"
+    assert run.outputs == {
+        branch_id[0]: {
+            "_prepare": ["world"],
+            "_greet": ["Hello, world!"],
+        }
+    }
+
+
+def test_binding_dict_for_task_rejects_unknown_parameter_early(mock_task_factory):
+    async def _greet(name: str):
+        return f"Hello, {name}!"
+
+    greet = mock_task_factory(_greet)
+
+    with pytest.raises(TypeError, match="does not define parameters: missing"):
+        Binder[greet](missing="value")
+
+
+@pytest.mark.asyncio
+async def test_run_workflow_rejects_model_binding_dict_for_bind_input(
+    mock_task_factory,
+):
+    class GreetInput(BaseModel):
+        punctuation: str
+
+    def _prepare():
+        return "world"
+
+    async def _greet(name: str, punctuation: str):
+        return f"Hello, {name}{punctuation}"
+
+    prepare = mock_task_factory(_prepare)
+    greet = mock_task_factory(_greet)
+
+    workflow = Workflow(
+        "greet_world",
+        start=Node(run=prepare, next="greet"),
+        greet=Node(run=greet, bind_input=Binder[GreetInput](punctuation="!")),
+    )
+
+    with pytest.raises(
+        TypeError,
+        match="Cannot use Binder\\[GreetInput\\] for task input binding",
+    ):
+        await workflow.run()
+
+
+@pytest.mark.asyncio
+async def test_run_workflow_rejects_typed_binding_dict_for_different_task(
+    mock_task_factory,
+):
+    def _prepare():
+        return "world"
+
+    async def _greet(name: str, punctuation: str):
+        return f"Hello, {name}{punctuation}"
+
+    async def _other(punctuation: str):
+        return punctuation
+
+    prepare = mock_task_factory(_prepare)
+    greet = mock_task_factory(_greet)
+    other = mock_task_factory(_other)
+
+    workflow = Workflow(
+        "greet_world",
+        start=Node(run=prepare, next="greet"),
+        greet=Node(run=greet, bind_input=Binder[other](punctuation="!")),
+    )
+
+    with pytest.raises(
+        TypeError,
+        match="Cannot bind Binder\\[_other\\] to task '_greet'",
+    ):
+        await workflow.run()
+
+
+@pytest.mark.asyncio
 async def test_run_workflow_literal_input_overrides_automatic_binding(mock_task_factory):
     def _prepare():
         return "world"
@@ -255,7 +356,7 @@ async def test_run_workflow_literal_input_overrides_automatic_binding(mock_task_
     workflow = Workflow(
         "greet_world",
         start=Node(run=prepare, next="greet"),
-        greet=Node(run=greet, bind_input={"name": "friend"}),
+        greet=Node(run=greet, bind_input=Binder[greet](name="friend")),
     )
 
     run = await workflow.run()
@@ -279,7 +380,7 @@ async def test_run_workflow_literal_input_mixed_with_automatic_binding(mock_task
     workflow = Workflow(
         "greet_world",
         start=Node(run=prepare, next="greet"),
-        greet=Node(run=greet, bind_input={"punctuation": "!"}),
+        greet=Node(run=greet, bind_input=Binder[greet](punctuation="!")),
     )
 
     run = await workflow.run()
@@ -307,7 +408,7 @@ async def test_run_workflow_literal_input_type_mismatch(mock_task_factory):
     workflow = Workflow(
         "greet_world",
         start=Node(run=prepare, next="greet"),
-        greet=Node(run=greet, bind_input={"count": "wrong"}),
+        greet=Node(run=greet, bind_input=Binder[greet](count="wrong")),
     )
 
     with pytest.raises(TypeError, match="parameter 'count'"):
@@ -323,7 +424,7 @@ async def test_run_workflow_literal_input_missing_required_parameter(mock_task_f
 
     workflow = Workflow(
         "greet_world",
-        start=Node(run=greet, bind_input={"punctuation": "!"}),
+        start=Node(run=greet, bind_input=Binder[greet](punctuation="!")),
     )
 
     with pytest.raises(TypeError, match="missing required inputs: title"):
@@ -349,7 +450,7 @@ async def test_run_workflow_input_ref_binding(mock_task_factory):
 
     workflow = Workflow(
         "greet_world",
-        start=Node(run=greet, bind_input={"title": Input.title}),
+        start=Node(run=greet, bind_input=Binder[greet](title=Input.title)),
     )
 
     run = await workflow.run(title="Dr")
@@ -375,10 +476,10 @@ async def test_run_workflow_context_ref_binding(mock_task_factory):
         context=GreetingContext,
         greet=Node(
             run=greet,
-            bind_input={
-                "name": "world",
-                "punctuation": Context.punctuation,
-            },
+            bind_input=Binder[greet](
+                name="world",
+                punctuation=Context.punctuation,
+            ),
         ),
     )
 
@@ -405,10 +506,10 @@ async def test_run_workflow_upstream_ref_binding_from_mapped_payload(mock_task_f
         start=Node(run=prepare, bind_output=["style", "name"], next="greet"),
         greet=Node(
             run=greet,
-            bind_input={
-                "name": Upstream.name,
-                "style": Upstream.style,
-            },
+            bind_input=Binder[greet](
+                name=Upstream.name,
+                style=Upstream.style,
+            ),
         ),
     )
 
@@ -435,10 +536,10 @@ async def test_run_workflow_upstream_ref_binding_from_registered_model(mock_task
         start=Node(run=prepare, next="greet"),
         greet=Node(
             run=greet,
-            bind_input={
-                "name": Upstream.name,
-                "style": Upstream.style,
-            },
+            bind_input=Binder[greet](
+                name=Upstream.name,
+                style=Upstream.style,
+            ),
         ),
     )
 
@@ -463,7 +564,7 @@ async def test_run_workflow_upstream_ref_fails_for_opaque_raw_dict(mock_task_fac
     workflow = Workflow(
         "greet_world",
         start=Node(run=prepare, next="greet"),
-        greet=Node(run=greet, bind_input={"name": Upstream.name}),
+        greet=Node(run=greet, bind_input=Binder[greet](name=Upstream.name)),
     )
 
     with pytest.raises(TypeError, match="cannot read Upstream.name from value of type dict"):
@@ -479,7 +580,7 @@ async def test_run_workflow_input_ref_missing_field(mock_task_factory):
 
     workflow = Workflow(
         "greet_world",
-        start=Node(run=greet, bind_input={"title": Input.title}),
+        start=Node(run=greet, bind_input=Binder[greet](title=Input.title)),
     )
 
     with pytest.raises(TypeError, match="Workflow input does not provide field 'title'"):
@@ -496,9 +597,11 @@ async def test_run_workflow_context_ref_missing_field(mock_task_factory):
     workflow = Workflow(
         "greet_world",
         context=GreetingContext,
-        start=Node(run=greet, bind_input={"punctuation": Context.missing}),
+        start=Node(
+            run=greet,
+            bind_input=Binder[greet](punctuation=Context.missing),
+        ),
     )
 
     with pytest.raises(TypeError, match="Context does not provide field 'missing'"):
         await workflow.run()
-

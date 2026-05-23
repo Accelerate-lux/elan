@@ -180,6 +180,30 @@ Use `bind_output` or `bind_input` when the shape must be made explicit.
 
 Default binding keeps small workflows short. Explicit binding becomes valuable when the data shape stops being obvious.
 
+## Raw dict vs `Binder`
+
+### Recommended
+
+Use `Binder[...]` for explicit binding dictionaries in application
+workflow code.
+
+Use this when:
+
+- `Workflow.bind_context` targets a context model with `Binder[ContextModel](...)`
+- `Node.context` targets a context model with `Binder[ContextModel](...)`
+- `Node.bind_input` targets a task with `Binder[some_task](...)`
+- you want misspelled context fields or task parameters to fail when declared
+
+### Alternative
+
+Use a raw dictionary for compact examples, tests, and generated workflows.
+
+### Why this is the default
+
+`Binder` keeps the authoring surface explicit without changing runtime
+semantics. It is still a dictionary, but it carries the intended binding target
+and validates keys early.
+
 ## `result=Node(...)` vs `result=Join(...)`
 
 ### Recommended

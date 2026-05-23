@@ -43,7 +43,7 @@ Supported class declarations:
 - `name: str`
 - `start: Task | str | Node`
 - `context: type[BaseModel] | None`
-- `bind_context: dict[str, Any] | None`
+- `bind_context: Binder[ContextModel] | dict[str, Any] | None`
 - public node attributes with values of type `Task | str | Node | Join`
 
 If `name` is omitted, the workflow name defaults to the class name.
@@ -94,8 +94,48 @@ Parameters:
 - `name: str`
 - `start: Task | str | Node`
 - `context: type[BaseModel] | None`
-- `bind_context: dict[str, Any] | None`
+- `bind_context: Binder[ContextModel] | dict[str, Any] | None`
 - `**nodes: Task | str | Node | Join`
+
+## `Binder[target](...)`
+
+Typed binding dictionary for explicit binding declarations.
+
+```python
+class ReviewContext(BaseModel):
+    locale: str
+    reviewer: str
+
+
+class ReviewWorkflow(Workflow):
+    context = ReviewContext
+    bind_context = Binder[ReviewContext](
+        locale=Input.locale,
+        reviewer="default",
+    )
+    start = Node(run=review)
+```
+
+```python
+@task
+def greet(name: str, punctuation: str):
+    return f"Hello, {name}{punctuation}"
+
+
+greet_node = Node(
+    run=greet,
+    bind_input=Binder[greet](punctuation="!"),
+)
+```
+
+Supported targets:
+
+- `Binder[ContextModel]` for `Workflow.bind_context` and `Node.context`
+- `Binder[task_or_callable]` for `Node.bind_input`
+
+`Binder[...]` validates binding keys when the object is created. It remains
+a normal dictionary at runtime, so raw dictionaries continue to work for compact
+examples and programmatic graph construction.
 
 ## `await workflow.run(**input)`
 
@@ -109,9 +149,9 @@ Supported fields:
 
 - `run: Task | str`
 - `next` as `str | list[str | When] | dict[str, str]`
-- `bind_input`
+- `bind_input: Binder[task] | dict[str, Any] | None`
 - `bind_output`
-- `context`
+- `context: Binder[ContextModel] | dict[str, Any] | None`
 - `route_on`
 
 ## `When(condition, target)`

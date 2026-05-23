@@ -25,7 +25,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
-from elan import Input, Join, Node, Workflow, ref, task
+from elan import Binder, Input, Join, Node, Workflow, ref, task
 
 
 class ToyApplication(BaseModel):
@@ -368,20 +368,20 @@ class ApplicationScreeningWorkflow(Workflow):
 
     name = "toy_current_application_screening"
     context = ToyScreeningContext
-    bind_context = {
-        "provider": Input.provider,
-        "model": Input.model,
-        "temperature": Input.temperature,
-        "stop_on_hard_gate_fail": Input.stop_on_hard_gate_fail,
-        "a_threshold": Input.a_threshold,
-        "b_threshold": Input.b_threshold,
-        "max_requested_amount_usd": Input.max_requested_amount_usd,
-        "min_budget_line_items": Input.min_budget_line_items,
-        "min_problem_statement_words": Input.min_problem_statement_words,
-        "min_pilot_users": Input.min_pilot_users,
-        "min_monthly_active_users": Input.min_monthly_active_users,
-        "max_delivery_timeline_weeks": Input.max_delivery_timeline_weeks,
-    }
+    bind_context = Binder[ToyScreeningContext](
+        provider=Input.provider,
+        model=Input.model,
+        temperature=Input.temperature,
+        stop_on_hard_gate_fail=Input.stop_on_hard_gate_fail,
+        a_threshold=Input.a_threshold,
+        b_threshold=Input.b_threshold,
+        max_requested_amount_usd=Input.max_requested_amount_usd,
+        min_budget_line_items=Input.min_budget_line_items,
+        min_problem_statement_words=Input.min_problem_statement_words,
+        min_pilot_users=Input.min_pilot_users,
+        min_monthly_active_users=Input.min_monthly_active_users,
+        max_delivery_timeline_weeks=Input.max_delivery_timeline_weeks,
+    )
 
     start = Node(run=load_applications, next=prepare)
     prepare = Node(run=prepare_application, next=identity)

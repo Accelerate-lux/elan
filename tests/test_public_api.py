@@ -3,7 +3,7 @@ import asyncio
 import pytest
 from pydantic import BaseModel
 
-from elan import Context, Input, Join, Node, Upstream, When, Workflow, ref
+from elan import Binder, Context, Input, Join, Node, Upstream, When, Workflow, ref
 
 
 @pytest.mark.asyncio
@@ -40,10 +40,7 @@ async def test_literal_input_mapping(mock_task_factory, branch_id):
         start=Node(run=prepare, bind_output="name", next="greet"),
         greet=Node(
             run=greet,
-            bind_input={
-                "title": "Dr",
-                "punctuation": "!",
-            },
+            bind_input=Binder[greet](title="Dr", punctuation="!"),
         ),
     ).run()
 
@@ -114,11 +111,11 @@ async def test_ref_backed_binding(mock_task_factory, branch_id):
         start=Node(run=prepare, next="greet"),
         greet=Node(
             run=greet,
-            bind_input={
-                "name": Upstream.name,
-                "title": Input.title,
-                "punctuation": Context.punctuation,
-            },
+            bind_input=Binder[greet](
+                name=Upstream.name,
+                title=Input.title,
+                punctuation=Context.punctuation,
+            ),
         ),
     ).run(title="Dr")
 
@@ -151,18 +148,18 @@ async def test_workflow_bind_context_from_input(mock_task_factory, branch_id):
     run = await Workflow(
         "greet_world",
         context=GreetingContext,
-        bind_context={
-            "title": Input.title,
-            "punctuation": Input.punctuation,
-        },
+        bind_context=Binder[GreetingContext](
+            title=Input.title,
+            punctuation=Input.punctuation,
+        ),
         start=Node(run=prepare, next="greet"),
         greet=Node(
             run=greet,
-            bind_input={
-                "name": Upstream.name,
-                "title": Context.title,
-                "punctuation": Context.punctuation,
-            },
+            bind_input=Binder[greet](
+                name=Upstream.name,
+                title=Context.title,
+                punctuation=Context.punctuation,
+            ),
         ),
     ).run(title="Dr", punctuation="?")
 
@@ -390,23 +387,23 @@ async def test_context_preparation_with_upstream_and_input(mock_task_factory, br
         context=PublishContext,
         start=Node(
             run=prepare_article,
-            context={"prefix": Input.prefix},
+            context=Binder[PublishContext](prefix=Input.prefix),
             next="publish",
         ),
         publish=Node(
             run=publish_article,
-            bind_input={
-                "locale": Context.locale,
-                "prefix": Context.prefix,
-            },
+            bind_input=Binder[publish_article](
+                locale=Context.locale,
+                prefix=Context.prefix,
+            ),
             next="notify",
         ),
         notify=Node(
-            context={"published_url": Upstream.url},
+            context=Binder[PublishContext](published_url=Upstream.url),
             run=notify_team,
-            bind_input={
-                "published_url": Context.published_url,
-            },
+            bind_input=Binder[notify_team](
+                published_url=Context.published_url,
+            ),
         ),
     ).run(title="Launch Post", prefix="blog")
 

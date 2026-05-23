@@ -4,6 +4,7 @@ from typing import Any
 
 from pydantic import BaseModel, TypeAdapter, ValidationError
 
+from .binding import Binder
 from ._refs import ModelFieldRef, RefLookup, SourceFieldRef
 
 
@@ -11,7 +12,7 @@ def prepare_context(
     *,
     workflow_name: str,
     branch_context: BaseModel | None,
-    mapping: dict[str, Any] | None,
+    mapping: dict[str, Any] | Binder[Any] | None,
     lookup: RefLookup,
     phase_name: str,
 ) -> BaseModel | None:

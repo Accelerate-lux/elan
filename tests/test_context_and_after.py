@@ -1,7 +1,7 @@
 import pytest
 from pydantic import BaseModel
 
-from elan import Context, Input, Join, Node, Upstream, Workflow, ref
+from elan import Binder, Context, Input, Join, Node, Upstream, Workflow, ref, task
 
 
 class RunContext(BaseModel):
@@ -28,7 +28,7 @@ class ContextRoutePayload(BaseModel):
 
 
 @pytest.mark.asyncio
-async def test_node_context_writes_literals_before_task_runs(mock_task_factory):
+async def test_node_context_accepts_raw_dict_for_compatibility(mock_task_factory):
     async def _greet(punctuation: str):
         return punctuation
 
@@ -49,6 +49,75 @@ async def test_node_context_writes_literals_before_task_runs(mock_task_factory):
 
 
 @pytest.mark.asyncio
+async def test_node_context_accepts_typed_binding_dict(mock_task_factory):
+    async def _greet(punctuation: str):
+        return punctuation
+
+    greet = mock_task_factory(_greet)
+
+    run = await Workflow(
+        "greet",
+        context=RunContext,
+        start=Node(
+            run=greet,
+            context=Binder[RunContext](punctuation="?"),
+            bind_input=Binder[greet](punctuation=Context.punctuation),
+        ),
+    ).run()
+
+    greet.mock.assert_called_once_with(punctuation="?")
+    assert run.result == "?"
+
+
+def test_node_context_binding_dict_rejects_unknown_context_key_early():
+    with pytest.raises(TypeError, match="does not define fields: missing"):
+        Binder[RunContext](missing="value")
+
+
+def test_node_context_rejects_binding_dict_for_different_context(mock_task_factory):
+    class OtherContext(BaseModel):
+        punctuation: str = "?"
+
+    async def _greet(punctuation: str):
+        return punctuation
+
+    greet = mock_task_factory(_greet)
+
+    with pytest.raises(
+        TypeError,
+        match="cannot use Binder\\[OtherContext\\] as context for node 'start' with workflow context 'RunContext'",
+    ):
+        Workflow(
+            "greet",
+            context=RunContext,
+            start=Node(
+                run=greet,
+                context=Binder[OtherContext](punctuation="?"),
+            ),
+        )
+
+
+def test_node_context_rejects_task_binding_dict(mock_task_factory):
+    async def _greet(label: str):
+        return label
+
+    greet = mock_task_factory(_greet)
+
+    with pytest.raises(
+        TypeError,
+        match="cannot use Binder\\[_greet\\] as context for node 'start'",
+    ):
+        Workflow(
+            "greet",
+            context=RunContext,
+            start=Node(
+                run=greet,
+                context=Binder[greet](label=Input.label),
+            ),
+        )
+
+
+@pytest.mark.asyncio
 async def test_task_can_receive_whole_context_by_annotation(mock_task_factory):
     async def _show(ctx: RunContext):
         return ctx.locale
@@ -60,7 +129,7 @@ async def test_task_can_receive_whole_context_by_annotation(mock_task_factory):
         context=RunContext,
         start=Node(
             run=show,
-            context={"locale": "fr"},
+            context=Binder[RunContext](locale="fr"),
         ),
     ).run()
 
@@ -81,7 +150,7 @@ async def test_explicit_binding_overrides_whole_context_injection(mock_task_fact
         context=RunContext,
         start=Node(
             run=show,
-            bind_input={"ctx": {"locale": "de"}},
+            bind_input=Binder[show](ctx={"locale": "de"}),
         ),
     ).run()
 
@@ -102,8 +171,8 @@ async def test_node_context_reads_from_input(mock_task_factory):
         context=RunContext,
         start=Node(
             run=format_label,
-            context={"label": Input.label},
-            bind_input={"label": Context.label},
+            context=Binder[RunContext](label=Input.label),
+            bind_input=Binder[format_label](label=Context.label),
         ),
     ).run(label="urgent")
 
@@ -123,8 +192,8 @@ async def test_node_context_reads_from_existing_context(mock_task_factory):
         context=RunContext,
         start=Node(
             run=show_label,
-            context={"label": Context.locale},
-            bind_input={"label": Context.label},
+            context=Binder[RunContext](label=Context.locale),
+            bind_input=Binder[show_label](label=Context.label),
         ),
     ).run()
 
@@ -149,8 +218,8 @@ async def test_node_context_reads_from_upstream_for_non_entry_node(mock_task_fac
         start=Node(run=prepare, bind_output="name", next="greet"),
         greet=Node(
             run=greet,
-            context={"label": Upstream.name},
-            bind_input={"label": Context.label},
+            context=Binder[RunContext](label=Upstream.name),
+            bind_input=Binder[greet](label=Context.label),
         ),
     ).run()
 
@@ -179,9 +248,9 @@ async def test_node_context_reads_from_bound_upstream_value(mock_task_factory):
             next="notify",
         ),
         notify=Node(
-            context={"published_url": Upstream.url},
+            context=Binder[RunContext](published_url=Upstream.url),
             run=notify,
-            bind_input={"url": Context.published_url},
+            bind_input=Binder[notify](url=Context.published_url),
         ),
     ).run()
 
@@ -202,11 +271,11 @@ async def test_context_updates_partially_merge(mock_task_factory):
         context=RunContext,
         start=Node(
             run=show,
-            context={"prefix": "published"},
-            bind_input={
-                "prefix": Context.prefix,
-                "punctuation": Context.punctuation,
-            },
+            context=Binder[RunContext](prefix="published"),
+            bind_input=Binder[show](
+                prefix=Context.prefix,
+                punctuation=Context.punctuation,
+            ),
         ),
     ).run()
 
@@ -215,7 +284,7 @@ async def test_context_updates_partially_merge(mock_task_factory):
 
 
 @pytest.mark.asyncio
-async def test_workflow_bind_context_initializes_from_input(mock_task_factory):
+async def test_workflow_bind_context_accepts_raw_dict_for_compatibility(mock_task_factory):
     async def _show(prefix: str, punctuation: str):
         return f"{prefix}{punctuation}"
 
@@ -230,10 +299,10 @@ async def test_workflow_bind_context_initializes_from_input(mock_task_factory):
         },
         start=Node(
             run=show,
-            bind_input={
-                "prefix": Context.prefix,
-                "punctuation": Context.punctuation,
-            },
+            bind_input=Binder[show](
+                prefix=Context.prefix,
+                punctuation=Context.punctuation,
+            ),
         ),
     ).run(prefix="published", punctuation="?")
 
@@ -242,7 +311,7 @@ async def test_workflow_bind_context_initializes_from_input(mock_task_factory):
 
 
 @pytest.mark.asyncio
-async def test_workflow_bind_context_accepts_literals(mock_task_factory):
+async def test_workflow_bind_context_accepts_typed_binding_dict(mock_task_factory):
     async def _show(prefix: str, punctuation: str):
         return f"{prefix}{punctuation}"
 
@@ -251,16 +320,89 @@ async def test_workflow_bind_context_accepts_literals(mock_task_factory):
     run = await Workflow(
         "show",
         context=RunContext,
-        bind_context={
-            "prefix": "published",
-            "punctuation": "?",
-        },
+        bind_context=Binder[RunContext](
+            prefix=Input.prefix,
+            punctuation=Input.punctuation,
+        ),
         start=Node(
             run=show,
-            bind_input={
-                "prefix": Context.prefix,
-                "punctuation": Context.punctuation,
-            },
+            bind_input=Binder[show](
+                prefix=Context.prefix,
+                punctuation=Context.punctuation,
+            ),
+        ),
+    ).run(prefix="published", punctuation="?")
+
+    show.mock.assert_called_once_with(prefix="published", punctuation="?")
+    assert run.result == "published?"
+
+
+def test_binding_dict_rejects_unknown_context_key_early():
+    with pytest.raises(TypeError, match="does not define fields: missing"):
+        Binder[RunContext](missing=Input.missing)
+
+
+def test_binding_dict_rejects_non_model_generic_parameter():
+    with pytest.raises(TypeError, match="requires a Pydantic model class, task, or callable"):
+        Binder[int](label="value")
+
+
+def test_workflow_bind_context_rejects_binding_dict_for_different_context():
+    class OtherContext(BaseModel):
+        prefix: str = ""
+
+    async def _show(prefix: str):
+        return prefix
+
+    show = task(_show)
+
+    with pytest.raises(
+        TypeError,
+        match="cannot use Binder\\[OtherContext\\] with workflow context 'RunContext'",
+    ):
+        Workflow(
+            "show",
+            context=RunContext,
+            bind_context=Binder[OtherContext](prefix=Input.prefix),
+            start=Node(run=show),
+        )
+
+
+def test_workflow_bind_context_rejects_task_binding_dict(mock_task_factory):
+    async def _show(label: str):
+        return label
+
+    show = mock_task_factory(_show)
+
+    with pytest.raises(
+        TypeError,
+        match="cannot use Binder\\[_show\\] for Workflow.bind_context",
+    ):
+        Workflow(
+            "show",
+            context=RunContext,
+            bind_context=Binder[show](label=Input.label),
+            start=Node(run=show),
+        )
+
+
+@pytest.mark.asyncio
+async def test_workflow_bind_context_accepts_literal_values(mock_task_factory):
+    async def _show(prefix: str, punctuation: str):
+        return f"{prefix}{punctuation}"
+
+    show = mock_task_factory(_show)
+
+    run = await Workflow(
+        "show",
+        context=RunContext,
+        bind_context=Binder[RunContext](prefix="published", punctuation="?"),
+        start=Node(
+            run=show,
+            bind_input=Binder[show](
+                prefix=Context.prefix,
+                punctuation=Context.punctuation,
+            ),
         ),
     ).run()
 
@@ -278,7 +420,7 @@ async def test_workflow_bind_context_can_initialize_required_context_fields(mock
     run = await Workflow(
         "show",
         context=RequiredRunContext,
-        bind_context={"label": Input.label},
+        bind_context=Binder[RequiredRunContext](label=Input.label),
         start=Node(run=show),
     ).run(label="urgent")
 
@@ -369,7 +511,10 @@ async def test_invalid_bare_model_field_ref_fails_clearly(mock_task_factory):
     workflow = Workflow(
         "show",
         context=RunContext,
-        start=Node(run=show, context={"label": ContextRoutePayload.name}),
+        start=Node(
+            run=show,
+            context=Binder[RunContext](label=ContextRoutePayload.name),
+        ),
     )
 
     with pytest.raises(TypeError, match="cannot use bare model field reference 'ContextRoutePayload.name'"):
@@ -413,7 +558,7 @@ async def test_model_passthrough_stays_unchanged(mock_task_factory):
         start=Node(run=prepare, next="consume"),
         consume=Node(
             run=consume,
-            context={"label": "still-works"},
+            context=Binder[RunContext](label="still-works"),
         ),
     ).run()
 
@@ -450,28 +595,28 @@ async def test_branch_local_context_is_isolated_between_siblings(mock_task_facto
         context=RunContext,
         start=Node(
             run=prepare,
-            context={"prefix": "shared"},
+            context=Binder[RunContext](prefix="shared"),
             next=["email", "ticket"],
         ),
         email=Node(
             run=email,
-            bind_input={"prefix": Context.prefix},
+            bind_input=Binder[email](prefix=Context.prefix),
             next="report_email",
         ),
         ticket=Node(
             run=ticket,
-            bind_input={"prefix": Context.prefix},
+            bind_input=Binder[ticket](prefix=Context.prefix),
             next="report_ticket",
         ),
         report_email=Node(
             run=report,
-            context={"prefix": "email"},
-            bind_input={"prefix": Context.prefix},
+            context=Binder[RunContext](prefix="email"),
+            bind_input=Binder[report](prefix=Context.prefix),
         ),
         report_ticket=Node(
             run=report,
-            context={"prefix": "ticket"},
-            bind_input={"prefix": Context.prefix},
+            context=Binder[RunContext](prefix="ticket"),
+            bind_input=Binder[report](prefix=Context.prefix),
         ),
     ).run()
 
@@ -522,20 +667,20 @@ async def test_join_does_not_merge_sibling_contexts(mock_task_factory):
         context=RunContext,
         start=Node(
             run=prepare,
-            context={"label": "shared"},
-            bind_input={"label": Context.label},
+            context=Binder[RunContext](label="shared"),
+            bind_input=Binder[prepare](label=Context.label),
             next=["email_branch", "ticket_branch"],
         ),
         email_branch=Node(
             run=email,
-            context={"label": "email"},
-            bind_input={"label": Context.label},
+            context=Binder[RunContext](label="email"),
+            bind_input=Binder[email](label=Context.label),
             next="result",
         ),
         ticket_branch=Node(
             run=ticket,
-            context={"label": "ticket"},
-            bind_input={"label": Context.label},
+            context=Binder[RunContext](label="ticket"),
+            bind_input=Binder[ticket](label=Context.label),
             next="result",
         ),
         result=Join(run=collect),

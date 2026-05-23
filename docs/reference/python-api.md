@@ -30,6 +30,10 @@ This section is generated from the public Python surface exported by `elan`.
 
 ::: elan.Join
 
+## `elan.Binder`
+
+::: elan.Binder
+
 ## `elan.Upstream`
 
 ::: elan.Upstream

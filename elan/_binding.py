@@ -5,6 +5,7 @@ from typing import Any
 from pydantic import BaseModel, TypeAdapter, ValidationError
 
 from ._refs import ModelFieldRef, RefLookup, SourceFieldRef
+from .binding import Binder
 from .task import Task
 
 
@@ -108,6 +109,17 @@ def _bind_with_input_spec(
     lookup: RefLookup,
     treat_dict_as_named_payload: bool,
 ) -> dict[str, Any]:
+    if isinstance(input_spec, Binder):
+        if input_spec.target_kind == "model":
+            raise TypeError(
+                f"Cannot use Binder[{input_spec.target_name}] for task input binding; "
+                "use Binder[task] instead."
+            )
+        if not input_spec.matches_task(target):
+            raise TypeError(
+                f"Cannot bind Binder[{input_spec.target_name}] to task '{target.name}'."
+            )
+
     parameter_names = {parameter.name for parameter in target.parameters}
     unknown = [name for name in input_spec if name not in parameter_names]
     if unknown:

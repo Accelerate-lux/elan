@@ -2,23 +2,26 @@
 """Toy application screening workflow using yield-based batch fan-out.
 
 The process is deliberately small:
-1. Load fake application rows inside the workflow.
-2. Yield one typed application per row.
-3. Screen each yielded application on its own branch.
-4. Screen each application through child workflows with internal fan-out/fan-in.
-5. Reject applications without tax/contact verification, over the request cap,
+1. Expose a typed Python `run(...)` signature for the workflow's public inputs.
+2. Accept screening settings as ordinary user data, not as Elan policy/context.
+3. Load fake application rows inside the workflow.
+4. Yield one typed review state per row.
+5. Screen each yielded state on its own branch.
+6. Screen each application through child workflows with internal fan-out/fan-in.
+7. Reject applications without tax/contact verification, over the request cap,
    or missing enough budget/problem detail.
-6. Stop early on hard-gate failure, or continue into scoring layers.
-7. Score priority category fit, pilot/usage traction, delivery owner/timeline,
+8. Stop early on hard-gate failure, or continue into scoring layers.
+9. Score priority category fit, pilot/usage traction, delivery owner/timeline,
    and contradiction count.
-8. Convert the layer scores into a final bucket.
-9. Join all screened applications and aggregate the batch inside the workflow.
+10. Convert the layer scores into a final bucket.
+11. Join all screened applications and aggregate the batch inside the workflow.
 
-The yield, composition, and aggregation refactor is now visible, but some
-remaining limitations are still deliberate:
+The example deliberately keeps the framework/user-data boundaries visible:
 - domain configuration is ordinary user data, not Elan context or policy
-- provider-like run metadata is passed through workflow context
-- concurrency is governed by a minimal workflow policy
+- provider-like run metadata is read through Elan workflow context
+- concurrency is governed by Elan workflow policy
+- batch fan-out uses generator yields
+- per-application fan-in uses child workflows with terminal `Join(...)`
 """
 
 import asyncio
@@ -488,7 +491,7 @@ class ApplicationScreeningWorkflow(Workflow):
         provider: str = "deterministic",
         model: str = "toy-reviewer",
         temperature: float = 0.0,
-        config: ToyScreeningConfig | None = None,
+        config: ToyScreeningConfig,
     ):
         return await self._run(
             provider=provider,

@@ -1,7 +1,8 @@
 from .binding import Binder, BindingDict
 from .join import Join
 from .node import Node
-from ._refs import Context, Input, Upstream, ref
+from ._refs import Context, Input, Policy, Upstream, ref
+from .policy import WorkflowPolicy
 from .result import WorkflowRun
 from .task import Task, task
 from .when import When
@@ -15,9 +16,11 @@ __all__ = [
     "Join",
     "Binder",
     "BindingDict",
+    "WorkflowPolicy",
     "Upstream",
     "Input",
     "Context",
+    "Policy",
     "When",
     "task",
     "ref",

@@ -41,6 +41,20 @@ double=Node(
 inherits the current branch context. If the child declares its own context model
 and a parent context exists, the model must match.
 
+Child workflows also inherit the current workflow policy. A child may declare a
+narrower policy, but the parent policy must allow it:
+
+```python
+from elan import WorkflowPolicy
+
+
+child = Workflow(
+    "read_only_child",
+    policy=WorkflowPolicy(max_parallel_tasks=1),
+    start=read_only_task,
+)
+```
+
 ## Composition With Join
 
 A child workflow can use its own terminal `Join(...)`:
@@ -62,6 +76,7 @@ The parent sees the merged score as one node output.
 - parent outputs record one value for the child workflow node
 - child internal outputs are not merged into the parent `WorkflowRun.outputs`
 - child workflows may be used after yield fan-out
+- child workflows inherit policy and may only narrow it
 - child workflow failures fail the parent activation
 
 For exact result behavior, see [Runtime Behavior](../reference/runtime-behavior.md).

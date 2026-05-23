@@ -44,6 +44,7 @@ Supported class declarations:
 - `start: Task | str | Node`
 - `context: type[BaseModel] | None`
 - `bind_context: Binder[ContextModel] | dict[str, Any] | None`
+- `policy: WorkflowPolicy | None`
 - public node attributes with values of type `Task | str | Workflow | Node | Join`
 
 If `name` is omitted, the workflow name defaults to the class name.
@@ -84,7 +85,7 @@ Instantiate the subclass to validate and build the runnable workflow object:
 workflow = GreetingWorkflow()
 ```
 
-## `Workflow(name, start, context=None, bind_context=None, **nodes)`
+## `Workflow(name, start, context=None, bind_context=None, policy=None, **nodes)`
 
 Programmatic and inline authoring form. This remains supported for tests,
 small examples, REPL use, and generated graphs.
@@ -95,7 +96,23 @@ Parameters:
 - `start: Task | str | Workflow | Node`
 - `context: type[BaseModel] | None`
 - `bind_context: Binder[ContextModel] | dict[str, Any] | None`
+- `policy: WorkflowPolicy | None`
 - `**nodes: Task | str | Workflow | Node | Join`
+
+## `WorkflowPolicy`
+
+Runtime governance object for execution-shape limits.
+
+Built-in fields:
+
+- `max_parallel_tasks: int | None = None`
+- `allow_runtime_expansion: bool = False`
+- `allow_cycles: bool = False`
+
+Policy is immutable for a run and is declared as an object, not bound from
+workflow input. Child workflows inherit the parent policy unless they declare a
+narrower policy. Narrowing is accepted when `parent_policy.allows(child_policy)`
+returns `True`.
 
 ## `Binder[target](...)`
 
@@ -108,6 +125,7 @@ class ReviewContext(BaseModel):
 
 
 class ReviewWorkflow(Workflow):
+    policy = WorkflowPolicy(max_parallel_tasks=4)
     context = ReviewContext
     bind_context = Binder[ReviewContext](
         locale=Input.locale,
@@ -136,6 +154,15 @@ Supported targets:
 `Binder[...]` validates binding keys when the object is created. It remains
 a normal dictionary at runtime, so raw dictionaries continue to work for compact
 examples and programmatic graph construction.
+
+## `Input`, `Context`, `Policy`, and `Upstream`
+
+Reference namespaces for explicit bindings.
+
+- `Input.field` reads workflow input
+- `Context.field` reads current branch context
+- `Policy.field` reads immutable run policy
+- `Upstream.field` reads the previous node's emitted value
 
 ## `await workflow.run(**input)`
 

@@ -7,6 +7,7 @@ from pydantic import BaseModel
 from ._binding import bind_entry_input, bind_input, bind_workflow_input
 from ._refs import RefLookup
 from .node import Node
+from .policy import WorkflowPolicy
 
 if TYPE_CHECKING:
     from .workflow import Workflow
@@ -42,11 +43,13 @@ class Activation:
         *,
         workflow_input: dict[str, Any],
         context: BaseModel | None,
+        policy: WorkflowPolicy | None,
         on_yield: Callable[[Any], Awaitable[None]] | None = None,
     ) -> Any:
         lookup = RefLookup(
             workflow_input=workflow_input,
             context=context,
+            policy=policy,
             upstream_value=None if self.is_entry else self.input_value,
         )
         if _is_workflow(self.node.run):
@@ -54,6 +57,7 @@ class Activation:
                 self.node.run,
                 lookup=lookup,
                 context=context,
+                policy=policy,
             )
             return self.output
 
@@ -95,6 +99,7 @@ class Activation:
         *,
         lookup: RefLookup,
         context: BaseModel | None,
+        policy: WorkflowPolicy | None,
     ) -> Any:
         if self.node.bind_input is None:
             child_input = self.input_value
@@ -110,6 +115,7 @@ class Activation:
         child_run = await workflow._run_child(
             child_input,
             inherited_context=context,
+            inherited_policy=policy,
             input_is_workflow_input=input_is_workflow_input,
         )
         return child_run.result

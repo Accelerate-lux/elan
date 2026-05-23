@@ -73,6 +73,13 @@ class Scheduler:
 
     def launch_ready(self) -> None:
         while True:
+            max_parallel_tasks = self._max_parallel_tasks()
+            if (
+                max_parallel_tasks is not None
+                and len(self.state.running) >= max_parallel_tasks
+            ):
+                return
+
             activation_id = self.state.dequeue_queued()
             if activation_id is None:
                 return
@@ -96,6 +103,7 @@ class Scheduler:
         await activation.execute(
             workflow_input=self.orchestrator.run_state.workflow_input,
             context=self.orchestrator.context_for_activation(activation),
+            policy=self.orchestrator.run_state.policy,
             on_yield=_on_yield,
         )
 
@@ -138,3 +146,9 @@ class Scheduler:
 
     def is_quiescent(self) -> bool:
         return self.state.is_quiescent()
+
+    def _max_parallel_tasks(self) -> int | None:
+        policy = self.orchestrator.run_state.policy
+        if policy is None:
+            return None
+        return policy.max_parallel_tasks

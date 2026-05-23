@@ -25,6 +25,7 @@ def bind_entry_input(
     effective_lookup = lookup or RefLookup(
         workflow_input=value if isinstance(value, dict) else {},
         context=None,
+        policy=None,
         upstream_value=None,
     )
     if input_spec is not None:
@@ -54,6 +55,7 @@ def bind_input(
     effective_lookup = lookup or RefLookup(
         workflow_input={},
         context=None,
+        policy=None,
         upstream_value=value,
     )
     if input_spec is not None:

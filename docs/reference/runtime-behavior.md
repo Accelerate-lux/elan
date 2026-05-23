@@ -53,9 +53,22 @@ Between nodes, Elan currently binds values using these rules:
 - Pydantic model outputs may pass through as one value or auto-unpack by field name
 - `Node.bind_output` may create a named adapter payload
 - `Node.bind_input` may be a raw dictionary or `Binder[task]`
-- `Node.bind_input` may provide literal values or read from `Upstream.field`, `Input.field`, and `Context.field`
+- `Node.bind_input` may provide literal values or read from `Upstream.field`, `Input.field`, `Context.field`, and `Policy.field`
 - generator task outputs are collected as one list in `WorkflowRun.outputs`; each yielded item is routed independently
 - `Node(run=child_workflow)` records the child workflow result once in the parent outputs
+
+## Policy behavior
+
+Current policy semantics:
+
+- workflow policy is declared as a `WorkflowPolicy` instance on `Workflow(..., policy=...)`
+- if no policy is declared, the run uses the base `WorkflowPolicy`
+- policy is immutable for a run
+- child workflows inherit the parent policy
+- child workflows may refine policy if `parent_policy.allows(child_policy)` returns `True`
+- `max_parallel_tasks` limits concurrently running activations in one workflow run
+- `allow_cycles=False` rejects static cycles in the declared graph
+- `allow_runtime_expansion` is a governance flag for future runtime expansion features
 
 ## Context behavior
 
@@ -79,6 +92,7 @@ Current composition semantics:
 - child internal outputs are not merged into parent `WorkflowRun.outputs`
 - parent `Node.bind_input` may adapt the packet before the child starts
 - a child workflow with a declared context model must match the inherited context model
+- child workflows inherit parent policy and may only narrow it
 
 Current write phases:
 
@@ -90,6 +104,7 @@ Current supported context sources are intentionally narrow:
 - literals
 - `Input.field`
 - `Context.field`
+- `Policy.field`
 - `Upstream.field` for non-entry nodes
 
 Context updates are partial merges into the current branch scope. Unknown fields and invalid values fail clearly.
@@ -130,7 +145,7 @@ Sibling runnable branches execute concurrently.
 
 Current scheduler behavior:
 
-- all runnable activations are launched
-- concurrency is currently unlimited
+- runnable activations are launched up to `WorkflowPolicy.max_parallel_tasks`
+- concurrency is unlimited when `max_parallel_tasks` is `None`
 - join contribution order follows runtime arrival order
 - reducers should therefore be order-agnostic unless the workflow explicitly constrains completion order

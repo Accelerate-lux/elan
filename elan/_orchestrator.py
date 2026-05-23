@@ -104,6 +104,7 @@ class Orchestrator:
         lookup = RefLookup(
             workflow_input=self.run_state.workflow_input,
             context=branch_context,
+            policy=self.run_state.policy,
             upstream_value=None if activation.is_entry else activation.input_value,
         )
         prepared_context = prepare_context(

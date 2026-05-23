@@ -9,12 +9,14 @@ from ._context import copy_context, prepare_context
 from ._graph_state import GraphState
 from ._join_state import JoinState
 from ._orchestrator import Orchestrator
+from ._policy import prepare_policy
 from ._refs import RefLookup
 from ._resolution import resolve_task_ref
 from .binding import Binder
 from ._run_state import RunState
 from .join import Join
 from .node import Node
+from .policy import WorkflowPolicy
 from .result import WorkflowRun
 from .task import Task, task
 from .when import When
@@ -64,6 +66,7 @@ class Workflow(metaclass=_WorkflowMeta):
         start: Task | str | Node | "Workflow" | object = _UNSET,
         context: type[BaseModel] | None | object = _UNSET,
         bind_context: dict[str, Any] | Binder[Any] | None | object = _UNSET,
+        policy: WorkflowPolicy | None | object = _UNSET,
         **nodes: Task | str | Node | Join | "Workflow",
     ) -> None:
         if type(self) is not Workflow:
@@ -72,12 +75,13 @@ class Workflow(metaclass=_WorkflowMeta):
                 or start is not _UNSET
                 or context is not _UNSET
                 or bind_context is not _UNSET
+                or policy is not _UNSET
                 or nodes
             ):
                 raise TypeError(
                     f"Workflow subclass '{type(self).__name__}' does not accept constructor arguments."
                 )
-            name, start, context, bind_context, nodes = self._class_declaration()
+            name, start, context, bind_context, policy, nodes = self._class_declaration()
         else:
             if name is _UNSET or start is _UNSET:
                 raise TypeError("Workflow constructor requires 'name' and 'start'.")
@@ -85,12 +89,15 @@ class Workflow(metaclass=_WorkflowMeta):
                 context = None
             if bind_context is _UNSET:
                 bind_context = None
+            if policy is _UNSET:
+                policy = None
 
         self._initialize(
             name=name,
             start=start,
             context=context,
             bind_context=bind_context,
+            policy=policy,
             nodes=nodes,
         )
 
@@ -102,12 +109,14 @@ class Workflow(metaclass=_WorkflowMeta):
         Task | str | Node | "Workflow",
         type[BaseModel] | None,
         dict[str, Any] | Binder[Any] | None,
+        WorkflowPolicy | None,
         dict[str, Task | str | Node | Join | "Workflow"],
     ]:
         declared_name: str | None = None
         declared_start: Task | str | Node | Workflow | object = _UNSET
         declared_context: type[BaseModel] | None = None
         declared_bind_context: dict[str, Any] | Binder[Any] | None = None
+        declared_policy: WorkflowPolicy | None = None
         declared_nodes: dict[str, Task | str | Node | Join | Workflow] = {}
         forward_declarations: set[str] = set()
 
@@ -129,6 +138,9 @@ class Workflow(metaclass=_WorkflowMeta):
                     continue
                 if declaration_name == "bind_context":
                     declared_bind_context = value
+                    continue
+                if declaration_name == "policy":
+                    declared_policy = value
                     continue
                 if _is_node_declaration(value):
                     declared_nodes[declaration_name] = value
@@ -164,6 +176,7 @@ class Workflow(metaclass=_WorkflowMeta):
             declared_start,
             declared_context,
             declared_bind_context,
+            declared_policy,
             declared_nodes,
         )
 
@@ -174,12 +187,15 @@ class Workflow(metaclass=_WorkflowMeta):
         start: Task | str | Node | "Workflow",
         context: type[BaseModel] | None,
         bind_context: dict[str, Any] | Binder[Any] | None,
+        policy: WorkflowPolicy | None,
         nodes: dict[str, Task | str | Node | Join | "Workflow"],
     ) -> None:
         if context is not None and (
             not isinstance(context, type) or not issubclass(context, BaseModel)
         ):
             raise TypeError("Workflow context must be a Pydantic model class or None.")
+        if policy is not None and not isinstance(policy, WorkflowPolicy):
+            raise TypeError("Workflow policy must be a WorkflowPolicy instance or None.")
         if isinstance(start, Join):
             raise TypeError(
                 f"Workflow '{name}' only allows Join(...) as the reserved result node."
@@ -231,6 +247,7 @@ class Workflow(metaclass=_WorkflowMeta):
         self.start = start
         self.context_cls = context
         self.bind_context = bind_context
+        self.policy = policy
         self.nodes = dict(nodes)
 
     async def run(self, **input: Any) -> WorkflowRun:
@@ -238,6 +255,7 @@ class Workflow(metaclass=_WorkflowMeta):
             input,
             workflow_input=dict(input),
             inherited_context=None,
+            inherited_policy=None,
             input_is_workflow_input=True,
         )
         orchestrator = Orchestrator(run_state=run_state)
@@ -248,6 +266,7 @@ class Workflow(metaclass=_WorkflowMeta):
         input_value: Any,
         *,
         inherited_context: BaseModel | None,
+        inherited_policy: WorkflowPolicy | None,
         input_is_workflow_input: bool,
     ) -> WorkflowRun:
         workflow_input = (
@@ -259,6 +278,7 @@ class Workflow(metaclass=_WorkflowMeta):
             input_value,
             workflow_input=workflow_input,
             inherited_context=inherited_context,
+            inherited_policy=inherited_policy,
             input_is_workflow_input=input_is_workflow_input,
         )
         orchestrator = Orchestrator(run_state=run_state)
@@ -270,6 +290,7 @@ class Workflow(metaclass=_WorkflowMeta):
         *,
         workflow_input: dict[str, Any] | None = None,
         inherited_context: BaseModel | None = None,
+        inherited_policy: WorkflowPolicy | None = None,
         input_is_workflow_input: bool = True,
     ) -> RunState:
         if workflow_input is None:
@@ -278,6 +299,10 @@ class Workflow(metaclass=_WorkflowMeta):
                 if isinstance(input_value, dict)
                 else _workflow_input_from_value(input_value)
             )
+        policy = self._create_policy(
+            inherited_policy=inherited_policy,
+        )
+        self._validate_policy_allows_graph(policy)
         return RunState(
             workflow=self,
             graph=GraphState(
@@ -285,9 +310,11 @@ class Workflow(metaclass=_WorkflowMeta):
                 nodes=dict(self.nodes),
             ),
             workflow_input=dict(workflow_input),
+            policy=policy,
             context=self._create_context(
                 workflow_input,
                 inherited_context=inherited_context,
+                policy=policy,
             ),
             join_state=self._create_join_state(),
             entry_treat_dict_as_named_payload=input_is_workflow_input,
@@ -298,6 +325,7 @@ class Workflow(metaclass=_WorkflowMeta):
         workflow_input: dict[str, Any],
         *,
         inherited_context: BaseModel | None,
+        policy: WorkflowPolicy | None,
     ) -> BaseModel | None:
         if inherited_context is not None:
             if (
@@ -314,6 +342,7 @@ class Workflow(metaclass=_WorkflowMeta):
             lookup = RefLookup(
                 workflow_input=workflow_input,
                 context=context,
+                policy=policy,
                 upstream_value=None,
             )
             return prepare_context(
@@ -339,6 +368,7 @@ class Workflow(metaclass=_WorkflowMeta):
         lookup = RefLookup(
             workflow_input=workflow_input,
             context=context,
+            policy=policy,
             upstream_value=None,
         )
         return prepare_context(
@@ -347,6 +377,17 @@ class Workflow(metaclass=_WorkflowMeta):
             mapping=self.bind_context,
             lookup=lookup,
             phase_name="Workflow.bind_context",
+        )
+
+    def _create_policy(
+        self,
+        *,
+        inherited_policy: WorkflowPolicy | None,
+    ) -> WorkflowPolicy:
+        return prepare_policy(
+            workflow_name=self.name,
+            declared_policy=self.policy,
+            inherited_policy=inherited_policy,
         )
 
     def _create_join_state(self) -> JoinState | None:
@@ -359,6 +400,12 @@ class Workflow(metaclass=_WorkflowMeta):
             reducer = resolve_task_ref(self.name, join_value.run)
 
         return JoinState(reducer=reducer)
+
+    def _validate_policy_allows_graph(self, policy: WorkflowPolicy) -> None:
+        if not policy.allow_cycles and _has_static_cycle(self.start, self.nodes):
+            raise TypeError(
+                f"Workflow '{self.name}' defines a static cycle but policy does not allow cycles."
+            )
 
 
 def _is_node_declaration(value: Any) -> bool:
@@ -379,7 +426,14 @@ def _node_annotations(cls: type) -> set[str]:
         name
         for name, annotation in annotations.items()
         if not name.startswith("_")
-        and name not in {"name", "context", "bind_context", "start"}
+        and name
+        not in {
+            "name",
+            "context",
+            "bind_context",
+            "policy",
+            "start",
+        }
         and _is_node_annotation(annotation)
     }
 
@@ -480,6 +534,61 @@ def _resolve_forward_ref(
             f"'{ref.name}' before assigning it."
         )
     return ref.name
+
+
+def _has_static_cycle(
+    start: Task | str | Node | Workflow,
+    nodes: dict[str, Task | str | Node | Join | Workflow],
+) -> bool:
+    graph = {"start": start, **nodes}
+    visiting: set[str] = set()
+    visited: set[str] = set()
+
+    def visit(node_name: str) -> bool:
+        if node_name in visiting:
+            return True
+        if node_name in visited:
+            return False
+
+        node_value = graph.get(node_name)
+        if node_value is None:
+            return False
+
+        visiting.add(node_name)
+        for next_name in _next_node_names(node_value):
+            if next_name in graph and visit(next_name):
+                return True
+        visiting.remove(node_name)
+        visited.add(node_name)
+        return False
+
+    return any(visit(node_name) for node_name in graph)
+
+
+def _next_node_names(value: Any) -> set[str]:
+    if not isinstance(value, Node):
+        return set()
+    return _target_node_names(value.next)
+
+
+def _target_node_names(value: Any) -> set[str]:
+    if value is None:
+        return set()
+    if isinstance(value, str):
+        return {value}
+    if isinstance(value, When):
+        return _target_node_names(value.target)
+    if isinstance(value, list):
+        names: set[str] = set()
+        for item in value:
+            names.update(_target_node_names(item))
+        return names
+    if isinstance(value, dict):
+        names: set[str] = set()
+        for item in value.values():
+            names.update(_target_node_names(item))
+        return names
+    return set()
 
 
 def _workflow_input_from_value(value: Any) -> dict[str, Any]:

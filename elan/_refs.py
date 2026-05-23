@@ -5,11 +5,14 @@ from typing import Any
 
 from pydantic import BaseModel
 
+from .policy import WorkflowPolicy
+
 
 @dataclass(frozen=True)
 class RefLookup:
     workflow_input: dict[str, Any]
     context: BaseModel | None
+    policy: WorkflowPolicy | None
     upstream_value: Any
 
     def input_field(self, field_name: str, *, owner: str) -> Any:
@@ -26,6 +29,16 @@ class RefLookup:
             self.context,
             field_name,
             source_name="Context",
+            owner=owner,
+        )
+
+    def policy_field(self, field_name: str, *, owner: str) -> Any:
+        if self.policy is None:
+            raise TypeError(f"{owner} cannot read Policy.{field_name} without workflow policy.")
+        return resolve_model_field(
+            self.policy,
+            field_name,
+            source_name="Policy",
             owner=owner,
         )
 
@@ -61,6 +74,12 @@ class ContextFieldRef(SourceFieldRef):
 
 
 @dataclass(frozen=True)
+class PolicyFieldRef(SourceFieldRef):
+    def eval(self, lookup: RefLookup, *, owner: str) -> Any:
+        return lookup.policy_field(self.field_name, owner=owner)
+
+
+@dataclass(frozen=True)
 class UpstreamFieldRef(SourceFieldRef):
     def eval(self, lookup: RefLookup, *, owner: str) -> Any:
         return lookup.upstream_field(self.field_name, owner=owner)
@@ -85,6 +104,7 @@ class _SourceNamespace:
 Upstream = _SourceNamespace(UpstreamFieldRef)
 Input = _SourceNamespace(InputFieldRef)
 Context = _SourceNamespace(ContextFieldRef)
+Policy = _SourceNamespace(PolicyFieldRef)
 
 
 def resolve_model_field(
@@ -162,10 +182,12 @@ def resolve_ref(value: type[Any] | str) -> type[Any]:
 __all__ = [
     "Context",
     "Input",
+    "Policy",
     "Upstream",
     "ref",
     "resolve_ref",
     "RefLookup",
     "SourceFieldRef",
+    "PolicyFieldRef",
     "ModelFieldRef",
 ]

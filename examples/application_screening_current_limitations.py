@@ -17,7 +17,7 @@ The process is deliberately small:
 The yield, composition, and aggregation refactor is now visible, but some
 remaining limitations are still deliberate:
 - provider-like settings are passed through workflow context
-- concurrency is controlled nowhere in the workflow/runtime contract
+- concurrency is governed by a minimal workflow policy
 """
 
 import asyncio
@@ -25,7 +25,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
-from elan import Binder, Input, Join, Node, Workflow, ref, task
+from elan import Binder, Input, Join, Node, Workflow, WorkflowPolicy, ref, task
 
 
 class ToyApplication(BaseModel):
@@ -456,6 +456,7 @@ class ApplicationScreeningWorkflow(Workflow):
     result: Join
 
     name = "toy_current_application_screening"
+    policy = WorkflowPolicy(max_parallel_tasks=4)
     context = ToyScreeningContext
     bind_context = Binder[ToyScreeningContext](
         provider=Input.provider,

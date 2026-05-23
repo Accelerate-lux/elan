@@ -9,6 +9,7 @@ from ._branch import Branch
 from ._context import copy_context
 from ._graph_state import GraphState
 from ._join_state import JoinState
+from .policy import WorkflowPolicy
 
 if TYPE_CHECKING:
     from .workflow import Workflow
@@ -22,6 +23,7 @@ class RunState:
     graph: GraphState
     workflow_input: dict[str, Any] = field(default_factory=dict)
     context: BaseModel | None = None
+    policy: WorkflowPolicy | None = None
     result: Any = None
     last_output: Any = None
     outputs: dict[str, dict[str, list[Any]]] = field(default_factory=dict)

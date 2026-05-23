@@ -1,9 +1,11 @@
+from __future__ import annotations
+
 from dataclasses import replace
 from typing import Any
 
 from pydantic import BaseModel
 
-from ._context import prepare_context
+from ._context import copy_context, prepare_context
 from ._graph_state import GraphState
 from ._join_state import JoinState
 from ._orchestrator import Orchestrator
@@ -59,10 +61,10 @@ class Workflow(metaclass=_WorkflowMeta):
     def __init__(
         self,
         name: str | object = _UNSET,
-        start: Task | str | Node | object = _UNSET,
+        start: Task | str | Node | "Workflow" | object = _UNSET,
         context: type[BaseModel] | None | object = _UNSET,
         bind_context: dict[str, Any] | Binder[Any] | None | object = _UNSET,
-        **nodes: Task | str | Node | Join,
+        **nodes: Task | str | Node | Join | "Workflow",
     ) -> None:
         if type(self) is not Workflow:
             if (
@@ -97,16 +99,16 @@ class Workflow(metaclass=_WorkflowMeta):
         cls,
     ) -> tuple[
         str,
-        Task | str | Node,
+        Task | str | Node | "Workflow",
         type[BaseModel] | None,
         dict[str, Any] | Binder[Any] | None,
-        dict[str, Task | str | Node | Join],
+        dict[str, Task | str | Node | Join | "Workflow"],
     ]:
         declared_name: str | None = None
-        declared_start: Task | str | Node | object = _UNSET
+        declared_start: Task | str | Node | Workflow | object = _UNSET
         declared_context: type[BaseModel] | None = None
         declared_bind_context: dict[str, Any] | Binder[Any] | None = None
-        declared_nodes: dict[str, Task | str | Node | Join] = {}
+        declared_nodes: dict[str, Task | str | Node | Join | Workflow] = {}
         forward_declarations: set[str] = set()
 
         for declaration_cls in reversed(cls.mro()):
@@ -169,10 +171,10 @@ class Workflow(metaclass=_WorkflowMeta):
         self,
         *,
         name: str,
-        start: Task | str | Node,
+        start: Task | str | Node | "Workflow",
         context: type[BaseModel] | None,
         bind_context: dict[str, Any] | Binder[Any] | None,
-        nodes: dict[str, Task | str | Node | Join],
+        nodes: dict[str, Task | str | Node | Join | "Workflow"],
     ) -> None:
         if context is not None and (
             not isinstance(context, type) or not issubclass(context, BaseModel)
@@ -232,11 +234,50 @@ class Workflow(metaclass=_WorkflowMeta):
         self.nodes = dict(nodes)
 
     async def run(self, **input: Any) -> WorkflowRun:
-        run_state = self._create_run_state(input)
+        run_state = self._create_run_state(
+            input,
+            workflow_input=dict(input),
+            inherited_context=None,
+            input_is_workflow_input=True,
+        )
         orchestrator = Orchestrator(run_state=run_state)
-        return await orchestrator.run(**input)
+        return await orchestrator.run(input)
 
-    def _create_run_state(self, workflow_input: dict[str, Any]) -> RunState:
+    async def _run_child(
+        self,
+        input_value: Any,
+        *,
+        inherited_context: BaseModel | None,
+        input_is_workflow_input: bool,
+    ) -> WorkflowRun:
+        workflow_input = (
+            dict(input_value)
+            if input_is_workflow_input and isinstance(input_value, dict)
+            else _workflow_input_from_value(input_value)
+        )
+        run_state = self._create_run_state(
+            input_value,
+            workflow_input=workflow_input,
+            inherited_context=inherited_context,
+            input_is_workflow_input=input_is_workflow_input,
+        )
+        orchestrator = Orchestrator(run_state=run_state)
+        return await orchestrator.run(input_value)
+
+    def _create_run_state(
+        self,
+        input_value: Any,
+        *,
+        workflow_input: dict[str, Any] | None = None,
+        inherited_context: BaseModel | None = None,
+        input_is_workflow_input: bool = True,
+    ) -> RunState:
+        if workflow_input is None:
+            workflow_input = (
+                dict(input_value)
+                if isinstance(input_value, dict)
+                else _workflow_input_from_value(input_value)
+            )
         return RunState(
             workflow=self,
             graph=GraphState(
@@ -244,11 +285,45 @@ class Workflow(metaclass=_WorkflowMeta):
                 nodes=dict(self.nodes),
             ),
             workflow_input=dict(workflow_input),
-            context=self._create_context(workflow_input),
+            context=self._create_context(
+                workflow_input,
+                inherited_context=inherited_context,
+            ),
             join_state=self._create_join_state(),
+            entry_treat_dict_as_named_payload=input_is_workflow_input,
         )
 
-    def _create_context(self, workflow_input: dict[str, Any]) -> BaseModel | None:
+    def _create_context(
+        self,
+        workflow_input: dict[str, Any],
+        *,
+        inherited_context: BaseModel | None,
+    ) -> BaseModel | None:
+        if inherited_context is not None:
+            if (
+                self.context_cls is not None
+                and type(inherited_context) is not self.context_cls
+            ):
+                raise TypeError(
+                    f"Workflow '{self.name}' cannot inherit context "
+                    f"'{type(inherited_context).__name__}' as '{self.context_cls.__name__}'."
+                )
+            context = copy_context(inherited_context)
+            if self.bind_context is None:
+                return context
+            lookup = RefLookup(
+                workflow_input=workflow_input,
+                context=context,
+                upstream_value=None,
+            )
+            return prepare_context(
+                workflow_name=self.name,
+                branch_context=context,
+                mapping=self.bind_context,
+                lookup=lookup,
+                phase_name="Workflow.bind_context",
+            )
+
         if self.context_cls is None:
             if self.bind_context is not None:
                 raise TypeError(
@@ -287,7 +362,7 @@ class Workflow(metaclass=_WorkflowMeta):
 
 
 def _is_node_declaration(value: Any) -> bool:
-    return isinstance(value, (Task, str, Node, Join))
+    return isinstance(value, (Task, str, Node, Join, Workflow))
 
 
 def _is_node_annotation(annotation: Any) -> bool:
@@ -313,7 +388,7 @@ def _resolve_forward_refs(
     workflow_class_name: str,
     value: Any,
     *,
-    declared_nodes: dict[str, Task | str | Node | Join],
+    declared_nodes: dict[str, Task | str | Node | Join | Workflow],
 ) -> Any:
     if isinstance(value, _ForwardNodeRef):
         return _resolve_forward_ref(
@@ -339,7 +414,7 @@ def _resolve_next_forward_refs(
     workflow_class_name: str,
     next_value: Any,
     *,
-    declared_nodes: dict[str, Task | str | Node | Join],
+    declared_nodes: dict[str, Task | str | Node | Join | Workflow],
 ) -> Any:
     if isinstance(next_value, _ForwardNodeRef):
         return _resolve_forward_ref(
@@ -381,7 +456,7 @@ def _resolve_when_forward_refs(
     workflow_class_name: str,
     when: When,
     *,
-    declared_nodes: dict[str, Task | str | Node | Join],
+    declared_nodes: dict[str, Task | str | Node | Join | Workflow],
 ) -> When:
     return replace(
         when,
@@ -397,7 +472,7 @@ def _resolve_forward_ref(
     workflow_class_name: str,
     ref: _ForwardNodeRef,
     *,
-    declared_nodes: dict[str, Task | str | Node | Join],
+    declared_nodes: dict[str, Task | str | Node | Join | Workflow],
 ) -> str:
     if ref.name not in declared_nodes:
         raise TypeError(
@@ -405,6 +480,14 @@ def _resolve_forward_ref(
             f"'{ref.name}' before assigning it."
         )
     return ref.name
+
+
+def _workflow_input_from_value(value: Any) -> dict[str, Any]:
+    if isinstance(value, dict):
+        return dict(value)
+    if isinstance(value, BaseModel):
+        return value.model_dump()
+    return {}
 
 
 __all__ = ["Workflow", "task"]

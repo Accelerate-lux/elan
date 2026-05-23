@@ -17,11 +17,11 @@ This page summarizes the current public implementation status of Elan.
 - yield-based fan-out
 - `When(...)`
 - terminal `Join` on reserved `result`
+- workflow composition through `Node(run=child_workflow)`
 - concurrent execution of sibling runnable branches
 
 ## Not implemented yet
 
-- workflow composition
 - dynamic expansion
 - callable continuation growth
 - cycles and broader dynamic graph materialization

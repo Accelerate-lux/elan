@@ -35,7 +35,7 @@ It supports fine-grained routing, branching, synchronization, and dynamic execut
 | Workflow subclass authoring  | ✅ Available |
 | Yield fan-out                | ✅ Available |
 | Shared workflow context      | ✅ Available |
-| Workflow composition         | ☐ Planned    |
+| Workflow composition         | ✅ Available |
 | Dynamic graph expansion      | ☐ Planned    |
 
 

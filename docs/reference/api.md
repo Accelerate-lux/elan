@@ -44,7 +44,7 @@ Supported class declarations:
 - `start: Task | str | Node`
 - `context: type[BaseModel] | None`
 - `bind_context: Binder[ContextModel] | dict[str, Any] | None`
-- public node attributes with values of type `Task | str | Node | Join`
+- public node attributes with values of type `Task | str | Workflow | Node | Join`
 
 If `name` is omitted, the workflow name defaults to the class name.
 Subclass attributes override inherited declarations.
@@ -92,10 +92,10 @@ small examples, REPL use, and generated graphs.
 Parameters:
 
 - `name: str`
-- `start: Task | str | Node`
+- `start: Task | str | Workflow | Node`
 - `context: type[BaseModel] | None`
 - `bind_context: Binder[ContextModel] | dict[str, Any] | None`
-- `**nodes: Task | str | Node | Join`
+- `**nodes: Task | str | Workflow | Node | Join`
 
 ## `Binder[target](...)`
 
@@ -147,7 +147,7 @@ Defines a configured task node.
 
 Supported fields:
 
-- `run: Task | str`
+- `run: Task | str | Workflow`
 - `next` as `str | list[str | When] | dict[str, str]`
 - `bind_input: Binder[task] | dict[str, Any] | None`
 - `bind_output`

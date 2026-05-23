@@ -55,6 +55,7 @@ Between nodes, Elan currently binds values using these rules:
 - `Node.bind_input` may be a raw dictionary or `Binder[task]`
 - `Node.bind_input` may provide literal values or read from `Upstream.field`, `Input.field`, and `Context.field`
 - generator task outputs are collected as one list in `WorkflowRun.outputs`; each yielded item is routed independently
+- `Node(run=child_workflow)` records the child workflow result once in the parent outputs
 
 ## Context behavior
 
@@ -66,7 +67,18 @@ Current context semantics:
 - `Node.context` may be a raw dictionary or `Binder[ContextModel]`
 - context is branch-local, not one shared mutable object for the whole run
 - child branches inherit the parent branch context at branch creation time
+- child workflows inherit a copy of the current branch context
 - sibling branches do not observe each other's later context writes
+
+## Composition behavior
+
+Current composition semantics:
+
+- a parent node may run a child workflow with `Node(run=child_workflow)`
+- the parent receives the child workflow's exported `WorkflowRun.result`
+- child internal outputs are not merged into parent `WorkflowRun.outputs`
+- parent `Node.bind_input` may adapt the packet before the child starts
+- a child workflow with a declared context model must match the inherited context model
 
 Current write phases:
 

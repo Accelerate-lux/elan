@@ -31,6 +31,7 @@ class RunState:
     status: RunStatus = "created"
     used_branching: bool = False
     join_state: JoinState | None = None
+    entry_treat_dict_as_named_payload: bool = True
 
     def mark_running(self) -> None:
         self.status = "running"

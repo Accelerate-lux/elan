@@ -1,22 +1,67 @@
 # Composition
 
-This guide will cover workflow composition through `Node(run=child_workflow)`.
+Workflow composition lets a node run another workflow:
 
-## Current state
+```python
+child = Workflow("double_value", start=double)
 
-Composition is not implemented yet.
+parent = Workflow(
+    "parent",
+    start=Node(run=load_value, next="double"),
+    double=Node(run=child),
+)
+```
 
-## Planned coverage
+The parent receives the child workflow's exported `result`, not the child's full
+`WorkflowRun`.
 
-This page will eventually document:
+## Boundary Behavior
 
-- child workflows as nodes
-- result boundaries between parent and child workflows
-- how composition interacts with branching and joins
+The child workflow consumes the parent packet through its own normal start-node
+binding rules.
 
-## For now
+If the interfaces already match, no adapter is needed:
 
-See:
+```python
+double=Node(run=child)
+```
 
-- [Join on Result](join-result.md)
-- [Runtime Behavior](../reference/runtime-behavior.md)
+If the child needs a different input shape, use the parent node's `bind_input`:
+
+```python
+double=Node(
+    run=child,
+    bind_input={
+        "value": Upstream.amount,
+    },
+)
+```
+
+`Node.context` still runs before the child workflow starts. A child workflow
+inherits the current branch context. If the child declares its own context model
+and a parent context exists, the model must match.
+
+## Composition With Join
+
+A child workflow can use its own terminal `Join(...)`:
+
+```python
+child = Workflow(
+    "score_item",
+    start=Node(run=prepare, next=["quality", "risk"]),
+    quality=Node(run=score_quality, next="result"),
+    risk=Node(run=score_risk, next="result"),
+    result=Join(run=merge_scores),
+)
+```
+
+The parent sees the merged score as one node output.
+
+## Runtime Semantics
+
+- parent outputs record one value for the child workflow node
+- child internal outputs are not merged into the parent `WorkflowRun.outputs`
+- child workflows may be used after yield fan-out
+- child workflow failures fail the parent activation
+
+For exact result behavior, see [Runtime Behavior](../reference/runtime-behavior.md).

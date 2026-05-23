@@ -1,12 +1,15 @@
 import asyncio
 from dataclasses import dataclass
-from typing import Any, Awaitable, Callable, Literal
+from typing import TYPE_CHECKING, Any, Awaitable, Callable, Literal
 
 from pydantic import BaseModel
 
-from ._binding import bind_entry_input, bind_input
+from ._binding import bind_entry_input, bind_input, bind_workflow_input
 from ._refs import RefLookup
 from .node import Node
+
+if TYPE_CHECKING:
+    from .workflow import Workflow
 
 ActivationStatus = Literal["queued", "running", "settled"]
 _GENERATOR_DONE = object()
@@ -20,6 +23,7 @@ class Activation:
     node: Node
     input_value: Any
     is_entry: bool
+    treat_entry_dict_as_named_payload: bool = True
     status: ActivationStatus = "queued"
     output: Any = None
     yielded: bool = False
@@ -45,12 +49,21 @@ class Activation:
             context=context,
             upstream_value=None if self.is_entry else self.input_value,
         )
+        if _is_workflow(self.node.run):
+            self.output = await self._execute_workflow(
+                self.node.run,
+                lookup=lookup,
+                context=context,
+            )
+            return self.output
+
         if self.is_entry:
             args, kwargs = bind_entry_input(
                 self.node.run,
                 self.input_value,
                 input_spec=self.node.bind_input,
                 lookup=lookup,
+                treat_dict_as_named_payload=self.treat_entry_dict_as_named_payload,
             )
         else:
             args, kwargs = bind_input(
@@ -75,6 +88,31 @@ class Activation:
 
         self.output = await execution
         return self.output
+
+    async def _execute_workflow(
+        self,
+        workflow: "Workflow",
+        *,
+        lookup: RefLookup,
+        context: BaseModel | None,
+    ) -> Any:
+        if self.node.bind_input is None:
+            child_input = self.input_value
+            input_is_workflow_input = False
+        else:
+            child_input = bind_workflow_input(
+                self.node.bind_input,
+                lookup=lookup,
+                workflow_name=workflow.name,
+            )
+            input_is_workflow_input = True
+
+        child_run = await workflow._run_child(
+            child_input,
+            inherited_context=context,
+            input_is_workflow_input=input_is_workflow_input,
+        )
+        return child_run.result
 
     async def _execute_async_generator(
         self,
@@ -113,3 +151,9 @@ def _next_or_done(iterator: Any) -> Any:
         return next(iterator)
     except StopIteration:
         return _GENERATOR_DONE
+
+
+def _is_workflow(value: Any) -> bool:
+    from .workflow import Workflow
+
+    return isinstance(value, Workflow)

@@ -34,7 +34,7 @@ Designed with developer experience in mind, Elan bridges this gap by offering a 
 | Workflow subclass authoring | ✅ Available |
 | Yield fan-out | ✅ Available |
 | Shared workflow context | ✅ Available |
-| Workflow composition | ☐ Planned |
+| Workflow composition | ✅ Available |
 | Dynamic graph expansion | ☐ Planned |
 
 ## Installation

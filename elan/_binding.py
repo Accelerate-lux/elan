@@ -16,13 +16,14 @@ class _MappedPayload:
 
 def bind_entry_input(
     target: Task,
-    value: dict[str, Any],
+    value: Any,
     *,
     input_spec: dict[str, Any] | None = None,
     lookup: RefLookup | None = None,
+    treat_dict_as_named_payload: bool = True,
 ) -> tuple[tuple[Any, ...], dict[str, Any]]:
     effective_lookup = lookup or RefLookup(
-        workflow_input=value,
+        workflow_input=value if isinstance(value, dict) else {},
         context=None,
         upstream_value=None,
     )
@@ -32,14 +33,14 @@ def bind_entry_input(
             input_spec=input_spec,
             fallback_value=value,
             lookup=effective_lookup,
-            treat_dict_as_named_payload=True,
+            treat_dict_as_named_payload=treat_dict_as_named_payload,
         )
     return (), _bind_remaining_parameters(
         target,
         parameters=target.parameters,
         value=value,
         lookup=effective_lookup,
-        treat_dict_as_named_payload=True,
+        treat_dict_as_named_payload=treat_dict_as_named_payload,
     )
 
 
@@ -99,6 +100,40 @@ def bind_output(output_spec: str | list[Any] | None, output: Any) -> Any:
             continue
         mapped[str(name)] = values[index]
     return _MappedPayload(mapped)
+
+
+def bind_workflow_input(
+    input_spec: dict[str, Any],
+    *,
+    lookup: RefLookup,
+    workflow_name: str,
+) -> dict[str, Any]:
+    return {
+        name: _resolve_workflow_input_value(
+            name=name,
+            value=value,
+            lookup=lookup,
+            workflow_name=workflow_name,
+        )
+        for name, value in input_spec.items()
+    }
+
+
+def _resolve_workflow_input_value(
+    *,
+    name: str,
+    value: Any,
+    lookup: RefLookup,
+    workflow_name: str,
+) -> Any:
+    if isinstance(value, SourceFieldRef):
+        return value.eval(lookup, owner=f"workflow '{workflow_name}' input binding")
+    if isinstance(value, ModelFieldRef):
+        raise TypeError(
+            f"Model field reference '{value.model.__name__}.{value.field_name}' "
+            f"cannot be used as a binding source without Upstream/Input/Context."
+        )
+    return value
 
 
 def _bind_with_input_spec(

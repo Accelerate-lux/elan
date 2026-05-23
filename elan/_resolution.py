@@ -2,10 +2,10 @@ from .node import Node
 from .task import Task, resolve_task
 
 
-def resolve_node(workflow_name: str, value: Task | str | Node) -> Node:
+def resolve_node(workflow_name: str, value: Task | str | Node | object) -> Node:
     if isinstance(value, Node):
         return Node(
-            run=resolve_task_ref(workflow_name, value.run),
+            run=resolve_run_ref(workflow_name, value.run),
             next=value.next,
             bind_input=value.bind_input,
             bind_output=value.bind_output,
@@ -13,10 +13,18 @@ def resolve_node(workflow_name: str, value: Task | str | Node) -> Node:
             route_on=value.route_on,
         )
 
-    return Node(run=resolve_task_ref(workflow_name, value))
+    return Node(run=resolve_run_ref(workflow_name, value))
 
 
-def resolve_task_ref(workflow_name: str, value: Task | str) -> Task:
+def resolve_run_ref(workflow_name: str, value: object) -> Task | object:
+    from .workflow import Workflow
+
+    if isinstance(value, Workflow):
+        return value
+    return resolve_task_ref(workflow_name, value)
+
+
+def resolve_task_ref(workflow_name: str, value: object) -> Task:
     if isinstance(value, Task):
         return value
 

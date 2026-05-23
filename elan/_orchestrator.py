@@ -29,9 +29,9 @@ class Orchestrator:
     ) -> None:
         self.run_state = run_state
 
-    async def run(self, **input: Any) -> WorkflowRun:
+    async def run(self, input_value: Any) -> WorkflowRun:
         scheduler = Scheduler(orchestrator=self)
-        self._seed_run(scheduler, input)
+        self._seed_run(scheduler, input_value)
 
         while True:
             settled = await self._next_settled_activation(scheduler)
@@ -353,6 +353,9 @@ class Orchestrator:
             ),
             input_value=input_value,
             is_entry=branch.is_entry,
+            treat_entry_dict_as_named_payload=(
+                self.run_state.entry_treat_dict_as_named_payload
+            ),
         )
         self.run_state.activations[activation.id] = activation
         return activation
@@ -379,7 +382,7 @@ class Orchestrator:
             )
         return branch
 
-    def _resolve_current_node(self, node_name: str | None) -> Task | str | Node | Join:
+    def _resolve_current_node(self, node_name: str | None) -> Any:
         if node_name == "start":
             return self.run_state.graph.start
 

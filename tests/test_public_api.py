@@ -3,7 +3,7 @@ import asyncio
 import pytest
 from pydantic import BaseModel
 
-from elan import Binder, Context, Input, Join, Node, Upstream, When, Workflow, ref
+from elan import Binder, Context, Input, Join, Node, Upstream, When, Workflow, ref, task
 
 
 @pytest.mark.asyncio
@@ -605,3 +605,37 @@ async def test_workflow_subclass_yield_fan_out_with_join_result(branch_id):
             "multiply": [30],
         },
     }
+
+
+@pytest.mark.asyncio
+async def test_child_workflow_node_with_parent_join_result(branch_id):
+    @task
+    def load_values():
+        yield 2
+        yield 3
+
+    @task
+    def multiply(value: int) -> int:
+        return value * 10
+
+    @task
+    def sum_values(values: list[int]) -> int:
+        return sum(values)
+
+    child = Workflow("multiply_value", start=multiply)
+
+    run = await Workflow(
+        "compose_and_sum",
+        start=Node(run=load_values, next="multiply"),
+        multiply=Node(run=child, next="result"),
+        result=Join(run=sum_values),
+    ).run()
+
+    assert run.result == 50
+    assert run.outputs[branch_id[0]] == {"load_values": [[2, 3]]}
+    child_outputs = [
+        outputs["multiply_value"][0]
+        for branch, outputs in run.outputs.items()
+        if branch != branch_id[0]
+    ]
+    assert sorted(child_outputs) == [20, 30]

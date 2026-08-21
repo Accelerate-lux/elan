@@ -167,6 +167,7 @@ async def test_workflow_subclass_collects_join_result(branch_id):
     assert run.outputs == {
         branch_id[0]: {
             "load_values": [[1, 2]],
+            "collect": [3],
         },
     }
 
@@ -238,7 +239,7 @@ def test_workflow_subclass_invalid_join_placement_reuses_constructor_validation(
         start = hello
         collect = Join()
 
-    with pytest.raises(TypeError, match="only allows Join"):
+    with pytest.raises(TypeError, match="outside.*requires.*scope"):
         InvalidJoin()
 
 

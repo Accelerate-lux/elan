@@ -70,7 +70,7 @@ nav:
       - Linear Workflows: guides/linear-workflows.md
       - Data Binding: guides/data-binding.md
       - Branching: guides/branching.md
-      - Join on Result: guides/join-result.md
+      - Joins: guides/join-result.md
       - Context: guides/context.md
       - Composition: guides/composition.md
       - Dynamic Execution: guides/dynamic-execution.md

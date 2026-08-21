@@ -132,14 +132,20 @@ Ref-based `route_on` currently applies to exclusive branching only.
 
 ## Join behavior
 
-Current `Join` semantics:
+`Join` semantics:
 
-- terminal-only on reserved `result`
-- branches routed to `result` contribute their emitted values
+- `result=Join()` without `scope` waits for workflow-wide quiescence
+- a scoped join creates one barrier per activation of its declared scope node
+- all descendant branches are awaited, including branches that do not contribute
+- branches routed to the join contribute their emitted values
 - `Join()` returns the collected list
 - `Join(run=reducer)` calls the reducer with the collected list as one value
-- `Join(scope=...)` identifies the branch context owned by the declared node
-- a scoped reducer may receive that context through normal typed injection
+- a scoped reducer runs on the preserved scope-owner branch and may receive its context
+- mid-graph joins route their reduced value through `bind_output`, `route_on`, and `next`
+- reducer returns are recorded in `WorkflowRun.outputs`; reducer-less joins add no entry
+- distinct scoped joins may nest; the inner reducer and continuation remain outer-scope work
+- concurrent activations of a mid-graph scope reduce independently
+- terminal scoped joins require exactly one scope activation
 - sibling branch contexts are never merged implicitly
 
 ## Concurrency behavior

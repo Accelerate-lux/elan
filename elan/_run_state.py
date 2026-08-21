@@ -8,6 +8,7 @@ from ._activation import Activation
 from ._branch import Branch
 from ._context import copy_context
 from ._graph_state import GraphState
+from ._join_activation import JoinActivation
 from ._join_state import JoinState
 from .policy import WorkflowPolicy
 
@@ -30,10 +31,11 @@ class RunState:
     outputs: dict[str, dict[str, list[Any]]] = field(default_factory=dict)
     branches: dict[str, Branch] = field(default_factory=dict)
     branch_contexts: dict[str, BaseModel | None] = field(default_factory=dict)
-    activations: dict[str, Activation] = field(default_factory=dict)
+    activations: dict[str, Activation | JoinActivation] = field(default_factory=dict)
     status: RunStatus = "created"
     used_branching: bool = False
-    join_state: JoinState | None = None
+    join_states: dict[str, JoinState] = field(default_factory=dict)
+    entry_branch_id: str | None = None
     entry_treat_dict_as_named_payload: bool = True
 
     def mark_running(self) -> None:

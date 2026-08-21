@@ -38,7 +38,7 @@ This is the next step if you want to understand:
 
 ## If you need multiple branches to converge
 
-Read [Join on Result](../guides/join-result.md).
+Read [Joins](../guides/join-result.md).
 
 This is the next step if multiple branches must contribute to one final output.
 

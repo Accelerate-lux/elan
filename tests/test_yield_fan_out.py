@@ -34,6 +34,7 @@ async def test_sync_generator_yields_scalars_to_downstream_branches(branch_id):
     assert run.outputs == {
         branch_id[0]: {
             "produce_numbers": [[1, 2, 3]],
+            "collect": [[2, 4, 6]],
         },
         branch_id[1]: {
             "double": [2],
@@ -108,6 +109,7 @@ async def test_yielded_items_route_through_bind_output(branch_id):
     assert run.result == ["Ada Lovelace", "Grace Hopper"]
     assert run.outputs[branch_id[0]] == {
         "produce_people": [[("Ada", "Lovelace"), ("Grace", "Hopper")]],
+        "collect": [["Ada Lovelace", "Grace Hopper"]],
     }
 
 
@@ -175,6 +177,7 @@ async def test_yielded_items_can_contribute_directly_to_join_result(branch_id):
     assert run.outputs == {
         branch_id[0]: {
             "produce_numbers": [[3, 4]],
+            "collect": [7],
         },
     }
 

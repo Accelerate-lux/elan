@@ -81,10 +81,10 @@ If a workflow uses branching forms and does not define reserved `result`, `run.r
 ## Current runtime notes
 
 - sibling runnable branches execute concurrently
-- scheduler concurrency is currently unlimited
+- scheduler concurrency is unlimited unless `WorkflowPolicy.max_parallel_tasks` is set
 - ordering between sibling branch completions is not guaranteed
 
 ## Next steps
 
-- [Join on Result](join-result.md)
+- [Joins](join-result.md)
 - [Runtime Behavior](../reference/runtime-behavior.md)

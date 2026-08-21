@@ -207,21 +207,28 @@ Supported forms include:
 - `When(RoutePayload.should_email, "send_email")`
 - `When("should_ticket", ["open_ticket", "audit"])`
 
-## `Join(run=None, scope=None)`
+## `Join(run=None, scope=None, next=None, bind_output=None, route_on=None)`
 
-Terminal workflow-scope synchronization primitive.
+Synchronization and reduction primitive.
 
 Supported forms:
 
 - `result=Join()`
 - `result=Join(run=reduce_values)`
 - `result=Join(run=reduce_values, scope="start")`
+- `merged=Join(run=reduce_values, scope="fan_out", next="continue")`
 
-`Join` is only valid as the reserved `result` node.
+Outside the reserved `result` node, `scope` is required. Each activation of the
+declared scope creates an independent barrier. Descendant branches are awaited;
+only branches explicitly routed to the join contribute values.
 
-When `scope` is set, a reducer parameter annotated with the workflow context
-model receives the context owned by that node's branch. Sibling branch contexts
-remain isolated and are not merged automatically.
+The reducer runs on the scope owner's branch and may receive the workflow context
+through normal typed injection. Its raw return is recorded in `WorkflowRun.outputs`.
+`bind_output`, `route_on`, and `next` then behave as they do for `Node` output.
+Sibling branch contexts remain isolated and are not merged automatically.
+
+`result=Join(...)` remains terminal. Without `scope`, it waits for the whole
+workflow. With `scope`, that scope must activate exactly once.
 
 ## `WorkflowRun`
 

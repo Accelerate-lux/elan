@@ -712,24 +712,21 @@ This also fits the yield placement rules:
 - `yield -> sub_workflow(...)` creates several independent child workflow executions
 - `sub_workflow(yield -> ...)` creates coupled internal branches that may converge through `Join`
 
-### Future Mid-Graph Join Direction
+### Activation-Scoped Mid-Graph Joins
 
-Mid-graph joins remain deferred.
+`Join` outside `result` uses the same public surface with an explicit `scope`.
+The implemented model is:
 
-If Elan later allows `Join` outside `result`, it reuses the same `Join(...)` surface instead of introducing a second join syntax.
+- each activation of the scope node defines one branch family
+- generator exhaustion closes further emission from a generator scope
+- the join waits for all descendants in that family to settle
+- only descendants routed to the join contribute values
+- the preserved owner branch runs the reducer and continuation
 
-The design direction is:
-
-- a mid-graph join is tied to one upstream yield-producing task execution
-- that yield-producing execution defines the branch family
-- the producer finishing emission closes that family
-- the join waits for the branches between that producer and the join to settle
-
-That direction keeps dynamic branch cardinality compatible with joins without forcing a statically paired split-and-join model.
-
-Nested or repeated fan-out before a join still needs a more complete family-resolution rule.
-
-That work stays out of the first implementation.
+This keeps dynamic branch cardinality compatible with joins without forcing a
+statically paired split-and-join model. Distinct scopes may nest, and concurrent
+activations of the same mid-graph scope remain isolated. Recursive re-entry into
+the same join scope on one branch is rejected.
 
 ## Dynamic Execution
 

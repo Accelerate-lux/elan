@@ -110,8 +110,8 @@ Sibling branches:
 - do not observe each other's writes
 
 Sibling context changes are never merged implicitly. A scoped join reducer runs
-against the context owned by its declared scope, after its branch contributions
-have settled:
+against the context owned by each activation of its declared scope, after all
+descendant branches have settled:
 
 ```python
 @task

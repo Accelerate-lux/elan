@@ -44,7 +44,9 @@ This phase covers `Node(run=child_workflow)`, child result export through `resul
 
 ### Phase 8. Join Behavior
 
-This phase covers the first implementation of `Join`: terminal-only usage on `result`, contribution collection, reducer behavior, waiting on workflow scope completion, and non-contributing sibling branches.
+This phase covers workflow-wide terminal joins and activation-scoped mid-graph
+joins: contribution collection, reducer behavior, descendant settlement,
+continuation routing, nested scopes, and non-contributing sibling branches.
 
 ### Phase 9. Dynamic Execution And Expansion
 
@@ -64,7 +66,9 @@ This phase covers the config/API representation of the Python model, including w
 
 ### Phase 13. Reserved Future Surfaces
 
-This phase keeps space for deferred features that need their own test surface later, especially mid-graph joins, richer error handling behavior, and agent-specific workflow features.
+This phase keeps space for deferred features that need their own test surface
+later, especially richer error handling behavior and agent-specific workflow
+features.
 
 ## 1. One async task workflow
 
@@ -342,10 +346,15 @@ What it tests:
 ## 28. Barriers and joins
 
 Status: ✅
+Source: [tests/test_join_result.py](../tests/test_join_result.py),
+[tests/test_join_scope.py](../tests/test_join_scope.py)
 
 What it tests:
 
 - `Join()` collects terminal `result` contributions
 - `Join(run=reducer)` reduces them after workflow-scope completion
+- scoped joins wait for all descendants of one scope activation
+- mid-graph joins can bind and route reducer output into a continuation
+- concurrent and nested scope instances remain isolated
 - non-contributing sibling branches are still awaited
-- join reduction becomes `WorkflowRun.result` without adding extra `outputs` entries
+- reducer returns are recorded in `WorkflowRun.outputs`

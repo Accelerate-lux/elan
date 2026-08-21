@@ -91,7 +91,7 @@ The static type system must reason over these surfaces:
 - `When(...)`
 - `Expand(...)`
 - `Node(run=child_workflow)`
-- `result=Join(...)`
+- `Join(...)`
 
 ### Input Contracts
 
@@ -168,12 +168,15 @@ A returned fragment is valid if it already routes correctly into the existing gr
 
 The validator must verify:
 
-- that `Join()` is only used as the reserved `result` node
-- that all statically-known contributors to `result` are compatible with each other when required
+- that a non-terminal `Join(...)` declares a valid explicit scope
+- that each scope node is paired with at most one scoped join
+- that the reserved `result=Join(...)` remains terminal
+- that all statically-known contributors to a join are compatible with each other when required
 - that `Join(run=reducer)` receives a reducer whose input type is compatible with the collected contribution type
-- that the reducer return type becomes the workflow result type
+- that the reducer return type is compatible with its declared continuation, or becomes the workflow result type for terminal joins
 
-If `Join()` is used without a reducer, the workflow result type is inferred as `list[T]`, where `T` is the contribution type when that type is known.
+If `Join()` is used without a reducer, its output type is inferred as `list[T]`,
+where `T` is the contribution type when that type is known.
 
 ## 3. Semi-Static Runtime Validation
 

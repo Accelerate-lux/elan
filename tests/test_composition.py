@@ -190,7 +190,10 @@ async def test_yielded_items_can_run_child_workflows_and_join_in_parent(branch_i
     ).run()
 
     assert run.result == 6
-    assert run.outputs[branch_id[0]] == {"produce": [[1, 2]]}
+    assert run.outputs[branch_id[0]] == {
+        "produce": [[1, 2]],
+        "total": [6],
+    }
     child_outputs = [
         outputs["double_value"][0]
         for branch, outputs in run.outputs.items()

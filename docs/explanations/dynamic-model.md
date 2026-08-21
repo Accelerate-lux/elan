@@ -17,7 +17,8 @@ Today, the runtime already supports:
 - explicit branching
 - fan-out
 - conditional multi-routing
-- terminal join on `result`
+- workflow-wide terminal joins
+- activation-scoped mid-graph joins
 - concurrent execution of sibling runnable branches
 
 ## Planned direction

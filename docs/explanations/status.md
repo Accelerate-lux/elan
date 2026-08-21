@@ -16,7 +16,8 @@ This page summarizes the current public implementation status of Elan.
 - fan-out
 - yield-based fan-out
 - `When(...)`
-- terminal `Join` on reserved `result`
+- workflow-wide and activation-scoped `Join`
+- mid-graph join reduction and continuation
 - workflow composition through `Node(run=child_workflow)`
 - concurrent execution of sibling runnable branches
 
@@ -25,14 +26,14 @@ This page summarizes the current public implementation status of Elan.
 - dynamic expansion
 - callable continuation growth
 - cycles and broader dynamic graph materialization
-- mid-graph joins and general barriers
+- arbitrary user-managed barriers outside workflow graph structure
 - post-execution workflow hooks or context update phases
 
 ## Current behavioral caveats
 
 - join contribution order follows runtime arrival order
 - reducers should be order-agnostic unless completion timing is intentionally constrained
-- scheduler concurrency is currently unlimited
+- scheduler concurrency is unlimited unless `WorkflowPolicy.max_parallel_tasks` is set
 
 ## How to read the docs today
 

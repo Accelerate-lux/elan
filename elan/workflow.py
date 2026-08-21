@@ -207,7 +207,7 @@ class Workflow(metaclass=_WorkflowMeta):
             raise TypeError("Workflow policy must be a WorkflowPolicy instance or None.")
         if isinstance(start, Join):
             raise TypeError(
-                f"Workflow '{name}' only allows Join(...) as the reserved result node."
+                f"Workflow '{name}' requires start to be an executable task or node, not Join(...)."
             )
         if isinstance(bind_context, Binder) and (
             bind_context.target_kind == "task"
@@ -255,11 +255,11 @@ class Workflow(metaclass=_WorkflowMeta):
             )
             for node_name, node_value in nodes.items()
         }
-        for node_name, node_value in normalized_nodes.items():
-            if isinstance(node_value, Join) and node_name != "result":
-                raise TypeError(
-                    f"Workflow '{name}' only allows Join(...) as the reserved result node."
-                )
+        _validate_join_declarations(
+            name,
+            start=start,
+            nodes=normalized_nodes,
+        )
 
         self.name = name
         self.start = start
@@ -337,7 +337,7 @@ class Workflow(metaclass=_WorkflowMeta):
                 inherited_context=inherited_context,
                 policy=policy,
             ),
-            join_state=self._create_join_state(),
+            join_states=self._create_join_states(),
             entry_treat_dict_as_named_payload=input_is_workflow_input,
         )
 
@@ -411,19 +411,22 @@ class Workflow(metaclass=_WorkflowMeta):
             inherited_policy=inherited_policy,
         )
 
-    def _create_join_state(self) -> JoinState | None:
-        join_value = self.nodes.get("result")
-        if not isinstance(join_value, Join):
-            return None
-
-        reducer = None
-        if join_value.run is not None:
-            reducer = resolve_task_ref(self.name, join_value.run)
-
-        return JoinState(
-            reducer=reducer,
-            scope_node_name=join_value.scope,
-        )
+    def _create_join_states(self) -> dict[str, JoinState]:
+        states: dict[str, JoinState] = {}
+        for node_name, node_value in self.nodes.items():
+            if not isinstance(node_value, Join):
+                continue
+            reducer = (
+                None
+                if node_value.run is None
+                else resolve_task_ref(self.name, node_value.run)
+            )
+            states[node_name] = JoinState(
+                node_name=node_name,
+                reducer=reducer,
+                scope_node_name=node_value.scope,
+            )
+        return states
 
     def _validate_policy_allows_graph(self, policy: WorkflowPolicy) -> None:
         if not policy.allow_cycles and _has_static_cycle(self.start, self.nodes):
@@ -469,7 +472,44 @@ def _normalize_join_scope(
         raise TypeError(
             f"Workflow '{workflow_name}' Join cannot use itself as its scope."
         )
+    scoped_value = start if scope_name == "start" else nodes[scope_name]
+    if isinstance(scoped_value, Join):
+        raise TypeError(
+            f"Workflow '{workflow_name}' Join scope '{scope_name}' must reference an executable node."
+        )
     return replace(value, scope=scope_name)
+
+
+def _validate_join_declarations(
+    workflow_name: str,
+    *,
+    start: Task | str | Node | Workflow,
+    nodes: dict[str, Task | str | Node | Join | Workflow],
+) -> None:
+    del start
+    joins_by_scope: dict[str, list[str]] = {}
+    for node_name, node_value in nodes.items():
+        if not isinstance(node_value, Join):
+            continue
+        if node_name == "result":
+            if node_value.next is not None:
+                raise TypeError(
+                    f"Workflow '{workflow_name}' requires the reserved result Join to be terminal."
+                )
+        elif node_value.scope is None:
+            raise TypeError(
+                f"Workflow '{workflow_name}' Join outside the reserved result requires an explicit scope."
+            )
+
+        if node_value.scope is not None:
+            joins_by_scope.setdefault(node_value.scope, []).append(node_name)
+
+    for scope_name, join_names in joins_by_scope.items():
+        if len(join_names) > 1:
+            raise TypeError(
+                f"Workflow '{workflow_name}' defines multiple joins for scope "
+                f"'{scope_name}': {', '.join(join_names)}."
+            )
 
 
 def _resolve_declared_join_scope(
@@ -542,7 +582,7 @@ def _resolve_forward_refs(
             declared_nodes=declared_nodes,
         )
 
-    if isinstance(value, Node):
+    if isinstance(value, (Node, Join)):
         return replace(
             value,
             next=_resolve_next_forward_refs(
@@ -657,7 +697,7 @@ def _has_static_cycle(
 
 
 def _next_node_names(value: Any) -> set[str]:
-    if not isinstance(value, Node):
+    if not isinstance(value, (Node, Join)):
         return set()
     return _target_node_names(value.next)
 

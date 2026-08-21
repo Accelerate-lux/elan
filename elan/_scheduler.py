@@ -4,6 +4,7 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
 from ._activation import Activation
+from ._join_activation import JoinActivation
 
 if TYPE_CHECKING:
     from ._orchestrator import Orchestrator
@@ -57,15 +58,15 @@ class Scheduler:
     orchestrator: "Orchestrator"
     state: SchedulerState = field(default_factory=SchedulerState)
 
-    def enqueue(self, activation: Activation) -> None:
+    def enqueue(self, activation: Activation | JoinActivation) -> None:
         activation.mark_queued()
         self.state.enqueue(activation.id)
 
-    def settle(self, activation: Activation) -> None:
+    def settle(self, activation: Activation | JoinActivation) -> None:
         activation.mark_settled()
         self.state.mark_settled(activation.id)
 
-    def next_settled(self) -> Activation | None:
+    def next_settled(self) -> Activation | JoinActivation | None:
         activation_id = self.state.dequeue_settled()
         if activation_id is None:
             return None
@@ -91,9 +92,11 @@ class Scheduler:
 
     async def execute_activation(
         self,
-        activation: Activation,
+        activation: Activation | JoinActivation,
     ) -> None:
         async def _on_yield(item: Any) -> None:
+            if isinstance(activation, JoinActivation):
+                raise RuntimeError("Join reducers cannot yield values.")
             self.orchestrator.handle_yielded_output(
                 scheduler=self,
                 activation=activation,
@@ -107,7 +110,7 @@ class Scheduler:
             on_yield=_on_yield,
         )
 
-    async def wait_next_completed(self) -> Activation | None:
+    async def wait_next_completed(self) -> Activation | JoinActivation | None:
         if not self.state.running:
             return None
 
@@ -128,7 +131,7 @@ class Scheduler:
             activation = self.orchestrator.activation_for_id(activation_id)
             self.settle(activation)
 
-    async def update(self) -> Activation | None:
+    async def update(self) -> Activation | JoinActivation | None:
         settled = self.next_settled()
         if settled is not None:
             return settled

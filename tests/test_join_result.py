@@ -119,6 +119,7 @@ async def test_run_workflow_join_reducer_receives_collected_list(
     assert run.outputs == {
         branch_id[0]: {
             "_prepare": ["world"],
+            "_collect": ["Hello, world! | badge:world"],
         },
         branch_id[1]: {
             "_greet": ["Hello, world!"],
@@ -164,6 +165,7 @@ async def test_run_workflow_join_reducer_receives_empty_list_for_zero_contributi
     assert run.outputs == {
         branch_id[0]: {
             "_prepare": ["world"],
+            "_count": [0],
         },
         branch_id[1]: {
             "_audit": ["audit:world"],
@@ -315,7 +317,7 @@ def test_join_outside_reserved_result_fails_clearly():
     def hello():
         return "Hello, world!"
 
-    with pytest.raises(TypeError, match="only allows Join"):
+    with pytest.raises(TypeError, match="outside.*requires.*scope"):
         Workflow(
             "invalid_join",
             start=hello,

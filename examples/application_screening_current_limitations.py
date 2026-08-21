@@ -7,7 +7,7 @@ The process is deliberately small:
 3. Load fake application rows inside the workflow.
 4. Yield one typed review state per row.
 5. Screen each yielded state on its own branch.
-6. Screen each application through child workflows with internal fan-out/fan-in.
+6. Screen each application with scoped mid-graph fan-out/fan-in.
 7. Reject applications without tax/contact verification, over the request cap,
    or missing enough budget/problem detail.
 8. Stop early on hard-gate failure, or continue into scoring layers.
@@ -279,8 +279,7 @@ async def review_budget_gate(
     return GateDecision(
         gate="budget",
         passed=(
-            state.app.requested_amount_usd
-            <= state.config.max_requested_amount_usd
+            state.app.requested_amount_usd <= state.config.max_requested_amount_usd
         ),
     )
 
@@ -445,66 +444,65 @@ def summarize_batch(states: list[ToyReviewState]) -> ToyBatchSummary:
     )
 
 
-class HardGateWorkflow(Workflow):
+class ScreenApplicationWorkflow(Workflow):
     identity: Node
     budget: Node
     submission: Node
-    result: Join
+    hard_gates: Join
+    scoring_start: Node
+    category_fit: Node
+    traction: Node
+    delivery_readiness: Node
+    consistency: Node
+    scoring_layers: Join
+    score: Node
+    result: Node
 
     context = ToyScreeningContext
 
     start = Node(
-        run=begin_review_stage,
+        run=prepare_application,
         next=[
             identity,
             budget,
             submission,
         ],
     )
-    identity = Node(run=review_identity_gate, next=result)
-    budget = Node(run=review_budget_gate, next=result)
-    submission = Node(run=review_submission_gate, next=result)
-    result = Join(run=merge_hard_gate_results, scope=start)
 
+    identity = Node(run=review_identity_gate, next=hard_gates)
+    budget = Node(run=review_budget_gate, next=hard_gates)
+    submission = Node(run=review_submission_gate, next=hard_gates)
 
-class ScoringLayersWorkflow(Workflow):
-    category_fit: Node
-    traction: Node
-    delivery_readiness: Node
-    consistency: Node
-    result: Join
-
-    context = ToyScreeningContext
-
-    start = Node(
-        run=begin_review_stage,
-        next=[category_fit, traction, delivery_readiness, consistency],
-    )
-    category_fit = Node(run=review_category_fit, next=result)
-    traction = Node(run=review_traction, next=result)
-    delivery_readiness = Node(run=review_delivery_readiness, next=result)
-    consistency = Node(run=review_consistency, next=result)
-    result = Join(run=merge_score_layer_results, scope=start)
-
-
-class ScreenApplicationWorkflow(Workflow):
-    hard_gates: Node
-    scoring_layers: Node
-    score: Node
-    result: Node
-
-    context = ToyScreeningContext
-
-    start = Node(run=prepare_application, next=hard_gates)
-    hard_gates = Node(
-        run=HardGateWorkflow(),
+    hard_gates = Join(
+        run=merge_hard_gate_results,
+        scope=start,
         route_on=ReviewRoute.value,
         next={
-            "continue": scoring_layers,
+            "continue": scoring_start,
             "stop": score,
         },
     )
-    scoring_layers = Node(run=ScoringLayersWorkflow(), next=score)
+
+    scoring_start = Node(
+        run=begin_review_stage,
+        next=[
+            category_fit,
+            traction,
+            delivery_readiness,
+            consistency,
+        ],
+    )
+    category_fit = Node(run=review_category_fit, next=scoring_layers)
+    traction = Node(run=review_traction, next=scoring_layers)
+    delivery_readiness = Node(run=review_delivery_readiness, next=scoring_layers)
+    consistency = Node(run=review_consistency, next=scoring_layers)
+
+    scoring_layers = Join(
+        run=merge_score_layer_results,
+        scope=scoring_start,
+        next=score,
+    )
+
     score = Node(run=score_application, next=result)
     result = Node(run=finish_application)
 

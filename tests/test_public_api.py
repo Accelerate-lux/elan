@@ -354,6 +354,7 @@ async def test_join_reducer_with_list_branching(mock_task_factory, branch_id):
     assert run.outputs == {
         branch_id[0]: {
             "_prepare": ["world"],
+            "_collect": ["Hello, world! | badge:world"],
         },
         branch_id[1]: {
             "_greet": ["Hello, world!"],
@@ -554,6 +555,7 @@ async def test_yield_fan_out_with_join_result(branch_id):
     assert run.outputs == {
         branch_id[0]: {
             "load_values": [[1, 2, 3]],
+            "sum_values": [14],
         },
         branch_id[1]: {
             "square": [1],
@@ -597,6 +599,7 @@ async def test_workflow_subclass_yield_fan_out_with_join_result(branch_id):
     assert run.outputs == {
         branch_id[0]: {
             "load_values": [[2, 3]],
+            "sum_values": [50],
         },
         branch_id[1]: {
             "multiply": [20],
@@ -632,7 +635,10 @@ async def test_child_workflow_node_with_parent_join_result(branch_id):
     ).run()
 
     assert run.result == 50
-    assert run.outputs[branch_id[0]] == {"load_values": [[2, 3]]}
+    assert run.outputs[branch_id[0]] == {
+        "load_values": [[2, 3]],
+        "sum_values": [50],
+    }
     child_outputs = [
         outputs["multiply_value"][0]
         for branch, outputs in run.outputs.items()

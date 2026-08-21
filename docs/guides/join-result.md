@@ -1,6 +1,6 @@
-# Join on Result
+# Joins
 
-Elan currently supports a first-pass terminal join form on the reserved `result` node.
+Elan supports workflow-wide terminal joins and activation-scoped mid-graph joins.
 
 ## Basic join
 
@@ -41,13 +41,42 @@ workflow = Workflow(
 )
 ```
 
-## Current semantics
+## Workflow-wide semantics
 
-- `Join` is only valid as the reserved `result` node
 - branches routed to `result` contribute their emitted values
 - `Join()` returns the collected list
 - `Join(run=reducer)` calls the reducer with that list as one value
-- join reduction is not recorded in `run.outputs`
+- reducer results are recorded in `run.outputs` under the reducer task name
+
+## Scoped mid-graph join
+
+Use `scope` to identify the activation whose descendants form the barrier:
+
+```python
+workflow = Workflow(
+    "review",
+    start=Node(run=prepare, next=["identity", "budget"]),
+    identity=Node(run=check_identity, next="checks"),
+    budget=Node(run=check_budget, next="checks"),
+    checks=Join(
+        run=merge_checks,
+        scope="start",
+        route_on="route",
+        next={"continue": "publish", "stop": "reject"},
+    ),
+    publish=publish,
+    reject=reject,
+)
+```
+
+Every activation of `start` creates a separate join instance. All descendants are
+awaited, while only descendants routed to `checks` contribute. The reducer runs
+on the preserved `start` branch, so context changes made there are visible to the
+selected continuation.
+
+Scoped joins can nest. An inner reducer and its continuation remain pending work
+for the enclosing scope. Concurrent activations of the same mid-graph scope remain
+isolated from one another.
 
 ## Ordering caveat
 
@@ -55,10 +84,12 @@ Join contribution order follows runtime arrival order.
 
 That means reducers should be order-agnostic unless the workflow intentionally constrains completion timing.
 
-## Current limits
+## Limits
 
-- no mid-graph joins yet
-- no general barriers yet
+- a mid-graph join requires an explicit scope
+- one scope node may define only one join boundary
+- the same join scope cannot recursively re-enter on one branch
+- a terminal scoped join requires exactly one activation
 
 ## Next steps
 

@@ -9,7 +9,7 @@ Use these pages instead:
 - [Linear Workflows](guides/linear-workflows.md)
 - [Data Binding](guides/data-binding.md)
 - [Branching](guides/branching.md)
-- [Join on Result](guides/join-result.md)
+- [Joins](guides/join-result.md)
 - [Runtime Behavior](reference/runtime-behavior.md)
 
 This page remains as a compatibility entry point while links are migrated.

@@ -65,24 +65,22 @@ Open points:
 
 ## Barrier
 
-`Barrier` is the internal synchronization mechanism behind workflow `result` joins.
+Activation-scoped join state is the internal barrier mechanism behind `Join`.
 
-It exists to keep waiting semantics out of branches, activations, and payload carriers.
+Scope identifiers travel with branches while the join state owns membership,
+contributions, and reducer lifecycle.
 
-At the current level of design, it is intentionally narrow:
+The mechanism:
 
-- it synchronizes the flows that contribute to workflow `result`
-- it determines when workflow result continuation may resume
+- creates one barrier for every activation of the declared scope node
+- suspends and later resumes the scope-owner branch
+- waits for contributing and non-contributing descendants
+- schedules reducers through the ordinary scheduler
+- keeps nested reducer and continuation work inside enclosing scopes
 
-It is not yet a general fan-in or mid-graph join mechanism.
-
-Open points:
-
-- what exactly a barrier tracks
-- whether it waits on branches, activations, packets, or settled outputs
-- how membership is established
-- how it interacts with retries, cycles, and dynamic expansion
-- whether `result` is a specialized barrier or simply uses the same underlying idea
+Workflow-wide `result=Join(...)` is the compatibility form. Mid-graph joins require
+an explicit scope. Recursive re-entry into the same active join scope remains
+unsupported until cycle semantics are expanded.
 
 ## Progression Loop
 

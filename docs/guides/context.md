@@ -8,7 +8,7 @@ Context is:
 - typed with a Pydantic model
 - scoped per branch
 - readable through `Context.field`
-- writable through `Node.context`
+- writable through `Node.context` or an injected context model
 
 ## Declare workflow context
 
@@ -109,7 +109,26 @@ Sibling branches:
 - can write different values to the same context key
 - do not observe each other's writes
 
-`Join(...)` does not merge branch contexts in this slice. It only reduces result contributions.
+Sibling context changes are never merged implicitly. A scoped join reducer runs
+against the context owned by its declared scope, after its branch contributions
+have settled:
+
+```python
+@task
+def collect(values: list[int], context: RunContext) -> int:
+    context.total = sum(values)
+    return context.total
+
+
+result = Join(run=collect, scope="start")
+```
+
+This keeps parallel branch writes isolated while giving one deterministic task
+ownership of the merged context update.
+
+When a child workflow completes successfully, its final context replaces the
+context of the parent branch before the next parent node runs. A failing child
+does not commit context.
 
 ## Validation rules
 

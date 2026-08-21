@@ -207,7 +207,7 @@ Supported forms include:
 - `When(RoutePayload.should_email, "send_email")`
 - `When("should_ticket", ["open_ticket", "audit"])`
 
-## `Join(run=None)`
+## `Join(run=None, scope=None)`
 
 Terminal workflow-scope synchronization primitive.
 
@@ -215,15 +215,25 @@ Supported forms:
 
 - `result=Join()`
 - `result=Join(run=reduce_values)`
+- `result=Join(run=reduce_values, scope="start")`
 
 `Join` is only valid as the reserved `result` node.
 
+When `scope` is set, a reducer parameter annotated with the workflow context
+model receives the context owned by that node's branch. Sibling branch contexts
+remain isolated and are not merged automatically.
+
 ## `WorkflowRun`
+
+Completed runs expose both `result` and the final committed `context`. Child
+workflows commit this context to their parent branch before parent execution
+continues.
 
 Fields:
 
 - `result: Any`
 - `outputs: dict[str, dict[str, list[Any]]]`
+- `context: BaseModel | None`
 
 ## Reference pages
 

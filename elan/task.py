@@ -1,12 +1,16 @@
 import inspect
 from dataclasses import dataclass
-from typing import Any, Callable
+from typing import Any, Awaitable, Callable, Generic, ParamSpec, TypeVar, overload
+
+
+P = ParamSpec("P")
+R = TypeVar("R")
 
 
 @dataclass
-class Task:
+class Task(Generic[P, R]):
     key: str
-    fn: Callable[..., Any]
+    fn: Callable[P, Any]
     signature: inspect.Signature
     parameters: tuple[inspect.Parameter, ...]
     is_async: bool
@@ -82,6 +86,30 @@ def resolve_task(value: Task | str) -> Task:
         return _TASKS_BY_ALIAS[value]
 
     raise KeyError(f"Unknown task '{value}'.")
+
+
+@overload
+def task(
+    fn: Callable[P, Awaitable[R]],
+    *,
+    alias: str | None = None,
+) -> Task[P, R]: ...
+
+
+@overload
+def task(
+    fn: Callable[P, R],
+    *,
+    alias: str | None = None,
+) -> Task[P, R]: ...
+
+
+@overload
+def task(
+    fn: None = None,
+    *,
+    alias: str | None = None,
+) -> Callable[[Callable[P, R]], Task[P, R]]: ...
 
 
 def task(

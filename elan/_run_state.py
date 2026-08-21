@@ -26,6 +26,7 @@ class RunState:
     policy: WorkflowPolicy | None = None
     result: Any = None
     last_output: Any = None
+    last_branch_id: str | None = None
     outputs: dict[str, dict[str, list[Any]]] = field(default_factory=dict)
     branches: dict[str, Branch] = field(default_factory=dict)
     branch_contexts: dict[str, BaseModel | None] = field(default_factory=dict)

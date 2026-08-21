@@ -157,6 +157,15 @@ class Workflow(metaclass=_WorkflowMeta):
                 f"{', '.join(missing_forward_declarations)}."
             )
 
+        declared_nodes = {
+            node_name: _resolve_declared_join_scope(
+                cls.__name__,
+                node_value,
+                declared_start=declared_start,
+                declared_nodes=declared_nodes,
+            )
+            for node_name, node_value in declared_nodes.items()
+        }
         declared_start = _resolve_forward_refs(
             cls.__name__,
             declared_start,
@@ -237,7 +246,16 @@ class Workflow(metaclass=_WorkflowMeta):
                     f"Workflow '{name}' cannot use Binder[{node_value.context.model_cls.__name__}] "
                     f"as context for node '{node_name}' with workflow context '{context.__name__}'."
                 )
-        for node_name, node_value in nodes.items():
+        normalized_nodes = {
+            node_name: _normalize_join_scope(
+                name,
+                node_value,
+                start=start,
+                nodes=nodes,
+            )
+            for node_name, node_value in nodes.items()
+        }
+        for node_name, node_value in normalized_nodes.items():
             if isinstance(node_value, Join) and node_name != "result":
                 raise TypeError(
                     f"Workflow '{name}' only allows Join(...) as the reserved result node."
@@ -248,7 +266,7 @@ class Workflow(metaclass=_WorkflowMeta):
         self.context_cls = context
         self.bind_context = bind_context
         self.policy = policy
-        self.nodes = dict(nodes)
+        self.nodes = normalized_nodes
 
     async def run(self, **input: Any) -> WorkflowRun:
         return await self._run(**input)
@@ -402,7 +420,10 @@ class Workflow(metaclass=_WorkflowMeta):
         if join_value.run is not None:
             reducer = resolve_task_ref(self.name, join_value.run)
 
-        return JoinState(reducer=reducer)
+        return JoinState(
+            reducer=reducer,
+            scope_node_name=join_value.scope,
+        )
 
     def _validate_policy_allows_graph(self, policy: WorkflowPolicy) -> None:
         if not policy.allow_cycles and _has_static_cycle(self.start, self.nodes):
@@ -413,6 +434,73 @@ class Workflow(metaclass=_WorkflowMeta):
 
 def _is_node_declaration(value: Any) -> bool:
     return isinstance(value, (Task, str, Node, Join, Workflow))
+
+
+def _normalize_join_scope(
+    workflow_name: str,
+    value: Task | str | Node | Join | Workflow,
+    *,
+    start: Task | str | Node | Workflow,
+    nodes: dict[str, Task | str | Node | Join | Workflow],
+) -> Task | str | Node | Join | Workflow:
+    if not isinstance(value, Join) or value.scope is None:
+        return value
+
+    if isinstance(value.scope, str):
+        scope_name = value.scope
+    else:
+        graph = {"start": start, **nodes}
+        matches = [
+            node_name
+            for node_name, node_value in graph.items()
+            if node_value is value.scope
+        ]
+        if not matches:
+            raise TypeError(
+                f"Workflow '{workflow_name}' Join scope does not reference a declared node."
+            )
+        scope_name = matches[0]
+
+    if scope_name != "start" and scope_name not in nodes:
+        raise TypeError(
+            f"Workflow '{workflow_name}' Join references unknown scope '{scope_name}'."
+        )
+    if scope_name == "result":
+        raise TypeError(
+            f"Workflow '{workflow_name}' Join cannot use itself as its scope."
+        )
+    return replace(value, scope=scope_name)
+
+
+def _resolve_declared_join_scope(
+    workflow_class_name: str,
+    value: Task | str | Node | Join | Workflow,
+    *,
+    declared_start: Task | str | Node | Workflow,
+    declared_nodes: dict[str, Task | str | Node | Join | Workflow],
+) -> Task | str | Node | Join | Workflow:
+    if not isinstance(value, Join) or value.scope is None:
+        return value
+
+    if isinstance(value.scope, (str, _ForwardNodeRef)):
+        scope_name = (
+            value.scope
+            if isinstance(value.scope, str)
+            else _resolve_forward_ref(
+                workflow_class_name,
+                value.scope,
+                declared_nodes=declared_nodes,
+            )
+        )
+        return replace(value, scope=scope_name)
+
+    if value.scope is declared_start:
+        return replace(value, scope="start")
+
+    for node_name, node_value in declared_nodes.items():
+        if node_value is value.scope:
+            return replace(value, scope=node_name)
+    return value
 
 
 def _is_node_annotation(annotation: Any) -> bool:

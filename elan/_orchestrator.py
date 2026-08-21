@@ -2,8 +2,10 @@ import asyncio
 from typing import Any
 from uuid import uuid4
 
+from pydantic import BaseModel
+
 from ._activation import Activation
-from ._binding import bind_output
+from ._binding import bind_input, bind_output
 from ._branch import Branch
 from ._context import prepare_context
 from ._refs import RefLookup
@@ -88,6 +90,7 @@ class Orchestrator:
         return WorkflowRun(
             result=self._final_result(),
             outputs=self.run_state.outputs,
+            context=self._final_context(),
         )
 
     def activation_for_id(
@@ -145,6 +148,7 @@ class Orchestrator:
         self,
         settled: Activation,
     ) -> list[Activation]:
+        self._capture_join_scope(settled)
         branch = self.run_state.branches[settled.branch_id]
         if settled.yielded:
             if settled.node.next is not None:
@@ -182,6 +186,7 @@ class Orchestrator:
         activation: Activation,
         yielded_output: Any,
     ) -> list[Activation]:
+        self._capture_join_scope(activation)
         branch = self.run_state.branches[activation.branch_id]
         emitted_value = bind_output(activation.node.bind_output, yielded_output)
 
@@ -210,7 +215,13 @@ class Orchestrator:
         self,
         activation: Activation,
     ) -> None:
+        if activation.context_output is not None:
+            self.run_state.set_context_for_branch(
+                activation.branch_id,
+                activation.context_output,
+            )
         self.run_state.last_output = activation.output
+        self.run_state.last_branch_id = activation.branch_id
         branch_outputs = self.run_state.outputs.setdefault(activation.branch_id, {})
         branch_outputs.setdefault(activation.node.run.name, []).append(
             activation.output
@@ -237,6 +248,7 @@ class Orchestrator:
             self.run_state.result = await self._run_join_reducer(
                 join_state.reducer,
                 contributions,
+                context=self._join_context(),
             )
         join_state.finalized = True
 
@@ -333,10 +345,43 @@ class Orchestrator:
         self,
         reducer: Task,
         contributions: list[Any],
+        *,
+        context: BaseModel | None,
     ) -> Any:
+        lookup = RefLookup(
+            workflow_input=self.run_state.workflow_input,
+            context=context,
+            policy=self.run_state.policy,
+            upstream_value=contributions,
+        )
+        args, kwargs = bind_input(
+            reducer,
+            contributions,
+            lookup=lookup,
+        )
         if reducer.is_async:
-            return await reducer.fn(contributions)
-        return await asyncio.to_thread(reducer.fn, contributions)
+            return await reducer.fn(*args, **kwargs)
+        return await asyncio.to_thread(reducer.fn, *args, **kwargs)
+
+    def _capture_join_scope(self, activation: Activation) -> None:
+        join_state = self.run_state.join_state
+        if join_state is None or activation.node_name is None:
+            return
+        join_state.bind_scope(activation.node_name, activation.branch_id)
+
+    def _join_context(self) -> BaseModel | None:
+        join_state = self.run_state.join_state
+        if join_state is None or join_state.scope_branch_id is None:
+            return self.run_state.context
+        return self.run_state.context_for_branch(join_state.scope_branch_id)
+
+    def _final_context(self) -> BaseModel | None:
+        join_state = self.run_state.join_state
+        if join_state is not None:
+            return self._join_context()
+        if self.run_state.last_branch_id is None:
+            return self.run_state.context
+        return self.run_state.context_for_branch(self.run_state.last_branch_id)
 
     def _create_activation(
         self,

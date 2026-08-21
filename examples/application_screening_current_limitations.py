@@ -18,10 +18,12 @@ The process is deliberately small:
 
 The example deliberately keeps the framework/user-data boundaries visible:
 - domain configuration is ordinary user data, not Elan context or policy
-- provider-like run metadata is read through Elan workflow context
+- provider-like metadata and the active review are held in branch context
+- parallel tasks return typed decisions instead of copied review states
+- scoped joins merge those decisions into their owning context
 - concurrency is governed by Elan workflow policy
 - batch fan-out uses generator yields
-- per-application fan-in uses child workflows with terminal `Join(...)`
+- successful child workflows commit their context before the parent continues
 """
 
 import asyncio
@@ -58,12 +60,6 @@ class ToyFinalScores(BaseModel):
     hard_fail_reasons: list[str] = Field(default_factory=list)
 
 
-class ToyScreeningContext(BaseModel):
-    provider: str = "deterministic"
-    model: str = "toy-reviewer"
-    temperature: float = 0.0
-
-
 class ToyScreeningConfig(BaseModel):
     stop_on_hard_gate_fail: bool = True
     a_threshold: int = 80
@@ -90,6 +86,49 @@ class ToyReviewState(BaseModel):
     delivery_readiness_score: int = 0
     consistency_score: int = 0
     final: ToyFinalScores | None = None
+
+
+GateName = Literal["identity", "budget", "submission"]
+ScoreLayerName = Literal[
+    "category_fit",
+    "traction",
+    "delivery_readiness",
+    "consistency",
+]
+
+
+class GateDecision(BaseModel):
+    gate: GateName
+    passed: bool
+
+
+@ref
+class ReviewRoute(BaseModel):
+    value: Literal["continue", "stop"]
+
+
+class LayerScore(BaseModel):
+    layer: ScoreLayerName
+    score: int
+
+
+class ScoreSummary(BaseModel):
+    category_fit: int
+    traction: int
+    delivery_readiness: int
+    consistency: int
+
+
+class ToyScreeningContext(BaseModel):
+    provider: str = "deterministic"
+    model: str = "toy-reviewer"
+    temperature: float = 0.0
+    review: ToyReviewState | None = None
+
+    def current_review(self) -> ToyReviewState:
+        if self.review is None:
+            raise RuntimeError("Screening context does not contain an active review.")
+        return self.review
 
 
 class ToyBatchSummary(BaseModel):
@@ -206,101 +245,93 @@ async def load_applications(config: ToyScreeningConfig):
 
 
 @task
-async def prepare_application(state: ToyReviewState) -> ToyReviewState:
+async def prepare_application(
+    state: ToyReviewState,
+    screening: ToyScreeningContext,
+) -> ToyReviewState:
+    screening.review = state
     return state
 
 
 @task
-def pass_review_state(state: ToyReviewState) -> ToyReviewState:
-    return state
+def begin_review_stage(screening: ToyScreeningContext) -> None:
+    screening.current_review()
 
 
 @task
 async def review_identity_gate(
-    state: ToyReviewState,
     screening: ToyScreeningContext,
-) -> ToyReviewState:
+) -> GateDecision:
     _ = screening.provider, screening.model, screening.temperature
-    if state.app.tax_id_present and state.app.contact_email_verified:
-        return state
-    return state.model_copy(
-        update={"hard_gate_failures": [*state.hard_gate_failures, "identity"]}
+    state = screening.current_review()
+    return GateDecision(
+        gate="identity",
+        passed=state.app.tax_id_present and state.app.contact_email_verified,
     )
 
 
 @task
 async def review_budget_gate(
-    state: ToyReviewState,
     screening: ToyScreeningContext,
-) -> ToyReviewState:
+) -> GateDecision:
     _ = screening.provider, screening.model, screening.temperature
-    if state.app.requested_amount_usd <= state.config.max_requested_amount_usd:
-        return state
-    return state.model_copy(
-        update={"hard_gate_failures": [*state.hard_gate_failures, "budget"]}
+    state = screening.current_review()
+    return GateDecision(
+        gate="budget",
+        passed=(
+            state.app.requested_amount_usd
+            <= state.config.max_requested_amount_usd
+        ),
     )
 
 
 @task
 async def review_submission_gate(
-    state: ToyReviewState,
     screening: ToyScreeningContext,
-) -> ToyReviewState:
+) -> GateDecision:
     _ = screening.provider, screening.model, screening.temperature
-    if (
-        state.app.budget_line_items >= state.config.min_budget_line_items
-        and state.app.problem_statement_words
-        >= state.config.min_problem_statement_words
-    ):
-        return state
-    return state.model_copy(
-        update={"hard_gate_failures": [*state.hard_gate_failures, "submission"]}
+    state = screening.current_review()
+    return GateDecision(
+        gate="submission",
+        passed=(
+            state.app.budget_line_items >= state.config.min_budget_line_items
+            and state.app.problem_statement_words
+            >= state.config.min_problem_statement_words
+        ),
     )
-
-
-@task
-async def decide_review_route(
-    state: ToyReviewState,
-) -> ToyReviewState:
-    route = (
-        "stop"
-        if state.config.stop_on_hard_gate_fail and state.hard_gate_failures
-        else "continue"
-    )
-    return state.model_copy(update={"review_route": route})
 
 
 @task
 async def review_category_fit(
-    state: ToyReviewState,
     screening: ToyScreeningContext,
-) -> ToyReviewState:
+) -> LayerScore:
     _ = screening.provider, screening.model, screening.temperature
+    state = screening.current_review()
     score = 25 if state.app.category in state.config.priority_categories else 0
-    return state.model_copy(update={"category_fit_score": score})
+    return LayerScore(layer="category_fit", score=score)
 
 
 @task
 async def review_traction(
-    state: ToyReviewState,
     screening: ToyScreeningContext,
-) -> ToyReviewState:
+) -> LayerScore:
     _ = screening.provider, screening.model, screening.temperature
+    state = screening.current_review()
     score = (
         25
         if state.app.pilot_users >= state.config.min_pilot_users
         or state.app.monthly_active_users >= state.config.min_monthly_active_users
         else 0
     )
-    return state.model_copy(update={"traction_score": score})
+    return LayerScore(layer="traction", score=score)
 
 
 @task
 async def review_delivery_readiness(
-    state: ToyReviewState,
     screening: ToyScreeningContext,
-) -> ToyReviewState:
+) -> LayerScore:
     _ = screening.provider, screening.model, screening.temperature
+    state = screening.current_review()
     score = (
         25
         if state.app.delivery_owner_named
@@ -308,23 +339,24 @@ async def review_delivery_readiness(
         <= state.config.max_delivery_timeline_weeks
         else 0
     )
-    return state.model_copy(update={"delivery_readiness_score": score})
+    return LayerScore(layer="delivery_readiness", score=score)
 
 
 @task
 async def review_consistency(
-    state: ToyReviewState,
     screening: ToyScreeningContext,
-) -> ToyReviewState:
+) -> LayerScore:
     _ = screening.provider, screening.model, screening.temperature
+    state = screening.current_review()
     score = 25 if state.app.contradiction_count == 0 else 0
-    return state.model_copy(update={"consistency_score": score})
+    return LayerScore(layer="consistency", score=score)
 
 
 @task
 async def score_application(
-    state: ToyReviewState,
+    screening: ToyScreeningContext,
 ) -> ToyReviewState:
+    state = screening.current_review()
     composite = (
         state.category_fit_score
         + state.traction_score
@@ -339,46 +371,54 @@ async def score_application(
         bucket = "B"
     else:
         bucket = "C"
-    return state.model_copy(
-        update={
-            "final": ToyFinalScores(
-                traction_score=state.traction_score,
-                category_fit_score=state.category_fit_score,
-                delivery_readiness_score=state.delivery_readiness_score,
-                consistency_score=state.consistency_score,
-                composite_score=composite,
-                bucket=bucket,
-                hard_fail_reasons=state.hard_gate_failures,
-            )
-        }
+    state.final = ToyFinalScores(
+        traction_score=state.traction_score,
+        category_fit_score=state.category_fit_score,
+        delivery_readiness_score=state.delivery_readiness_score,
+        consistency_score=state.consistency_score,
+        composite_score=composite,
+        bucket=bucket,
+        hard_fail_reasons=state.hard_gate_failures,
     )
+    return state
 
 
 @task
-def merge_hard_gate_results(states: list[ToyReviewState]) -> ToyReviewState:
-    base = states[0]
-    failures = {failure for state in states for failure in state.hard_gate_failures}
-    ordered_failures = [
-        failure
-        for failure in ("identity", "budget", "submission")
-        if failure in failures
+def merge_hard_gate_results(
+    decisions: list[GateDecision],
+    screening: ToyScreeningContext,
+) -> ReviewRoute:
+    state = screening.current_review()
+    failed = {decision.gate for decision in decisions if not decision.passed}
+    state.hard_gate_failures = [
+        gate for gate in ("identity", "budget", "submission") if gate in failed
     ]
-    return base.model_copy(update={"hard_gate_failures": ordered_failures})
+    state.review_route = (
+        "stop"
+        if state.config.stop_on_hard_gate_fail and state.hard_gate_failures
+        else "continue"
+    )
+    return ReviewRoute(value=state.review_route)
 
 
 @task
-def merge_score_layer_results(states: list[ToyReviewState]) -> ToyReviewState:
-    base = states[0]
-    return base.model_copy(
-        update={
-            "category_fit_score": max(state.category_fit_score for state in states),
-            "traction_score": max(state.traction_score for state in states),
-            "delivery_readiness_score": max(
-                state.delivery_readiness_score for state in states
-            ),
-            "consistency_score": max(state.consistency_score for state in states),
-        }
+def merge_score_layer_results(
+    layer_scores: list[LayerScore],
+    screening: ToyScreeningContext,
+) -> ScoreSummary:
+    state = screening.current_review()
+    scores = {result.layer: result.score for result in layer_scores}
+    summary = ScoreSummary(
+        category_fit=scores["category_fit"],
+        traction=scores["traction"],
+        delivery_readiness=scores["delivery_readiness"],
+        consistency=scores["consistency"],
     )
+    state.category_fit_score = summary.category_fit
+    state.traction_score = summary.traction
+    state.delivery_readiness_score = summary.delivery_readiness
+    state.consistency_score = summary.consistency
+    return summary
 
 
 @task
@@ -413,11 +453,18 @@ class HardGateWorkflow(Workflow):
 
     context = ToyScreeningContext
 
-    start = Node(run=pass_review_state, next=[identity, budget, submission])
+    start = Node(
+        run=begin_review_stage,
+        next=[
+            identity,
+            budget,
+            submission,
+        ],
+    )
     identity = Node(run=review_identity_gate, next=result)
     budget = Node(run=review_budget_gate, next=result)
     submission = Node(run=review_submission_gate, next=result)
-    result = Join(run=merge_hard_gate_results)
+    result = Join(run=merge_hard_gate_results, scope=start)
 
 
 class ScoringLayersWorkflow(Workflow):
@@ -430,19 +477,18 @@ class ScoringLayersWorkflow(Workflow):
     context = ToyScreeningContext
 
     start = Node(
-        run=pass_review_state,
+        run=begin_review_stage,
         next=[category_fit, traction, delivery_readiness, consistency],
     )
     category_fit = Node(run=review_category_fit, next=result)
     traction = Node(run=review_traction, next=result)
     delivery_readiness = Node(run=review_delivery_readiness, next=result)
     consistency = Node(run=review_consistency, next=result)
-    result = Join(run=merge_score_layer_results)
+    result = Join(run=merge_score_layer_results, scope=start)
 
 
 class ScreenApplicationWorkflow(Workflow):
     hard_gates: Node
-    hard_gate_route: Node
     scoring_layers: Node
     score: Node
     result: Node
@@ -450,10 +496,9 @@ class ScreenApplicationWorkflow(Workflow):
     context = ToyScreeningContext
 
     start = Node(run=prepare_application, next=hard_gates)
-    hard_gates = Node(run=HardGateWorkflow(), next=hard_gate_route)
-    hard_gate_route = Node(
-        run=decide_review_route,
-        route_on=ToyReviewState.review_route,
+    hard_gates = Node(
+        run=HardGateWorkflow(),
+        route_on=ReviewRoute.value,
         next={
             "continue": scoring_layers,
             "stop": score,

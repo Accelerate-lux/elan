@@ -27,6 +27,7 @@ class Activation:
     treat_entry_dict_as_named_payload: bool = True
     status: ActivationStatus = "queued"
     output: Any = None
+    context_output: BaseModel | None = None
     yielded: bool = False
 
     def mark_queued(self) -> None:
@@ -118,6 +119,8 @@ class Activation:
             inherited_policy=policy,
             input_is_workflow_input=input_is_workflow_input,
         )
+        if context is not None and child_run.context is not None:
+            self.context_output = child_run.context
         return child_run.result
 
     async def _execute_async_generator(

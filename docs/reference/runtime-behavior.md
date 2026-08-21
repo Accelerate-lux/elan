@@ -81,6 +81,7 @@ Current context semantics:
 - context is branch-local, not one shared mutable object for the whole run
 - child branches inherit the parent branch context at branch creation time
 - child workflows inherit a copy of the current branch context
+- successful child workflows commit their final context before the parent continues
 - sibling branches do not observe each other's later context writes
 
 ## Composition behavior
@@ -137,7 +138,9 @@ Current `Join` semantics:
 - branches routed to `result` contribute their emitted values
 - `Join()` returns the collected list
 - `Join(run=reducer)` calls the reducer with the collected list as one value
-- `Join(...)` does not merge branch-local context in the current runtime
+- `Join(scope=...)` identifies the branch context owned by the declared node
+- a scoped reducer may receive that context through normal typed injection
+- sibling branch contexts are never merged implicitly
 
 ## Concurrency behavior
 

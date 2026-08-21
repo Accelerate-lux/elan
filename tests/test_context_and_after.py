@@ -690,3 +690,55 @@ async def test_join_does_not_merge_sibling_contexts(mock_task_factory):
     email.mock.assert_called_once_with(label="email")
     ticket.mock.assert_called_once_with(label="ticket")
     assert sorted(run.result) == ["email", "ticket"]
+
+
+@pytest.mark.asyncio
+async def test_child_scoped_join_commits_context_for_parent_continuation():
+    class ReviewContext(BaseModel):
+        total: int = 1
+
+    @task
+    def prepare() -> str:
+        return "review"
+
+    @task
+    def begin(value: str, context: ReviewContext) -> str:
+        return value
+
+    @task
+    def add_one(context: ReviewContext) -> int:
+        return context.total + 1
+
+    @task
+    def add_two(context: ReviewContext) -> int:
+        return context.total + 2
+
+    @task
+    def merge(values: list[int], context: ReviewContext) -> int:
+        context.total = sum(values)
+        return context.total
+
+    @task
+    def report(value: int, context: ReviewContext) -> tuple[int, int]:
+        return value, context.total
+
+    child = Workflow(
+        "review_parts",
+        context=ReviewContext,
+        start=Node(run=begin, next=["add_one", "add_two"]),
+        add_one=Node(run=add_one, next="result"),
+        add_two=Node(run=add_two, next="result"),
+        result=Join(run=merge, scope="start"),
+    )
+    parent = Workflow(
+        "review",
+        context=ReviewContext,
+        start=Node(run=prepare, next="child"),
+        child=Node(run=child, next="report"),
+        report=report,
+    )
+
+    run = await parent.run()
+
+    assert run.result == (5, 5)
+    assert run.context == ReviewContext(total=5)

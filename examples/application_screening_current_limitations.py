@@ -1,4 +1,4 @@
-# ruff: noqa: F821
+# ruff: noqa: F821, PIE794
 """Toy application screening workflow using yield-based batch fan-out.
 
 The process is deliberately small:

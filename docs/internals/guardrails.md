@@ -2,6 +2,13 @@
 
 This document captures the guardrails that constrain workflow execution in Elan.
 
+**Status: design-only for runtime graph expansion and recurrence.** The current
+runtime implements static-cycle detection plus the
+`WorkflowPolicy.allow_cycles` and `allow_runtime_expansion` declaration flags,
+but it does not execute graph expansion or provide recurrence budgets. Current
+join behavior is documented separately because activation-scoped joins were
+implemented after the original guardrails proposal.
+
 It separates:
 
 - structural guardrails, which are part of the graph model itself
@@ -55,13 +62,16 @@ Elan validates that structure as it exists now.
 
 If that returned structure itself contains nested `Expand(...)`, Elan validates the current materialized structure now and validates the nested expansion later, when it materializes.
 
-### 5. `Join` Remains Restricted To `result`
+### 5. Expanded Work Inherits Active Join Scopes
 
-Dynamic expansion does not bypass the ordinary graph language.
+`Join` is not restricted to `result`. The current graph language supports
+workflow-wide result joins and activation-scoped mid-graph joins.
 
-If a returned structure contains a `Join`, it must still obey the same rule as static workflows:
+If runtime expansion is implemented, dynamically added descendants must inherit
+active scope membership just like statically routed and yielded descendants.
 
-- `Join` is only allowed as a workflow `result`
+Whether dynamically returned fragments may declare new joins is still an open
+design question and must be resolved before expansion is implemented.
 
 ### 6. Dynamic Fragments May Reference Existing Static Nodes, But May Not Mutate Them
 
@@ -230,98 +240,45 @@ They define which forms of continuation are allowed in a workflow scope.
 
 ### Policy Shape
 
-These validation and boundary guardrails belong in a workflow-level policy object.
-
-Intended shape:
+The implemented workflow-level policy is deliberately small:
 
 ```python
+from elan import Workflow, WorkflowPolicy
+
 Workflow(
     "dynamic_pipeline",
     start=...,
     result=...,
-    policy=Policy(
-        budgets=BudgetPolicy(
-            max_active_branches=128,
-            max_materialized_nodes_live=512,
-            max_materialized_nodes_total=10000,
-            max_expansion_depth=16,
-            max_cycle_iterations=1000,
-            max_task_executions_total=50000,
-            task_timeout=30,
-            workflow_timeout=300,
-            subworkflow_timeout=300,
-            run_ttl=3600,
-        ),
-        validation=ValidationPolicy(
-            mode="strict",
-            enable_static_graph_validation=True,
-            enable_static_type_validation=True,
-            enable_dynamic_graph_validation=True,
-            enable_dynamic_type_validation=True,
-            allow_untyped_dynamic_expansion=False,
-            allow_heterogeneous_join_contributions=False,
-            allow_untyped_join_reducer=False,
-        ),
-        boundaries=BoundaryPolicy(
-            allow_expansion=True,
-            allow_cycles=False,
-            allow_expand_node=True,
-            allow_expand_fragment=True,
-            allow_expand_workflow=True,
-            allow_direct_static_references_from_expansion=True,
-            allow_then_anchor=True,
-            allow_nested_expand=False,
-            allow_recursive_expand=False,
-        ),
+    policy=WorkflowPolicy(
+        max_parallel_tasks=8,
+        allow_runtime_expansion=True,
+        allow_cycles=False,
     ),
 )
 ```
 
-This policy shape keeps structural validity, execution budgets, validation strictness, and dynamic boundary rules separate.
+`max_parallel_tasks` is enforced today. The two `allow_*` fields are declaration
+gates: static cycles are rejected unless allowed, while runtime expansion has no
+execution mechanism yet.
+
+Future guardrail work may add graph budgets, time budgets, validation
+strictness, and finer boundary rules. The previous nested `Policy`,
+`BudgetPolicy`, `ValidationPolicy`, and `BoundaryPolicy` sketch is not an
+accepted API.
 
 ### Default Policy
 
-The default policy is:
+The current default is equivalent to:
 
 ```python
-DEFAULT_POLICY = Policy(
-    budgets=BudgetPolicy(
-        max_active_branches=128,
-        max_materialized_nodes_live=512,
-        max_materialized_nodes_total=10000,
-        max_expansion_depth=16,
-        max_cycle_iterations=1000,
-        max_task_executions_total=50000,
-        task_timeout=30,
-        workflow_timeout=300,
-        subworkflow_timeout=300,
-        run_ttl=3600,
-    ),
-    validation=ValidationPolicy(
-        mode="strict",
-        enable_static_graph_validation=True,
-        enable_static_type_validation=True,
-        enable_dynamic_graph_validation=True,
-        enable_dynamic_type_validation=True,
-        allow_untyped_dynamic_expansion=False,
-        allow_heterogeneous_join_contributions=False,
-        allow_untyped_join_reducer=False,
-    ),
-    boundaries=BoundaryPolicy(
-        allow_expansion=True,
-        allow_cycles=False,
-        allow_expand_node=True,
-        allow_expand_fragment=True,
-        allow_expand_workflow=True,
-        allow_direct_static_references_from_expansion=True,
-        allow_then_anchor=True,
-        allow_nested_expand=False,
-        allow_recursive_expand=False,
-    ),
+WorkflowPolicy(
+    max_parallel_tasks=None,
+    allow_runtime_expansion=False,
+    allow_cycles=False,
 )
 ```
 
-This default policy keeps the runtime strict enough for production use while still allowing the main dynamic execution forms.
+There are no default graph, recurrence, or time budgets yet.
 
 ### Enforcement Model
 
@@ -352,17 +309,21 @@ In practice:
 
 ## Current Status
 
-The following guardrails are already part of the interface design:
+The following rules are design requirements for future expansion, not current
+runtime behavior:
 
 - append-only materialization
 - no rewriting of already materialized nodes or routes
 - valid current graph after each expansion
 - `then` must exist when used
 - returned structures are validated as currently materialized
-- `Join` remains restricted to `result`
+- expanded descendants inherit active join-scope membership
 - dynamic fragments may reference existing static nodes, but may not mutate them
-- workflows may explicitly disable dynamic expansion in their own scope
-- workflows may explicitly disable static cycles in their own scope
+
+The current policy surface records whether future runtime expansion would be
+allowed, rejects static cycles unless opted into, and lets the scheduler enforce
+`max_parallel_tasks`. Expansion itself and safe cycle execution are not
+implemented.
 
 The runtime guardrail policy surface still needs a detailed design. Its categories are:
 
@@ -372,4 +333,5 @@ The runtime guardrail policy surface still needs a detailed design. Its categori
 
 Error definitions and handling behavior remain a later topic.
 
-A draft note for that surface lives in [error_handling_draft.md](/C:/Users/Hugod/Workspace/elan/docs/internals/error_handling_draft.md).
+A draft note for that surface lives in
+[Error Handling Draft](error_handling_draft.md).

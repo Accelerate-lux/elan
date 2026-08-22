@@ -14,9 +14,13 @@ For the precise dynamic taxonomy used here, see [dynamic_models.md](./dynamic_mo
 | Metaflow | Strong | Moderate | N/A | Strong | Moderate | Moderate |
 | Temporal | Moderate | Strong | Weak | Weak | Strong | Strong |
 | LangGraph | Strong | Strong | Weak | Strong | Strong | Moderate |
-| Elan | Native | Native | Native | Native | Native | Strong |
+| Elan | Native | Native | Planned | Native | Native | Strong |
 
-Legend: `Native` means the capability is a first-class fit for the tool's model. `Strong`, `Moderate`, and `Weak` describe relative fit within this comparison set. `N/A` means the capability is outside the tool's graph model rather than merely weaker within it.
+Legend: `Native` means the capability is a first-class fit for the tool's model.
+`Planned` marks an explicit Elan design direction that is not implemented.
+`Strong`, `Moderate`, and `Weak` describe relative fit within this comparison
+set. `N/A` means the capability is outside the tool's graph model rather than
+merely weaker within it.
 
 ## Usage
 
@@ -34,7 +38,7 @@ Legend: `Native` means the usage quality is part of the tool's core design inten
 
 ## Per-tool takeaway
 
-Airflow remains the clearest scheduler baseline. It is genuinely dynamic in task multiplicity, but that dynamism stays inside an acyclic DAG. Elan is better positioned when the workflow shape itself needs to emerge at runtime.
+Airflow remains the clearest scheduler baseline. It is genuinely dynamic in task multiplicity, but that dynamism stays inside an acyclic DAG. Elan's planned graph-expansion model targets workflows whose shape itself needs to emerge at runtime.
 
 Prefect is the most compact "just write Python" comparison. Its dynamic story comes mainly from imperative Python control flow rather than graph materialization. Elan's value is clearer workflow topology without taking on a large platform surface.
 
@@ -44,9 +48,13 @@ Metaflow is one of the most readable explicit control-flow comparators. It is br
 
 Temporal is the durable-execution comparator in this set. It is strong when reliability, replay, timers, and long-running coordination are the main problem. Elan is differentiated when the workflow should be graph-native and routing-centric rather than durability-centric.
 
-LangGraph is the closest comparison on dynamic control-flow power. It is strong exactly where agent workflows need it to be strong, but it is still traversing a compiled state graph rather than materializing new workflow structure into the active graph. Elan is differentiated when users want that broader runtime graph growth model without committing to a shared-state-machine abstraction.
+LangGraph is the closest comparison on dynamic control-flow power. It is strong exactly where agent workflows need it to be strong, but it is still traversing a compiled state graph rather than materializing new workflow structure into the active graph. Elan's planned graph-growth model aims at that distinction without committing to a shared-state-machine abstraction.
 
-Elan's strongest position in this set is not raw feature count. It is the combination of explicit routing, native cycles, composable sub-workflows, and runtime graph materialization in a workflow model that stays small and readable across both data and agent-style use cases.
+Elan's strongest current position in this set is not raw feature count. It is
+the combination of explicit routing, scoped joins, yield-driven multiplicity,
+and composable sub-workflows in a workflow model that stays small and readable
+across both data and agent-style use cases. Guarded cycles and runtime graph
+materialization remain design directions rather than current capabilities.
 
 ## Overall takeaway
 

@@ -1,18 +1,46 @@
 # Interface Design
 
-This document captures the intended public interface for Elan.
+This document records the implemented local Python interface and the intended
+direction for surfaces that do not exist yet. It was audited against the
+implementation in August 2026.
 
-It is a design note. It describes the interface shape Elan is built around, including features that are not implemented yet.
+## Document Status
+
+The sections through structured payloads and branching describe the current
+Python API unless they explicitly say otherwise. Dynamic expansion,
+post-execution hooks, config/API authoring, and the production runtime are design
+only.
+
+Current implementation status:
+
+- **implemented:** tasks and registration, workflow construction and subclass
+  authoring, binding, refs, context preparation, structured payloads, routing,
+  fan-out, yield fan-out, composition, workflow-wide joins, activation-scoped
+  joins, concurrent scheduling, and basic workflow policy;
+- **partial:** graph/type validation and static-cycle governance;
+- **planned:** post-execution hooks, runtime graph expansion, callable `next`,
+  safe executable cycles, config/API parity, remote execution, persistence,
+  reliability controls, and observability.
+
+For the concise feature inventory, see
+[Status](../explanations/status.md). Exact runtime behavior lives in
+[Runtime Behavior](../reference/runtime-behavior.md).
 
 ## Public Vocabulary
 
 Elan uses a small top-level vocabulary:
 
 - `Workflow`: orchestration definition
-- `task`: registered executable callable
+- `Task` / `task`: registered executable callable and decorator
 - `Node`: configured use of a task inside a workflow
+- `Join`: synchronization and optional reduction in the graph
+- `When`: conditional target production inside `next`
 - `WorkflowRun`: execution of a workflow, including its exported `result` value when defined
-- `Context`: scoped execution state declared by the workflow
+- `WorkflowPolicy`: immutable execution governance for one workflow run
+- `Input`, `Upstream`, `Context`, and `Policy`: field-reference namespaces
+
+Workflow context itself is a user-declared Pydantic model. `Context` is the
+reference namespace used to read that model; it is not the state container.
 
 The split is intentional:
 
@@ -46,26 +74,34 @@ That is the baseline shape Elan preserves.
 
 ## Workflows
 
-Elan workflows have two reserved graph entry points:
+**Status: implemented.**
+
+Every Elan workflow has one required graph entry point and one optional reserved
+export node:
 
 - `start`: the first node to execute
-- `result`: the terminal node whose exposed value becomes the workflow export
+- `result`: the reserved node whose raw return becomes the workflow export
 
-`result` is a normal node in the graph. It is still configured with `Node(...)`.
+`result` may be an ordinary task/node/workflow or a `Join`.
 
 In the Python API, `result=` is the reserved keyword node.
 
-In config and API payloads, `result` is the reserved node id.
+In the planned config and API representations, `result` is the reserved node id.
 
 What makes it special is its role in the workflow contract:
 
 - it is the outward-facing result of the workflow
-- its exposed value is stored on `WorkflowRun.result`
+- its raw return is stored on `WorkflowRun.result`
 - when a workflow is used inside `Node(run=child_workflow)`, that exported value is what the parent receives as the child node output
 
-That keeps sub-workflow composition explicit. A child workflow does not silently expose its last value or its full `WorkflowRun`.
+When `result` exists, it keeps sub-workflow composition explicit: the child
+exports that value rather than its full `WorkflowRun`.
 
-Intended shape:
+For compatibility with minimal workflows, an unbranched workflow without a
+reserved `result` exports its last terminal output. A workflow that branches and
+does not define `result` exports `None`.
+
+Current shape:
 
 ```python
 import elan as el
@@ -93,11 +129,23 @@ workflow = Workflow(
 
 If the workflow defines `result`, the exported value is available on `WorkflowRun.result`.
 
-`result` is terminal. It does not route further through `next`.
+`result=Join(...)` is enforced as terminal. An ordinary reserved result node is
+not currently forced to be terminal: if it declares `next`, execution continues
+while `WorkflowRun.result` retains that result node's raw return. Whether the
+declaration should instead be rejected remains an API decision.
 
 For a single-node workflow, `start` may point directly to `result`.
 
+Workflows may also be authored as subclasses. Public class attributes declare
+the graph, annotation-only `Node` and `Join` attributes provide forward
+references, and subclasses may override `run(...)` with a typed signature that
+delegates to `_run(...)`.
+
 ## Workflow Context
+
+**Status: implemented for pre-execution preparation and scoped reducer
+mutation. Post-execution hooks and general merge/promotion policies are not
+implemented.**
 
 Context is declared at the workflow level.
 
@@ -109,7 +157,7 @@ That gives Elan:
 - validated reads and writes
 - one stable schema across all branch scopes
 
-Intended shape:
+Current shape:
 
 ```python
 import elan as el
@@ -117,7 +165,6 @@ from pydantic import BaseModel
 from elan import Workflow
 
 
-@el.ref
 class RunContext(BaseModel):
     user_id: int | None = None
     locale: str = "en"
@@ -131,9 +178,17 @@ workflow = Workflow(
 )
 ```
 
-Each execution scope carries a value of that model.
+Each execution scope carries a value of that model. `@ref` is not required for
+ordinary context declaration or binding.
 
-When the graph branches, context branches with it. Sibling branches may write the same keys with different values without seeing each other. Join and merge behavior decides what is promoted outside the branch scope.
+When the graph branches, context branches with it. Sibling branches may write
+the same keys with different values without seeing each other. Sibling contexts
+are not merged automatically by joins.
+
+An activation-scoped join preserves its scope-owner branch. Reducer mutations
+therefore remain visible to that join's continuation. A child workflow inherits
+a context copy and commits its final context to the parent branch before the
+parent continuation executes.
 
 All context updates follow the same base rule:
 
@@ -145,7 +200,7 @@ It uses the same reference model as node context preparation, but only has acces
 to workflow input, literals, and context defaults. It may provide required
 context fields from workflow input.
 
-Intended shape:
+Current shape:
 
 ```python
 from elan import Input, Workflow
@@ -164,17 +219,24 @@ workflow = Workflow(
 
 ## Refs
 
+**Status: implemented for the local Python runtime. Config serialization and
+remote value references are planned.**
+
 Elan uses registered ref classes for typed field references in the workflow DSL.
 
 `@el.ref` marks a class as referenceable and registers it under a stable id.
 
-That ref concept is used for:
+The implemented ref concept is used for:
 
-- workflow context model ids
 - structured return-model field references in `When(...)`
-- possible future structured return-model field references in deferred post-execution hooks
+- structured return-model field references in `route_on`
+- typed field lookup through `Upstream`
 
-Intended shape:
+`Input`, `Context`, `Policy`, and `Upstream` are source namespaces and do not
+require a registered model. `@ref` is needed when the workflow declaration uses
+class-level model fields such as `RoutePayload.should_email`.
+
+Current shape:
 
 ```python
 import elan as el
@@ -188,7 +250,8 @@ class RoutePayload(BaseModel):
     key: str
 ```
 
-In config and API payloads, the class name is the registry id:
+The following config/API serialization is planned, not implemented. The class
+name is the proposed registry id:
 
 ```yaml
 context: RunContext
@@ -202,6 +265,8 @@ $RoutePayload.should_email
 
 ## Nodes
 
+**Status: implemented.**
+
 Use a bare task when no extra configuration is needed.
 
 Use a `Node` when the workflow needs to define:
@@ -212,12 +277,12 @@ Use a `Node` when the workflow needs to define:
 - context preparation
 - routing
 
-The intended `Node` surface is:
+The current `Node` surface is:
 
 - `run`
-- `input`
+- `bind_input`
 - `context`
-- `output`
+- `bind_output`
 - `next`
 - `route_on`
 
@@ -254,12 +319,14 @@ workflow = Workflow(
 
 ## Node Execution Flow
 
+**Status: implemented.**
+
 For one node execution, Elan applies these phases in order:
 
-1. `input`: prepare task arguments when the workflow needs to adapt what the task receives
-2. `context`: prepare scoped context when the workflow needs to shape the context visible during task execution
+1. `context`: prepare the branch context for this activation
+2. `bind_input`: prepare task arguments, including reads from the prepared context
 3. `run`: execute the task and produce its result
-4. `output`: adapt the result when the workflow needs to reshape what the node emits
+4. `bind_output`: adapt the result when the workflow needs to reshape what the node emits
 5. `next`: route execution when the workflow continues beyond the current node
 
 These phases are optional. A node only declares the parts it needs.
@@ -274,64 +341,46 @@ and lets complexity appear only when the workflow actually needs it.
 
 This ordering also makes the phase boundaries explicit:
 
-- `input` and `context` are pre-execution
-- `output` is post-execution
+- `context` and `bind_input` are pre-execution
+- `bind_output` is post-execution
 - `next` routes the execution that remains after those phases have completed
+
+The raw task return is recorded in `WorkflowRun.outputs`; `bind_output` changes
+only the packet emitted downstream.
 
 ## Type System
 
-Elan's type system is part of a broader workflow validation system.
+**Status: partial.**
 
-It validates:
+The current runtime validates the contracts it encounters, but it does not yet
+perform the full static and semi-static validation system described in
+[Type System Requirements](type_system_requirements.md).
 
-- graph integrity
-- workflow contracts
-- type compatibility
-- runtime-materialized graph structure
+Implemented validation includes:
 
-The type system is designed around workflow surfaces Elan can reason about:
+- task registration and task/alias resolution;
+- workflow context, binding-target, join-placement, join-scope, and policy
+  declaration checks;
+- unknown routing targets and invalid routing packets when a route executes;
+- static-cycle rejection unless `WorkflowPolicy.allow_cycles` is enabled;
+- Pydantic-backed validation of bound task arguments and context updates;
+- structured payload, ref-field, and child context/policy compatibility checks.
 
-- task signatures
-- task return annotations
-- yielded item types
-- context schema
-- `input`
-- `output`
-- `context`
-- routing
-- composition boundaries
-- `Join(...)`
+Not implemented yet:
 
-The validation model has three layers:
+- whole-graph static type compatibility across edges;
+- unreachable/stray-node analysis;
+- static validation of every possible route packet;
+- runtime-materialized graph validation for expansion;
+- observed-type metadata and a unified validation report.
 
-1. static graph validation
-2. static type validation
-3. semi-static runtime validation
-
-Static graph validation catches structural problems such as:
-
-- missing `start` or `result`
-- unknown routing targets
-- stray unreachable nodes
-- invalid `Join` placement
-- invalid routing shapes
-
-Static type validation checks known workflow contracts such as:
-
-- input compatibility
-- output adaptation
-- context reads and writes
-- routing fields
-- child workflow result boundaries
-- join reducers
-
-Semi-static runtime validation covers graph structure and packets that are only knowable at execution time, especially for `yield`, dynamic expansion, and runtime join contributions.
-
-This validation system remains strong when type information is available and degrades gracefully when tasks are only partially typed.
-
-The full requirements are captured in [type_system_requirements.md](/C:/Users/Hugod/Workspace/elan/docs/internals/type_system_requirements.md).
+Validation currently happens at the narrowest available boundary: declaration
+time where possible, run start for cycle policy, and activation/routing time for
+value-dependent checks.
 
 ## Binding and Adaptation
+
+**Status: implemented.**
 
 Elan keeps automatic binding narrow.
 
@@ -383,7 +432,8 @@ bind_output=["name", "style"]
 bind_output=[..., "style"]
 ```
 
-In Python, `...` discards a returned position. In config, the equivalent is `null`.
+In Python, `...` discards a returned position. The proposed config equivalent is
+`null`; config authoring is not implemented.
 
 ## Input Mapping
 
@@ -413,7 +463,7 @@ workflow = Workflow(
     start=Node(
         run=build_profile,
         bind_input={
-            "name": Upstream.name,
+            "name": Input.name,
             "surname": Input.surname,
             "locale": Context.locale,
             "formal": True,
@@ -422,11 +472,11 @@ workflow = Workflow(
 )
 ```
 
-The config form uses the serialized reference syntax:
+The planned config form uses the serialized reference syntax:
 
 ```yaml
 input:
-  name: $upstream.name
+  name: $input.name
   surname: $input.surname
   locale: $context.locale
   formal: true
@@ -439,6 +489,7 @@ The supported sources are:
 - `Upstream`
 - `Input`
 - `Context`
+- `Policy`
 - literals
 
 Arbitrary references to other named nodes are not part of `Node.bind_input`.
@@ -453,7 +504,7 @@ It is part of the pre-execution phase, alongside `Node.bind_input`.
 
 That makes one thing explicit: it defines the context view the task sees when it runs.
 
-Intended shape:
+Current shape:
 
 ```python
 import elan as el
@@ -461,7 +512,6 @@ from pydantic import BaseModel
 from elan import Context, Input, Node, Upstream, Workflow
 
 
-@el.ref
 class RunContext(BaseModel):
     user_id: int | None = None
     locale: str = "en"
@@ -479,7 +529,7 @@ workflow = Workflow(
     start=Node(
         run=build_profile,
         bind_input={
-            "name": Upstream.name,
+            "name": Input.name,
             "surname": Input.surname,
             "locale": Context.locale,
             "formal": True,
@@ -493,7 +543,7 @@ workflow = Workflow(
 
 The `context` field on a node declares the context values that are prepared before task execution.
 
-The config form uses the same reference model:
+The planned config form uses the same reference model:
 
 ```yaml
 context: RunContext
@@ -502,7 +552,7 @@ nodes:
   build_profile:
     run: build_profile
     input:
-      name: $upstream.name
+      name: $input.name
       surname: $input.surname
       locale: $context.locale
       formal: true
@@ -513,6 +563,8 @@ nodes:
 Ordinary nodes read freely from context through `Node.bind_input`. `Node.context` prepares scoped context before the task runs.
 
 ## Deferred Post-Execution Hooks
+
+**Status: deferred; no `after` field exists in the public API.**
 
 Post-execution node hooks such as `after` are currently deferred.
 
@@ -574,6 +626,8 @@ The important distinction is that any future `after` surface should stay declara
 
 ## Workflow Composition
 
+**Status: implemented.**
+
 Sub-workflows compose through ordinary nodes.
 
 That is the public composition model:
@@ -582,7 +636,7 @@ That is the public composition model:
 - `run` is the executable
 - the executable may be a task or a workflow
 
-Intended shape:
+Current shape:
 
 ```python
 import elan as el
@@ -624,21 +678,25 @@ The child workflow remains reusable because its outward contract is declared onc
 
 The parent does not bind against the child's full execution object. It binds against the child's exported value.
 
+The parent records that exported value under the child workflow's name; child
+internal outputs are not merged into the parent output log. Parent
+`Node.bind_input` may explicitly construct the child's workflow input. Child
+workflows inherit compatible context and policy, and may only narrow an inherited
+policy.
+
 ## Join
 
-`Join` is the first-pass synchronization and reduction primitive.
+**Status: implemented for workflow-wide terminal joins and activation-scoped
+mid-graph joins.**
 
-It is a public graph element.
+`Join` is the synchronization and optional reduction primitive. It supports two
+scope models:
 
-In the first pass, `Join` is only allowed as the reserved `result` node.
+- `result=Join(...)` without `scope` waits for workflow-wide quiescence;
+- a join with explicit `scope` creates one isolated barrier for each activation
+  of the named scope node.
 
-That keeps the model narrow:
-
-- composition happens through sub-workflows
-- branching happens inside those workflows
-- joins close the workflow scope and produce the exported result
-
-Intended shape:
+Current shape:
 
 ```python
 import elan as el
@@ -675,7 +733,7 @@ This computes:
 (a * b) + (c * d)
 ```
 
-`Join` follows these execution rules:
+The workflow-wide form follows these execution rules:
 
 - it waits for the current workflow scope to complete
 - it collects the packets that were explicitly routed to `result`
@@ -700,14 +758,17 @@ result=Join(run=reduce_values)
 ```
 
 In that form, the reducer receives the collected contributions as one value.
+Contribution order follows runtime arrival order.
 
-The first-pass contract is intentionally strict:
+Reducer tasks use normal binding, context injection, scheduling limits, and
+failure propagation. Their raw returns are recorded in `WorkflowRun.outputs`.
+Reducer-less joins add no output entry.
 
-- `Join` is terminal
-- `Join` waits on workflow completion, not on selected internal nodes
-- finer-grained synchronization uses smaller sub-workflows
+The reserved `result=Join(...)` remains terminal. A terminal scoped join requires
+exactly one activation of its scope; repeated scope families should feed a
+separate workflow-wide result join.
 
-This also fits the yield placement rules:
+Join behavior composes with yield placement:
 
 - `yield -> sub_workflow(...)` creates several independent child workflow executions
 - `sub_workflow(yield -> ...)` creates coupled internal branches that may converge through `Join`
@@ -730,6 +791,10 @@ the same join scope on one branch is rejected.
 
 ## Dynamic Execution
 
+**Status: design only. `Expand` and callable `next` do not exist in the current
+runtime. `GraphState` and `WorkflowPolicy.allow_runtime_expansion` are scaffolding
+for this work.**
+
 Dynamic execution extends the graph at runtime.
 
 The graph evolution model is append-only.
@@ -740,19 +805,15 @@ Expansion is also controlled at the workflow level.
 
 A workflow may explicitly allow or forbid dynamic expansion inside its own scope.
 
-Intended shape:
+Proposed policy shape:
 
 ```python
-from elan import BoundaryPolicy, Policy, Workflow
+from elan import Workflow, WorkflowPolicy
 
 
 Workflow(
-    "static_child",
-    policy=Policy(
-        boundaries=BoundaryPolicy(
-            allow_expansion=False,
-        ),
-    ),
+    "dynamic_workflow",
+    policy=WorkflowPolicy(allow_runtime_expansion=True),
     start=...,
     result=...,
 )
@@ -771,7 +832,7 @@ Static continuation still looks like:
 next="revalidate"
 ```
 
-The common dynamic shorthand is a bare callable:
+One proposed dynamic shorthand is a bare callable:
 
 ```python
 next=build_dependencies
@@ -783,7 +844,8 @@ That is equivalent to:
 next=Expand(build_dependencies)
 ```
 
-The explicit `Expand(...)` form is used when the dynamic continuation needs extra metadata, especially a `then` continuation anchor.
+The proposed explicit `Expand(...)` form carries metadata, especially a `then`
+continuation anchor.
 
 Dynamic continuation uses `Expand(...)`:
 
@@ -813,14 +875,14 @@ workflow = Workflow(
 
 `Expand(...)` keeps `next` clean while making the dynamic case explicit.
 
-The builder may return:
+Candidate builder return forms are:
 
 - `None`
 - `Node`
 - a workflow-shaped node fragment
 - `Workflow`
 
-`then` is the static continuation anchor.
+`then` is the proposed static continuation anchor.
 
 That solves the insertion case cleanly:
 
@@ -851,14 +913,19 @@ The structural guardrails for dynamic execution are:
 - valid current graph after each expansion
 - `then` must exist when it is used
 - returned structures are validated as currently materialized
-- `Join` remains restricted to `result`
+- expanded descendants inherit any active join-scope membership
 - dynamic fragments may reference existing static nodes, but may not mutate them
 
-The current design defines the expansion mechanism itself.
-
-Validation rules, guardrails, recursion limits, and other runtime boundaries remain in later work.
+This is not yet an accepted implementation contract. Builder binding, initial
+return types, generated node identity, fragment entry/terminal rules,
+concurrency isolation, join declarations inside fragments, validation atomicity,
+and output/introspection behavior still require a focused design decision.
 
 ## Cycles
+
+**Status: partial scaffolding. Static-cycle detection and the
+`WorkflowPolicy.allow_cycles` gate exist. Safe executable recurrence, visit
+budgets, time budgets, and cycle-specific observability do not.**
 
 Static cycles are part of the graph language.
 
@@ -871,29 +938,30 @@ Dynamic expansion and static cycles solve different problems:
 
 Cycle use is controlled through workflow policy.
 
-Intended shape:
+Current policy shape:
 
 ```python
-from elan import BoundaryPolicy, Policy, Workflow
+from elan import Workflow, WorkflowPolicy
 
 
 Workflow(
     "agent_loop",
     start=...,
     result=...,
-    policy=Policy(
-        boundaries=BoundaryPolicy(
-            allow_cycles=True,
-        ),
-    ),
+    policy=WorkflowPolicy(allow_cycles=True),
 )
 ```
 
-Cycle rules:
+Current rule:
 
 - cycles are invalid unless the workflow policy allows them
-- when cycles are allowed, they remain subject to graph validation and type validation
-- cycle safety is enforced through runtime policy rather than by forbidding recurrence
+
+Enabling the flag currently bypasses static-cycle rejection; it does not provide
+safe termination. The remaining intended rules are:
+
+- allowed cycles remain subject to graph and type validation;
+- cycle safety is enforced through runtime budgets rather than an implicit
+  iteration limit.
 
 The runtime policy surface for cycle safety includes:
 
@@ -909,6 +977,9 @@ That allows one workflow to carry a top-level policy while a sub-workflow reuses
 Static cycles and dynamic expansion use the same guardrail system, but they remain separate graph features.
 
 ## Structured Payloads
+
+**Status: implemented. `@ref` is optional for binding and required only for
+class-level field references.**
 
 Elan supports native structured payloads through Pydantic models.
 
@@ -951,6 +1022,9 @@ If the downstream task expects `UserPayload` itself, the model passes through un
 
 ## Branching
 
+**Status: implemented for exclusive routing, static fan-out, conditional
+multi-routing, and sync/async generator fan-out.**
+
 Branching is any routing form that creates child execution paths.
 
 All branching forms follow the same scope rule:
@@ -965,6 +1039,13 @@ The main branching forms are:
 - conditional multi-routing
 - fan-out
 - yield-based fan-out
+
+Current constraints:
+
+- ref-based `route_on` applies to exclusive routing;
+- routing or yielding directly into an ordinary reserved `result=Node(...)` is
+  unsupported after fan-out; use `result=Join(...)` to collect branches;
+- all statically declared target ids must resolve inside the current workflow.
 
 ### Exclusive Branching
 
@@ -984,7 +1065,7 @@ For structured return models, the same intent may also be expressed through regi
 route_on=RoutePayload.style
 ```
 
-Intended shape:
+Current shape:
 
 ```python
 import elan as el
@@ -1043,7 +1124,7 @@ Duplicate destinations are allowed.
 
 `When(condition, [...])` is also valid and behaves like conditional fan-out to several destinations.
 
-Intended shape:
+Current shape:
 
 ```python
 import elan as el
@@ -1083,7 +1164,7 @@ workflow = Workflow(
 )
 ```
 
-The config form serializes the same idea explicitly:
+The planned config form serializes the same idea explicitly:
 
 ```yaml
 next:
@@ -1105,7 +1186,7 @@ Fan-out uses the `list` form of `next`.
 
 The current node output is copied to each downstream node.
 
-Intended shape:
+Current shape:
 
 ```python
 import elan as el
@@ -1145,7 +1226,7 @@ Yield-based fan-out follows the same routing rules.
 
 Each yielded item is treated like one node output packet and routed independently.
 
-Intended shape:
+Current shape:
 
 ```python
 import elan as el
@@ -1176,7 +1257,12 @@ workflow = Workflow(
 
 ## Config Shape
 
-Code, config files, and API payloads share the same workflow model.
+**Status: design only. No config parser or config-backed workflow model is
+implemented.**
+
+The design goal is for code, config files, and API payloads to share one workflow
+model. The examples below are proposed serialization shapes, not accepted input
+to the current package.
 
 Minimal YAML shape:
 
@@ -1225,7 +1311,7 @@ nodes:
   build_profile:
     run: build_profile
     input:
-      name: $upstream.name
+      name: $input.name
       surname: $input.surname
       locale: $context.locale
       formal: true
@@ -1243,11 +1329,13 @@ after:
 
 ## API Shape
 
-The HTTP API accepts the same workflow spec directly.
+**Status: design only. No HTTP service or run-resource API is implemented.**
+
+The proposed HTTP API accepts the same workflow spec directly.
 
 The API exposes the same workflow model instead of introducing a different orchestration format for HTTP clients.
 
-Suggested endpoints:
+Candidate endpoints:
 
 - `POST /v1/workflows/runs`
 - `GET /v1/workflows/runs/{run_id}`
@@ -1282,7 +1370,7 @@ Example create-run request with input adaptation and context preparation:
       "build_profile": {
         "run": "build_profile",
         "input": {
-          "name": "$upstream.name",
+          "name": "$input.name",
           "surname": "$input.surname",
           "locale": "$context.locale",
           "formal": true
@@ -1320,12 +1408,19 @@ Run response:
 }
 ```
 
-The final run response shape still needs to be updated once the execution and result model is fully locked down.
+The HTTP status, error, activation-history, and output-reference shapes remain
+unresolved. They should be derived from the implemented `WorkflowRun` contract
+rather than replacing it with unrelated semantics.
 
 ## Production Runtime Design Notes
 
-These notes capture production runtime design direction beyond the core workflow authoring model.
-They are split between decisions already taken and open topics that still need requirements-driven refinement.
+**Status: exploratory design only. The current runtime is in-process and
+in-memory. There is no server package, worker protocol, Taskiq backend,
+persistence backend, deployment model, or durable run API.**
+
+These notes capture production runtime direction beyond the core workflow
+authoring model. They are proposals to evaluate, not commitments made by the
+current implementation.
 
 Design choices in this area should be evaluated against Elan's existing goals:
 
@@ -1336,12 +1431,13 @@ Design choices in this area should be evaluated against Elan's existing goals:
 - the same workflow should be able to grow from local usage to production usage without being rewritten
 - the model should work for data workflows, agent workflows, service orchestration, and mixed workloads
 
-### Current Decisions
+### Provisional Design Direction
 
 #### Production Runtime Model
 
-The first production execution path uses a server plus worker model with Taskiq as the first execution backend.
-This is an implementation choice for distributed task execution, not the semantic owner of Elan workflows.
+One prior proposal uses a server plus worker model with Taskiq as the first
+execution backend. That choice has not been implemented or validated and should
+be revisited against requirements before it becomes a dependency.
 
 Elan owns:
 
@@ -1354,7 +1450,8 @@ Elan owns:
 - result recording
 - scheduling decisions
 
-Taskiq is used to run selected activations outside the orchestrator process.
+Under that proposal, Taskiq runs selected activations outside the orchestrator
+process.
 
 #### Activation Execution Contract
 
@@ -1380,7 +1477,11 @@ Elan remains responsible for recording completion and advancing routing, joins, 
 
 #### Task Identity And Registration
 
-Remote execution uses registered task names.
+The current local registry derives a canonical key from the Python import path
+and optionally accepts `@task(alias="...")`. Remote execution would require a
+stable naming contract beyond that current local behavior.
+
+The production proposal uses registered task names.
 Elan should expose its own task identity and registration surface, but keep it close to the Taskiq and Celery mental model so developers can rely on familiar behavior.
 
 Task names are Elan task names.
@@ -1391,17 +1492,21 @@ Tasks may be referenced locally by Python callable or remotely by stable name:
 - `Node(run=extract_metadata)`
 - `Node(run="content.extract_metadata")`
 
-The default task name should be derived from the Python import path for convenience.
-Explicit task names should be supported and recommended for production:
+The default remote task name could continue to derive from the Python import
+path. A dedicated explicit-name surface is not implemented; the current public
+override is `alias`:
 
-- `@task(name="content.extract_metadata")`
+- `@task(alias="content.extract_metadata")`
 
 Workers register the task names they can execute.
 The orchestrator should not need to import task implementation code just to dispatch remote activations by name.
 
 #### Result And Value Reference Model
 
-Remote activation results should be represented as addressable value references by default.
+This section describes a proposed remote value-reference model. It is distinct
+from the implemented `@ref` model-field registry and source namespaces.
+
+Remote activation results could be represented as addressable value references by default.
 Workers should not have to send full returned values back through the orchestrator unless the workflow runtime needs to materialize them.
 
 Elan should distinguish:
@@ -1431,7 +1536,8 @@ This keeps task code ordinary while allowing distributed execution to keep large
 
 #### Activation Status Model
 
-Activation status stays thin at first:
+Current local activations use `queued`, `running`, and `settled`. A production
+outcome model would need to distinguish:
 
 - queued
 - running
@@ -1443,7 +1549,8 @@ Activation status stays thin at first:
 
 #### Persistence Boundary
 
-Elan persists the current durable state needed to continue a run:
+No run state is currently persisted. A durable runtime would need to persist at
+least:
 
 - run identity
 - workflow identity
@@ -1610,32 +1717,31 @@ Questions to refine:
 
 ### Composition
 
-Composition is the topic of building larger systems from smaller workflows.
+Local composition is already implemented through `Node(run=child_workflow)`, an
+explicit child result boundary, compatible context inheritance, and inherited
+workflow policy. The remaining production topic is how that relationship is
+represented across deployment, durability, failure, and observability
+boundaries.
 
 Requirements to satisfy:
 
-- a child workflow should expose a clear result boundary
-- parent workflows should not need to know every internal node of the child
-- composed workflows should preserve task reuse and graph readability
-- context and input crossing should be explicit enough to reason about
+- preserve the implemented result, input, context, and policy contracts
 - composition should work with deployment, reliability, durability, and observability concerns
 - composition should not become a shortcut for hiding arbitrary orchestration side effects
 
 Shapes to evaluate:
 
-- reusable workflow units
-- `Node(run=child_workflow)`
-- workflow fragments
-- nested runs
-- inline expansion
-- shared runtime and deployment concerns across composed workflows
+- nested production run identities
+- inline versus separately deployed child execution
+- shared versus isolated persistence and retry scopes
+- workflow fragments as a separate future feature
 
 Questions to refine:
 
 - how parent and child workflow runs are represented
-- how context, inputs, and results cross workflow boundaries
 - how composition appears in observability and failure handling
-- whether composition should be purely runtime composition or also graph materialization
+- whether a child can be deployed or versioned independently without changing
+  local composition semantics
 
 ### Practical Use Cases
 

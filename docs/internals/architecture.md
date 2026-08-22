@@ -2,7 +2,8 @@
 
 ## Overview
 
-Elan is built around a single workflow model shared across:
+Elan is built around one Python workflow model today, with a design goal of
+sharing that model across:
 
 - pure Python workflow definitions
 - config-defined workflows
@@ -16,9 +17,11 @@ for code, config, and runtime behavior.
 The current public vocabulary is:
 
 - `Workflow`: the workflow definition
-- `task`: a registered executable callable
+- `Task` / `task`: a registered executable callable and decorator
 - `Node`: the configured use of a task or workflow inside a graph
-- `run`: the execution of a workflow
+- `Join`: workflow-wide or activation-scoped synchronization
+- `WorkflowRun`: the result, outputs, and final context of one run
+- `WorkflowPolicy`: per-run concurrency and graph-policy controls
 
 This keeps a clear separation between:
 
@@ -37,7 +40,7 @@ Each node may define:
 - how its outputs are exposed
 - where it routes next
 
-The same model is representable in:
+The current model is implemented in Python. Planned representations include:
 
 - Python
 - YAML
@@ -55,7 +58,7 @@ Workflow-level input and output behavior is defined by the graph model:
 - node input mapping may bind from workflow input or prior node output
 - node output mapping unpacks return values into named fields
 - Python uses `...` as the discard marker in output mappings
-- config formats use `null` as the discard marker
+- a future config representation may use `null` as the discard marker
 
 Automatic binding is the default in pure Python when the previous node output
 matches the next node signature cleanly.
@@ -80,36 +83,41 @@ which named output field selects the route.
 
 Elan treats dynamic graph behavior as part of the core model.
 
-This includes:
+Implemented dynamic-cardinality behavior includes:
 
 - branching
 - fan-out
 - yield-based fan-out
+
+Planned graph-evolution behavior includes:
+
 - graph expansion during execution
 - cycles and recurrence
 
-Loops are not a separate primitive at the core level. A loop is a cycle in the
-graph, and cycle safety is handled through runtime safeguards rather than a
-separate syntax.
+Static-cycle detection and a policy opt-in exist today. Safe executable
+recurrence still requires runtime safeguards and budgets; loops are not yet a
+supported production feature.
 
 ## Synchronization
 
 Synchronization is centered on workflow scopes.
 
-In the dynamic case, a barrier is effectively a workflow wrapper with join
-semantics. The meaningful thing to wait on is not a flat list of descendant
-tasks, but the completion of a branch or sub-workflow scope.
+Synchronization is represented directly by `Join`. A workflow-wide result join
+waits for the workflow to become quiescent. A mid-graph join names a scope node,
+and each activation of that node creates an isolated barrier for its descendant
+branch family.
 
 This means:
 
 - sub-workflow completion provides implicit synchronization
-- explicit barrier behavior is still possible when synchronization needs to be
-  represented directly in the graph
+- workflow-wide joins collect explicitly routed terminal contributions
+- activation-scoped joins can reduce and continue in the middle of a graph
 
 ## Design Direction
 
 The design stays centered on a small number of consistent primitives.
 
-The intent is to let simple workflows stay simple, while allowing more advanced
-behavior such as branching, fan-out, recursive barriers, and dynamic graph
-expansion to emerge from the same underlying model.
+The intent is to let simple workflows stay simple, while allowing implemented
+behavior such as branching, fan-out, scoped barriers, and composition to share
+the same model. Runtime graph expansion and guarded recurrence remain future
+directions.

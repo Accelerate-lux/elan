@@ -4,10 +4,12 @@ This page captures the exact public runtime semantics that matter when reading E
 
 ## `WorkflowRun.result`
 
-- if the workflow defines a reserved `result` node, `WorkflowRun.result` is the exported value of that node
+- if the workflow defines a reserved `result` node, `WorkflowRun.result` is that node's raw return; `bind_output` does not alter the exported result
 - if the workflow defines `result=Join(...)`, `WorkflowRun.result` is the finalized join value
 - if no reserved `result` is defined and the workflow is linear, `WorkflowRun.result` falls back to the last terminal output
 - if the workflow uses branching forms and does not define reserved `result`, `WorkflowRun.result` is `None`
+- an ordinary reserved result node may currently declare `next`; execution continues while the recorded result remains unchanged
+- a reserved result join is enforced as terminal
 
 ## `WorkflowRun.outputs`
 
@@ -40,7 +42,8 @@ Branched example:
 }
 ```
 
-Join reduction itself is not recorded in `run.outputs`.
+When a join has a reducer, its raw return is recorded under the reducer task name
+on the join owner branch. Reducer-less joins do not add an output entry.
 
 ## Binding behavior
 

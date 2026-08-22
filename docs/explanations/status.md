@@ -20,12 +20,14 @@ This page summarizes the current public implementation status of Elan.
 - mid-graph join reduction and continuation
 - workflow composition through `Node(run=child_workflow)`
 - concurrent execution of sibling runnable branches
+- static-cycle detection and the `WorkflowPolicy.allow_cycles` gate
+- per-run concurrency limits through `WorkflowPolicy.max_parallel_tasks`
 
 ## Not implemented yet
 
 - dynamic expansion
 - callable continuation growth
-- cycles and broader dynamic graph materialization
+- safe executable cycles and broader dynamic graph materialization
 - arbitrary user-managed barriers outside workflow graph structure
 - post-execution workflow hooks or context update phases
 

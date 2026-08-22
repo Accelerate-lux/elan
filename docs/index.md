@@ -4,20 +4,21 @@ Elan is a workflow orchestration engine for AI agents, data orchestration, and m
 
 Elan separates tasks from orchestration. Tasks stay plain Python, while routing, branching, joins, and workflow structure are defined explicitly in the workflow layer.
 
-It supports fine-grained routing, branching, synchronization, and dynamic execution within the same programming model.
+It supports fine-grained routing, branching, synchronization, composition, and
+yield-driven runtime multiplicity within the same programming model.
 
 ## Highlights
 
 - **One Tool for Data and Agents:** Build data workflows, AI agents, and mixed systems in one orchestration model.
 - **Plain Python, Reusable Tasks:** Keep business logic in plain Python functions that stay easy to reuse, test, and compose across workflows.
-- **Fine-Grained Workflow Control:** Express fan-out, conditional routing, value-based branching, joins, and dynamic execution directly in the workflow.
+- **Fine-Grained Workflow Control:** Express fan-out, conditional routing, value-based branching, joins, and yield-driven runtime multiplicity directly in the workflow.
 - **Simple Mental Model:** Keep tasks and orchestration separate so workflow structure stays readable.
-- **Unified Execution Model:** Use the same orchestration model across Python code, YAML/JSON config, and HTTP API payloads.
+- **One Model, Growing Surface:** Author workflows in Python today, with config and HTTP representations planned around the same semantics.
 - **Built for Mixed Workloads:** Use the same model for data workflows, AI agents, service orchestration, and human review steps.
 - **First-Class Composability:** Smaller workflows compose cleanly into larger ones with explicit `result` boundaries.
 - **Predictable Results:** Keep workflow outputs, result boundaries, and synchronization explicit.
 - **DAG Opt-In:** Use DAG-shaped workflows when they fit, without making DAG constraints the center of the model.
-- **Native Cycles:** Support loops and recursive agent patterns as part of the workflow model.
+- **Cycle-Aware Foundation:** Detect static cycles and govern them through policy while safe recurrence controls remain planned.
 - **Type-Safe Data Flow:** Use Python type hints and Pydantic models for predictable data movement between steps.
 - **Testable by Design:** Keep business logic easy to test in isolation.
 

@@ -27,7 +27,6 @@ The broader dynamic model still points toward:
 
 - runtime graph expansion
 - callable continuations
-- composition
 - cycles with guardrails
 
 ## Related reading

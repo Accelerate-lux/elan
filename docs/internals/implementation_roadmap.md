@@ -1,5 +1,13 @@
 # TDD Feature Roadmap From The Current Runtime Foundation
 
+**Status: historical roadmap.** Phases 1 through 8 were used to sequence the
+initial runtime work; everything through composition is now implemented, along
+with activation-scoped joins, workflow subclass authoring, context inheritance,
+and scheduler concurrency limits added afterward. Dynamic expansion and safe
+cycle execution remain unimplemented. Use
+[Status](../explanations/status.md) for the current inventory and
+[Interface Design](interface_design.md) for current versus proposed contracts.
+
 ## Summary
 
 The current runtime foundation is sufficient to stop refactoring internals and switch to feature delivery under strict TDD. The execution stack is now in the right shape:
@@ -235,5 +243,6 @@ Usage rule:
   - `SchedulerState`
   - `GraphState`
 - No new feature work goes back into `Workflow.run()` except thin delegation changes.
-- Scheduler concurrency is currently unlimited for all runnable activations.
-- Concurrency limits, priorities, and graph-execution ordering remain a later scheduler-improvement phase rather than part of the current branching/join slices.
+- Scheduler concurrency is unlimited by default and can be bounded with
+  `WorkflowPolicy.max_parallel_tasks`.
+- Priorities and graph-execution ordering remain later scheduler improvements.

@@ -10,14 +10,14 @@ Designed with developer experience in mind, Elan bridges this gap by offering a 
 
 - **One Tool for Data and Agents:** Build data workflows, AI agents, and mixed systems in one orchestration model.
 - **Plain Python, Reusable Tasks:** Keep business logic in plain Python functions that stay easy to reuse, test, and compose across workflows.
-- **Fine-Grained Workflow Control:** Express fan-out, conditional routing, value-based branching, joins, and dynamic execution directly in the workflow.
+- **Fine-Grained Workflow Control:** Express fan-out, conditional routing, value-based branching, joins, and yield-driven runtime multiplicity directly in the workflow.
 - **Simple Mental Model:** Keep tasks and orchestration separate so workflow structure stays readable.
-- **Unified Execution Model:** Write workflows in pure Python, YAML/JSON config, or HTTP API payloads while keeping one orchestration model and semantics.
+- **One Model, Growing Surface:** Author workflows in Python today, with config and HTTP representations planned around the same semantics.
 - **Built for Mixed Workloads:** Use the same model for data workflows, AI agents, service orchestration, and human review steps.
 - **First-Class Composability:** Compose smaller workflows into larger systems with explicit `result` boundaries.
 - **Predictable Results:** Keep workflow outputs, result boundaries, and synchronization explicit.
 - **DAG Opt-In:** Use DAG-shaped workflows when they fit, without making DAG constraints the center of the model.
-- **Native Cycles:** Support loops and recursive agent patterns as part of the workflow model.
+- **Cycle-Aware Foundation:** Detect static cycles and govern them through policy while safe recurrence controls remain planned.
 - **Type-Safe Data Flow:** Use Python type hints and Pydantic models for predictable data movement between steps.
 - **Testable by Design:** Keep business logic easy to test in isolation.
 
@@ -51,15 +51,15 @@ Building data pipelines and AI agents usually means stitching together different
 
 Elan is a multi-purpose orchestrator designed to handle both. Built with developer experience and flexibility at its core, it is easy to get started with for simple tasks, yet powerful enough for complex dynamic use cases without introducing heavy boilerplate. This means you no longer need to learn and maintain entirely different tools for your data pipelines and your AI agents.
 
-- **One Tool for Data and Agents:** Whether you are orchestrating standard data workflows or complex, recursive agent loops, Elan provides the exact same predictable, graph-native interface.
-- **Runtime Graph Materialization:** Unlike tools that just do dynamic mapping or traverse a pre-compiled state graph, Elan can materialize entirely new workflow structures into the active graph at runtime.
+- **One Tool for Data and Agents:** Whether you are orchestrating standard data workflows or branching agent processes, Elan provides the same predictable, graph-native interface.
+- **Runtime Graph Foundation:** Elan executes against a run-local graph designed to support future append-only graph materialization; general runtime expansion is not implemented yet.
 - **Strict Task/Orchestration Separation:** Tasks are pure Python functions. Routing is declared explicitly at the workflow level, making it easy to test your business logic and compose smaller workflows together.
 
 | Capability | Traditional DAGs | Agent Runtimes | Elan |
 | :--- | :--- | :--- | :--- |
 | **Runtime Multiplicity** | Strong | Strong | **Native** |
 | **Runtime Control Flow** | Weak / Moderate | Strong | **Native** |
-| **Runtime Graph Materialization** | N/A | Weak | **Native** |
+| **Runtime Graph Materialization** | N/A | Weak | **Planned** |
 | **Explicit Routing** | Moderate | Strong | **Native** |
 | **Composition** | Moderate | Moderate | **Native** |
 

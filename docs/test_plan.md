@@ -347,7 +347,8 @@ What it tests:
 
 Status: ✅
 Source: [tests/test_join_result.py](../tests/test_join_result.py),
-[tests/test_join_scope.py](../tests/test_join_scope.py)
+[tests/test_join_scope_mechanics.py](../tests/test_join_scope_mechanics.py),
+[tests/test_join_scope_shapes.py](../tests/test_join_scope_shapes.py)
 
 What it tests:
 
@@ -358,3 +359,8 @@ What it tests:
 - concurrent and nested scope instances remain isolated
 - non-contributing sibling branches are still awaited
 - reducer returns are recorded in `WorkflowRun.outputs`
+- scoped-join mechanics and invalid states are isolated from graph-shape scenarios
+- abstract graph scenarios cover uneven depths, diamonds, conditional and nested
+  fan-out, generators, repeated activations, nested/sequential/sibling scopes,
+  multi-stage dynamic branches, local-to-global joins, continuation fan-out,
+  and child-workflow composition

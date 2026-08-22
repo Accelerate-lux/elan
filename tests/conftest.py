@@ -108,3 +108,19 @@ def mock_task_factory():
         return wrapped_task
 
     return _wrap
+
+
+@pytest.fixture()
+def spy_tasks():
+    def _spy(*registered_tasks):
+        calls = Mock()
+        for registered_task in registered_tasks:
+            task_name = registered_task.name
+            mock = Mock(wraps=registered_task.fn)
+            mock.__name__ = registered_task.fn.__name__
+            registered_task.fn = mock
+            registered_task.mock = mock
+            calls.attach_mock(mock, task_name)
+        return calls
+
+    return _spy

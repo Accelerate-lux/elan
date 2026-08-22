@@ -83,16 +83,16 @@ Open questions:
 
 Examples:
 
-- malformed returned `Node`
 - malformed returned fragment
-- invalid returned `Workflow`
-- returned structure references missing nodes
-- returned structure violates current graph rules
+- builder returns a value other than `Fragment`
+- fragment references missing nodes
+- candidate combined graph violates current graph rules
+- fragment identity collides after run-local namespacing
 
 Current direction:
 
 - detected when the expansion result is materialized
-- invalid returned structure is rejected before append
+- the complete candidate graph is rejected atomically before append or scheduling
 
 Open questions:
 

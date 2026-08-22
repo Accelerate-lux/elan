@@ -49,16 +49,15 @@ It validates structural integrity independently of value types.
 The system must detect at least:
 
 - missing `start`
-- missing `result`
 - unknown `start` target
 - unknown `next` target
-- stray nodes that are never reachable
+- stray nodes that cannot be reached statically or through an allowed expansion
 - invalid routing targets
-- invalid use of `Join` outside the reserved `result` node
-- invalid use of `Expand(...)` or callable `next` in workflows where expansion is not allowed
+- invalid `Join` placement or scope declarations
+- invalid use of `Expand(...)` in workflows where expansion is not allowed
 - cycles in workflows where cycles are not allowed
 - `result` nodes that are not terminal
-- child workflows that do not define a valid `result`
+- child workflows that do not expose a valid result contract
 
 The validator also catches shape mismatches in workflow structure, for example:
 
@@ -142,27 +141,25 @@ The validator must verify:
 The validator must verify:
 
 - that `Expand(...)` is used in a valid continuation position
-- that `Expand(...)` and callable `next` are only used in workflows that allow expansion
+- that `Expand(...)` is only used in workflows that allow expansion
 - that cycles are only used in workflows that allow cycles
-- that `then`, when present, refers to a valid existing node in the current known graph
 - that the expansion builder input is compatible with the current node's exposed output when that can be known statically
+- that the builder's declared return is `Fragment`
 
-If the expansion builder returns a fully materialized structure, Elan must validate that current structure as inserted:
+When the expansion builder returns its materialized `Fragment`, Elan must
+construct and validate the complete candidate graph before append.
 
-- returned `Node`
-- returned workflow-shaped fragment
-- returned `Workflow`
+That atomic validation must check, when possible:
 
-That validation must check, when possible:
+- the fragment's declared entry;
+- graph integrity of the combined existing graph and materialized fragment;
+- internal references inside the fragment;
+- compatibility of direct references from the fragment into existing static nodes;
+- run-local node identity and collision freedom;
+- join scope and policy compatibility.
 
-- graph integrity of the materialized structure
-- internal references inside the returned structure
-- compatibility of any direct references from the returned structure into the existing static graph
-- correct use of `then` when the returned structure relies on it as a continuation anchor
-
-The validator must not require every returned fragment to use `then`.
-
-A returned fragment is valid if it already routes correctly into the existing graph, or if `then` supplies the required continuation anchor.
+The fragment owns all continuation edges. The initial contract has no implicit
+barrier, callable `next`, or `then` continuation.
 
 ### Join Contracts
 
@@ -194,13 +191,12 @@ This is required for:
 The runtime validator must verify:
 
 - that yielded packets are compatible with the downstream receiving contract
-- that dynamically materialized workflows still satisfy graph integrity rules
-- that dynamically materialized nodes and fragments satisfy graph integrity rules in their current materialized form
+- that a dynamically materialized fragment produces a valid combined graph
 - that allowed cycles remain within the active cycle budgets
 - that runtime branch contributions to `Join` are compatible with the join reducer
 - that runtime child workflow boundaries still satisfy the parent contract
 
-If a returned node or fragment itself contains `Expand(...)`, Elan must validate:
+If nested fragment expansion is added later, Elan must validate:
 
 - the current materialized graph immediately
 - the nested dynamic continuation later, when that nested expansion materializes

@@ -44,23 +44,26 @@ Elan does not allow an expansion to create a temporarily broken graph and rely o
 
 If a returned structure is invalid now, it is invalid.
 
-### 3. `then` Must Exist When Used
+### 3. A Fragment Owns Its Entry And Routes
 
-If `Expand(builder, then="node_name")` is used, that `then` target must already exist in the known graph.
+An expansion builder returns one `Fragment` with a declared entry node.
 
-`then` is a continuation anchor, not a speculative future reference.
+Fragment nodes declare their own internal routes and any routes into existing
+static nodes. The runtime does not infer continuation edges or attach an
+implicit barrier.
 
-### 4. Returned Structures Are Validated As Currently Materialized
+Callable `next` and `then`/`finally`-style expansion continuations are deferred
+beyond the initial contract.
 
-When an expansion builder returns:
+### 4. Candidate Graph Validation Is Atomic
 
-- `Node`
-- workflow-shaped node fragment
-- `Workflow`
+The builder return is not appended incrementally. Elan first assigns run-local
+identity and constructs a candidate graph containing the existing graph plus the
+complete fragment.
 
-Elan validates that structure as it exists now.
-
-If that returned structure itself contains nested `Expand(...)`, Elan validates the current materialized structure now and validates the nested expansion later, when it materializes.
+Elan validates the candidate as one graph. If validation fails, none of the
+fragment is appended or scheduled. Returning `Node`, `Workflow`, or a union of
+structural forms is outside the initial contract.
 
 ### 5. Expanded Work Inherits Active Join Scopes
 
@@ -75,7 +78,7 @@ design question and must be resolved before expansion is implemented.
 
 ### 6. Dynamic Fragments May Reference Existing Static Nodes, But May Not Mutate Them
 
-Returned nodes and fragments may route into already existing static nodes.
+A returned fragment may route into already existing static nodes.
 
 That is valid.
 
@@ -159,16 +162,14 @@ Elan also needs explicit controls for what kinds of dynamic execution are allowe
 
 Core toggles:
 
-- whether a given workflow scope allows `Expand(...)` or callable `next`
+- whether a given workflow scope allows `Expand(...)`
 - whether a given workflow scope allows static cycles
 - whether nested `Expand(...)` is allowed
 - whether recursive dynamic expansion is allowed
-- whether direct fragment insertion is allowed
-- whether returned `Workflow` expansion is allowed
 
 The workflow-level expansion toggle is especially important because it enables static validation:
 
-- workflows that set `allow_expansion=False` can be checked statically for forbidden dynamic continuation sites
+- workflows that set `allow_runtime_expansion=False` can be checked statically for forbidden expansion sites
 - parent workflows can disable expansion in child scopes without removing dynamic execution globally
 
 This controls graph evolution in sub-workflows without disabling dynamic execution everywhere.
@@ -226,13 +227,13 @@ Boundary guardrails control what a dynamic expansion is allowed to return and ho
 The boundary policy surface is:
 
 - whether expansion is allowed at all
-- whether expansion may return `Node`
-- whether expansion may return workflow-shaped fragments
-- whether expansion may return `Workflow`
 - whether expansions may reference existing static nodes directly
-- whether `then` anchors are allowed
 - whether nested `Expand(...)` is allowed
 - whether recursive dynamic expansion is allowed
+
+The initial structural return contract is not a policy choice: an expansion
+returns exactly one `Fragment`. Bare nodes, workflows, callable `next`, and
+`then` continuations are deferred rather than alternate modes.
 
 These rules constrain dynamic graph evolution without changing the graph language itself.
 
@@ -314,9 +315,9 @@ runtime behavior:
 
 - append-only materialization
 - no rewriting of already materialized nodes or routes
-- valid current graph after each expansion
-- `then` must exist when used
-- returned structures are validated as currently materialized
+- a fragment declares its entry and owns all of its routes
+- the candidate combined graph is validated and appended atomically
+- concurrent expansion activations receive isolated run-local identity
 - expanded descendants inherit active join-scope membership
 - dynamic fragments may reference existing static nodes, but may not mutate them
 

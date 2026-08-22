@@ -26,13 +26,14 @@ This page summarizes the current public implementation status of Elan.
 ## Not implemented yet
 
 - dynamic expansion
-- callable continuation growth
+- callable continuation shorthand and expansion lifecycle continuations
 - safe executable cycles and broader dynamic graph materialization
 - arbitrary user-managed barriers outside workflow graph structure
 - post-execution workflow hooks or context update phases
 
 ## Current behavioral caveats
 
+- ordinary reserved result nodes do not yet enforce the accepted terminality contract
 - join contribution order follows runtime arrival order
 - reducers should be order-agnostic unless completion timing is intentionally constrained
 - scheduler concurrency is unlimited unless `WorkflowPolicy.max_parallel_tasks` is set

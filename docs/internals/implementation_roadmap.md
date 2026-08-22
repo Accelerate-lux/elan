@@ -189,8 +189,9 @@ Eighth slice.
 
 Implementation goal:
 - `Expand(...)`
-- callable `next`
+- one `Fragment` return contract with fragment-owned entry and routing
 - append-only graph growth through `GraphState`
+- atomic combined-graph validation before append
 - policy-controlled cycles and expansion behavior
 
 Test work:

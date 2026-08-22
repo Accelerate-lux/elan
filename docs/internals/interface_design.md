@@ -18,9 +18,10 @@ Current implementation status:
   fan-out, yield fan-out, composition, workflow-wide joins, activation-scoped
   joins, concurrent scheduling, and basic workflow policy;
 - **partial:** graph/type validation and static-cycle governance;
-- **planned:** post-execution hooks, runtime graph expansion, callable `next`,
-  safe executable cycles, config/API parity, remote execution, persistence,
-  reliability controls, and observability.
+- **planned:** post-execution hooks, explicit runtime graph expansion, safe
+  executable cycles, config/API parity, remote execution, persistence,
+  reliability controls, and observability. Callable `next` and expansion
+  lifecycle continuations are deferred beyond the initial expansion contract.
 
 For the concise feature inventory, see
 [Status](../explanations/status.md). Exact runtime behavior lives in
@@ -74,13 +75,14 @@ That is the baseline shape Elan preserves.
 
 ## Workflows
 
-**Status: implemented.**
+**Status: implemented except for terminality validation on ordinary reserved
+result nodes.**
 
 Every Elan workflow has one required graph entry point and one optional reserved
 export node:
 
 - `start`: the first node to execute
-- `result`: the reserved node whose raw return becomes the workflow export
+- `result`: the terminal reserved node whose raw return becomes the workflow export
 
 `result` may be an ordinary task/node/workflow or a `Join`.
 
@@ -129,10 +131,15 @@ workflow = Workflow(
 
 If the workflow defines `result`, the exported value is available on `WorkflowRun.result`.
 
-`result=Join(...)` is enforced as terminal. An ordinary reserved result node is
-not currently forced to be terminal: if it declares `next`, execution continues
-while `WorkflowRun.result` retains that result node's raw return. Whether the
-declaration should instead be rejected remains an API decision.
+The accepted contract is that `result` is always terminal, whether declared as
+an ordinary node or as a `Join`. Declaring `next` on either form is invalid and
+must be rejected when the workflow is constructed. Epilogue work belongs before
+`result` or in a future explicit lifecycle primitive; `result` is not an export
+checkpoint in the middle of a graph.
+
+The runtime currently enforces this rule for `result=Join(...)` only. An
+ordinary reserved result node can still declare and follow `next`; that is an
+implementation gap, not the intended contract.
 
 For a single-node workflow, `start` may point directly to `result`.
 
@@ -791,9 +798,9 @@ the same join scope on one branch is rejected.
 
 ## Dynamic Execution
 
-**Status: design only. `Expand` and callable `next` do not exist in the current
-runtime. `GraphState` and `WorkflowPolicy.allow_runtime_expansion` are scaffolding
-for this work.**
+**Status: accepted initial design, not implemented. `Expand` and `Fragment` do
+not exist in the current runtime. `GraphState` and
+`WorkflowPolicy.allow_runtime_expansion` are scaffolding for this work.**
 
 Dynamic execution extends the graph at runtime.
 
@@ -822,104 +829,68 @@ Workflow(
 This matters for both execution and validation:
 
 - it gives users a clean way to disable expansion in sub-workflows
-- it lets Elan reject `Expand(...)` and callable `next` statically when expansion is not allowed in that workflow
+- it lets Elan reject `Expand(...)` statically when expansion is not allowed in that workflow
 
 Dynamic expansion belongs to `next`.
 
-Static continuation still looks like:
+The initial contract uses the explicit `Expand(...)` form only:
 
 ```python
-next="revalidate"
-```
-
-One proposed dynamic shorthand is a bare callable:
-
-```python
-next=build_dependencies
-```
-
-That is equivalent to:
-
-```python
-next=Expand(build_dependencies)
-```
-
-The proposed explicit `Expand(...)` form carries metadata, especially a `then`
-continuation anchor.
-
-Dynamic continuation uses `Expand(...)`:
-
-```python
-import elan as el
-from elan import Expand, Node, Workflow
+from elan import Expand, Fragment, Node, Workflow
 
 
-@el.task
-def validate():
-    ...
-
-
-def build_dependencies(...) -> Workflow | dict[str, Node] | Node | None:
+def build_dependencies(plan: Plan) -> Fragment:
     ...
 
 
 workflow = Workflow(
     "dynamic_example",
     start=Node(
-        run=validate,
-        next=Expand(build_dependencies, then="revalidate"),
+        run=create_plan,
+        next=Expand(build_dependencies),
     ),
-    revalidate=Node(run=validate),
+    publish=publish,
 )
 ```
 
-`Expand(...)` keeps `next` clean while making the dynamic case explicit.
+The builder is orchestration code, not a scheduled `Task`. It builds from the
+expanding node's emitted value and returns exactly one `Fragment`; returning a
+bare `Node`, `Workflow`, or union of structural forms is outside the initial
+contract.
 
-Candidate builder return forms are:
+The accepted fragment semantics are:
 
-- `None`
-- `Node`
-- a workflow-shaped node fragment
-- `Workflow`
+- a fragment declares one entry node;
+- its nodes own their complete routing, including edges to other fragment nodes
+  and existing nodes in the static graph;
+- the current branch enters the fragment through its declared entry;
+- a fragment path whose node has no `next` terminates normally;
+- expansion creates no implicit continuation or barrier;
+- synchronization remains explicit through `Join`.
 
-`then` is the proposed static continuation anchor.
-
-That solves the insertion case cleanly:
-
-- the expansion may append nodes before an already-declared continuation
-- the continuation node is not stray, because it is referenced statically through `then`
-- the runtime appends the materialized continuation fragment and wires its terminal continuation to `then`
-
-This allows both:
-
-- whole workflow generation
-- direct expansion of the current local workflow scope without forcing a sub-workflow boundary every time
-
-Dynamic graph validation follows the same incremental rule as the execution model:
-
-- Elan validates the graph as it is currently materialized
-- a returned fragment may route directly to existing static nodes
-- if the returned structure does not reference an existing continuation itself, `then` provides the continuation anchor
-- if the returned structure itself contains `Expand(...)`, that nested dynamic continuation is validated later, when it materializes
-
-So the validator does not try to prove the entire future graph upfront.
-
-It validates the known current graph and defers only the parts that are still genuinely dynamic.
+Appending a fragment is atomic. The runtime first assigns run-local identity,
+constructs the candidate combined graph, and validates that graph. Only a valid
+candidate is committed to `GraphState` and scheduled. Rejection leaves the
+materialized graph unchanged.
 
 The structural guardrails for dynamic execution are:
 
 - append-only materialization
 - no rewriting of already materialized nodes or routes
-- valid current graph after each expansion
-- `then` must exist when it is used
-- returned structures are validated as currently materialized
+- one valid combined graph after each atomic append
+- run-local namespacing isolates concurrent activations of the same expansion
+- a fragment owns its entry and all outgoing routes
 - expanded descendants inherit any active join-scope membership
 - dynamic fragments may reference existing static nodes, but may not mutate them
 
-This is not yet an accepted implementation contract. Builder binding, initial
-return types, generated node identity, fragment entry/terminal rules,
-concurrency isolation, join declarations inside fragments, validation atomicity,
-and output/introspection behavior still require a focused design decision.
+Bare callable `next` and a `then`/`finally`-style expansion continuation are
+explicitly deferred. The initial `Expand` contract does not reserve their
+syntax or imply their eventual semantics.
+
+Still open: the concrete `Fragment` authoring surface, builder binding details,
+generated node naming, declaration-time treatment of static nodes reachable
+only through future fragments, joins and nested expansion inside fragments,
+type validation, and output/introspection behavior.
 
 ## Cycles
 

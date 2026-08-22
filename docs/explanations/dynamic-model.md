@@ -25,9 +25,12 @@ Today, the runtime already supports:
 
 The broader dynamic model still points toward:
 
-- runtime graph expansion
-- callable continuations
+- explicit `Expand(...)` returning a fragment-owned valid graph addition
+- atomic, append-only validation and materialization
 - cycles with guardrails
+
+Callable continuation shorthand and expansion lifecycle continuations are
+deferred beyond the initial expansion contract.
 
 ## Related reading
 

@@ -8,8 +8,12 @@ This page captures the exact public runtime semantics that matter when reading E
 - if the workflow defines `result=Join(...)`, `WorkflowRun.result` is the finalized join value
 - if no reserved `result` is defined and the workflow is linear, `WorkflowRun.result` falls back to the last terminal output
 - if the workflow uses branching forms and does not define reserved `result`, `WorkflowRun.result` is `None`
-- an ordinary reserved result node may currently declare `next`; execution continues while the recorded result remains unchanged
 - a reserved result join is enforced as terminal
+
+Known specification gap: an ordinary reserved result node may currently declare
+`next`; execution continues while the recorded result remains unchanged. The
+accepted contract requires every reserved result form to be terminal and the
+workflow constructor to reject this declaration.
 
 ## `WorkflowRun.outputs`
 

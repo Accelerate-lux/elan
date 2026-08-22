@@ -50,7 +50,10 @@ continuation routing, nested scopes, and non-contributing sibling branches.
 
 ### Phase 9. Dynamic Execution And Expansion
 
-This phase covers callable `next`, `Expand(...)`, append-only graph growth, direct node/fragment/workflow expansion, continuation anchors through `then`, and incremental validation of materialized graph segments.
+This phase covers explicit `Expand(...)`, a single `Fragment` return contract,
+fragment-owned entry and routing, run-local identity, append-only graph growth,
+and atomic validation of the combined graph before append. Callable `next`,
+alternate structural return forms, and `then` continuations are deferred.
 
 ### Phase 10. Cycles And Policy Guardrails
 

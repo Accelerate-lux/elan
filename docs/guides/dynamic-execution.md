@@ -42,16 +42,21 @@ The generator task is recorded once in `WorkflowRun.outputs` with the collected
 yielded items. Downstream branches are scheduled per item and may run before the
 generator has finished.
 
-Dynamic expansion and callable runtime continuation are not implemented yet.
+Dynamic expansion is not implemented yet. Its accepted initial design uses an
+explicit `Expand(...)` builder that returns one self-routed `Fragment` and
+atomically appends it only when the combined graph is valid.
 
 ## Planned coverage
 
 This page will eventually document:
 
 - `Expand(...)`
-- callable `next`
+- fragment-owned entry and routing
 - append-only graph growth
+- atomic combined-graph validation
 - cycles and guardrails
+
+Callable `next` and `then`/`finally`-style expansion continuations are deferred.
 
 ## For now
 

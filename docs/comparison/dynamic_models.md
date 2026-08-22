@@ -24,10 +24,12 @@ The first two are common. The third is much rarer, and it is the distinction tha
 | Metaflow  | Branches, foreach, joins, and special-case recursion | Strong               | Moderate             | N/A                           | `self.next(...)`, `foreach`, joins, conditional transitions, step self-recursion     | Recursion is narrow and the flow remains DAG-shaped overall                                         |
 | Temporal  | Durable imperative workflow control flow             | Moderate             | Strong               | Weak                          | workflow code, child workflows, signals, timers, Continue-As-New                     | Strong runtime coordination, but not graph-native workflow growth                                   |
 | LangGraph | Dynamic traversal of a compiled state graph          | Strong               | Strong               | Weak                          | conditional edges, `Send`, `Command`, subgraphs                                      | Highly flexible routing, but not arbitrary runtime graph construction                               |
-| Elan      | Runtime graph growth as part of the model            | Native               | Native               | Native                        | `Expand(...)`, callable `next`, fragments, child workflows, append-only continuation | Expansion is broad but still bounded by validation and guardrails                                   |
+| Elan      | Runtime graph growth as a planned model direction    | Native               | Native               | Planned                       | explicit `Expand(...)`, self-routed fragments, atomic append                          | Expansion is designed but not implemented                                                           |
 
 
-Legend: `Native` means the capability is part of the tool's core model. `N/A` means the tool's graph model does not support that category directly.
+Legend: `Native` means the capability is part of the tool's core model.
+`Planned` means the capability has an accepted design but is not implemented.
+`N/A` means the tool's graph model does not support that category directly.
 
 ## Airflow
 
@@ -67,14 +69,15 @@ Still, LangGraph's flexibility is best understood as dynamic traversal and coord
 
 ## Elan
 
-Elan uses the widest definition of `dynamic` in this comparison set. In Elan's model, runtime logic may expand the active workflow by returning:
+Elan's planned model uses the widest definition of `dynamic` in this comparison
+set. Its accepted initial expansion contract lets runtime orchestration append:
 
-- `None`
-- a `Node`
-- a workflow-shaped fragment
-- a `Workflow`
+- one `Fragment` with a declared entry and fragment-owned routing
 
-This happens through callable `next` or explicit `Expand(...)`, optionally with a static `then` continuation anchor. That means Elan is not limited to "run this existing task many times" or "choose among these predefined routes." It can materialize new workflow structure at runtime and continue from it.
+This happens through explicit `Expand(...)`. The candidate combined graph is
+validated and appended atomically, and fragment nodes may route into existing
+static nodes themselves. Callable `next`, alternate return forms, and a static
+`then` continuation are deferred beyond the initial contract.
 
 That said, Elan is not an unrestricted graph mutation model. The internal design notes are explicit about the boundaries:
 
@@ -83,7 +86,10 @@ That said, Elan is not an unrestricted graph mutation model. The internal design
 - each materialized graph segment must validate in its current form
 - nested and recursive expansion are controlled by guardrails
 
-So the right claim is not "Elan can do anything." The right claim is that Elan treats runtime graph growth as part of the orchestration model itself, which is substantially broader than the other interpretations of `dynamic` in this comparison set.
+So the right claim is not that Elan already has this capability. It is that Elan
+treats runtime graph growth as an explicit orchestration-model direction, which
+is substantially broader than the other interpretations of `dynamic` in this
+comparison set once implemented.
 
 ## Why this matters for the comparison
 
@@ -94,7 +100,8 @@ If all of these tools are evaluated under one generic `Dynamic Graphs` label, th
 - Temporal is dynamic mainly in durable imperative control flow
 - Metaflow is dynamic in structured branching, joins, and narrow recursion
 - LangGraph is dynamic in graph traversal and stateful coordination
-- Elan is dynamic in runtime graph materialization itself
+- Elan currently supports dynamic multiplicity and control flow, with runtime
+  graph materialization as an accepted future direction
 
 That distinction is the clearest explanation for why Elan sits between scheduler-oriented orchestrators and agent runtimes while still differing from both.
 

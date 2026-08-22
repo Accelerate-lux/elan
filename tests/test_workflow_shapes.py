@@ -1,4 +1,4 @@
-"""Scoped-join scenarios organized by workflow graph shape."""
+"""Focused scenarios organized by workflow graph shape."""
 
 import asyncio
 from unittest.mock import Mock, call
@@ -49,6 +49,245 @@ def _assert_before(manager: Mock, *events) -> None:
         for event in events
     ]
     assert positions == sorted(positions)
+
+
+# Linear, routed, and independently terminating shapes
+
+
+@pytest.mark.asyncio
+async def test_linear_three_stage_chain(spy_tasks):
+    """start -> transform -> result."""
+    begin = _abstract_task("begin", lambda: 2)
+    transform = _abstract_task("transform", lambda value: value * 3)
+    finish = _abstract_task("finish", lambda value: f"value={value}")
+
+    task_calls = spy_tasks(begin, transform, finish)
+
+    run = await Workflow(
+        "linear_chain",
+        start=Node(run=begin, next="transform"),
+        transform=Node(run=transform, next="result"),
+        result=Node(run=finish),
+    ).run()
+
+    _assert_calls(begin, call())
+    _assert_calls(transform, call(2))
+    _assert_calls(finish, call(6))
+    _assert_before(task_calls, "begin", "transform", "finish")
+    assert run.result == "value=6"
+
+
+@pytest.mark.parametrize(
+    ("route", "selected_name", "expected"),
+    [("left", "left", 13), ("right", "right", 30)],
+)
+@pytest.mark.asyncio
+async def test_exclusive_paths_reconverge_without_a_barrier(
+    spy_tasks,
+    route,
+    selected_name,
+    expected,
+):
+    """start -(route)-> [left, right] -> result."""
+    begin = _abstract_task("begin", lambda: (3, route))
+    left = _abstract_task("left", lambda value: value + 10)
+    right = _abstract_task("right", lambda value: value * 10)
+    finish = _abstract_task("finish", lambda value: value)
+
+    task_calls = spy_tasks(begin, left, right, finish)
+
+    run = await Workflow(
+        "exclusive_paths",
+        start=Node(
+            run=begin,
+            bind_output=["value", "route"],
+            route_on="route",
+            next={"left": "left", "right": "right"},
+        ),
+        left=Node(run=left, next="result"),
+        right=Node(run=right, next="result"),
+        result=Node(run=finish),
+    ).run()
+
+    selected = left if selected_name == "left" else right
+    skipped = right if selected_name == "left" else left
+    _assert_calls(selected, call(value=3))
+    skipped.mock.assert_not_called()
+    _assert_calls(finish, call(expected))
+    _assert_before(task_calls, "begin", selected_name, "finish")
+    assert run.result == expected
+
+
+@pytest.mark.asyncio
+async def test_static_fan_out_ends_in_independent_branches(spy_tasks):
+    """start -> [left, right, deep_a -> deep_b]."""
+    begin = _abstract_task("begin", lambda: 2)
+    left = _abstract_task("left", lambda value: value + 1)
+    right = _abstract_task("right", lambda value: value + 2)
+    deep_a = _abstract_task("deep_a", lambda value: value + 3)
+    deep_b = _abstract_task("deep_b", lambda value: value * 2)
+
+    task_calls = spy_tasks(begin, left, right, deep_a, deep_b)
+
+    run = await Workflow(
+        "independent_fan_out",
+        start=Node(run=begin, next=["left", "right", "deep_a"]),
+        left=left,
+        right=right,
+        deep_a=Node(run=deep_a, next="deep_b"),
+        deep_b=deep_b,
+    ).run()
+
+    _assert_called_once(begin, left, right, deep_a, deep_b)
+    _assert_before(task_calls, "begin", "left")
+    _assert_before(task_calls, "begin", "right")
+    _assert_before(task_calls, "begin", "deep_a", "deep_b")
+    assert run.result is None
+
+
+@pytest.mark.asyncio
+async def test_conditional_fan_out_runs_only_matching_chains(spy_tasks):
+    """start -> [When(left_a -> left_b), When(middle), When(right_a -> right_b)]."""
+    begin = _abstract_task("begin", lambda: (2, True, False, True))
+    left_a = _abstract_task("left_a", lambda value: value + 1)
+    left_b = _abstract_task("left_b", lambda value: value * 10)
+    middle = _abstract_task("middle", lambda value: value)
+    right_a = _abstract_task("right_a", lambda value: value + 2)
+    right_b = _abstract_task("right_b", lambda value: value * 100)
+
+    task_calls = spy_tasks(begin, left_a, left_b, middle, right_a, right_b)
+
+    run = await Workflow(
+        "conditional_chains",
+        start=Node(
+            run=begin,
+            bind_output=["value", "take_left", "take_middle", "take_right"],
+            next=[
+                When("take_left", "left_a"),
+                When("take_middle", "middle"),
+                When("take_right", "right_a"),
+            ],
+        ),
+        left_a=Node(run=left_a, next="left_b"),
+        left_b=left_b,
+        middle=middle,
+        right_a=Node(run=right_a, next="right_b"),
+        right_b=right_b,
+    ).run()
+
+    _assert_called_once(begin, left_a, left_b, right_a, right_b)
+    middle.mock.assert_not_called()
+    _assert_before(task_calls, "begin", "left_a", "left_b")
+    _assert_before(task_calls, "begin", "right_a", "right_b")
+    assert run.result is None
+
+
+# Runtime fan-out and workflow composition shapes
+
+
+@pytest.mark.asyncio
+async def test_yielded_items_share_a_two_stage_pipeline(spy_tasks):
+    """start(yield 1, 2, 3) -> increment -> scale."""
+
+    @task
+    def produce():
+        yield 1
+        yield 2
+        yield 3
+
+    increment = _abstract_task("increment", lambda value: value + 1)
+    scale = _abstract_task("scale", lambda value: value * 10)
+
+    task_calls = spy_tasks(produce, increment, scale)
+
+    run = await Workflow(
+        "yielded_pipeline",
+        start=Node(run=produce, next="increment"),
+        increment=Node(run=increment, next="scale"),
+        scale=scale,
+    ).run()
+
+    _assert_calls(increment, call(1), call(2), call(3), any_order=True)
+    _assert_calls(scale, call(2), call(3), call(4), any_order=True)
+    _assert_before(task_calls, call.increment(1), call.scale(2))
+    _assert_before(task_calls, call.increment(2), call.scale(3))
+    _assert_before(task_calls, call.increment(3), call.scale(4))
+    assert run.result is None
+
+
+@pytest.mark.asyncio
+async def test_child_workflow_runs_between_parent_stages(spy_tasks):
+    """parent_start -> child(start -> result) -> parent_result."""
+    parent_start = _abstract_task("parent_start", lambda: 3)
+    child_start = _abstract_task("child_start", lambda value: value * 2)
+    child_result = _abstract_task("child_result", lambda value: value + 1)
+    parent_result = _abstract_task("parent_result", lambda value: f"done:{value}")
+
+    child = Workflow(
+        "child",
+        start=Node(run=child_start, next="result"),
+        result=Node(run=child_result),
+    )
+    task_calls = spy_tasks(
+        parent_start,
+        child_start,
+        child_result,
+        parent_result,
+    )
+
+    run = await Workflow(
+        "parent",
+        start=Node(run=parent_start, next="child"),
+        child=Node(run=child, next="result"),
+        result=Node(run=parent_result),
+    ).run()
+
+    _assert_called_once(parent_start, child_start, child_result, parent_result)
+    _assert_before(
+        task_calls,
+        "parent_start",
+        "child_start",
+        "child_result",
+        "parent_result",
+    )
+    assert run.result == "done:7"
+
+
+@pytest.mark.asyncio
+async def test_parent_fan_out_runs_distinct_child_workflows(spy_tasks):
+    """parent_start -> [left_child(a -> b), right_child(a -> b)]."""
+    parent_start = _abstract_task("parent_start", lambda: 2)
+    left_a = _abstract_task("left_a", lambda value: value + 1)
+    left_b = _abstract_task("left_b", lambda value: value * 10)
+    right_a = _abstract_task("right_a", lambda value: value * 2)
+    right_b = _abstract_task("right_b", lambda value: value + 5)
+
+    left_child = Workflow(
+        "left_child",
+        start=Node(run=left_a, next="result"),
+        result=Node(run=left_b),
+    )
+    right_child = Workflow(
+        "right_child",
+        start=Node(run=right_a, next="result"),
+        result=Node(run=right_b),
+    )
+    task_calls = spy_tasks(parent_start, left_a, left_b, right_a, right_b)
+
+    run = await Workflow(
+        "parent_fan_out",
+        start=Node(run=parent_start, next=["left", "right"]),
+        left=left_child,
+        right=right_child,
+    ).run()
+
+    _assert_called_once(parent_start, left_a, left_b, right_a, right_b)
+    _assert_before(task_calls, "parent_start", "left_a", "left_b")
+    _assert_before(task_calls, "parent_start", "right_a", "right_b")
+    assert run.result is None
+
+
+# Synchronizing shapes
 
 
 @pytest.mark.asyncio

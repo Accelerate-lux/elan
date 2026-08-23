@@ -33,22 +33,30 @@ def _call_position(manager: Mock, expected) -> int:
     return manager.mock_calls.index(expected)
 
 
-def _first_task_position(manager: Mock, task_name: str) -> int:
-    return next(
-        index
-        for index, recorded_call in enumerate(manager.mock_calls)
-        if recorded_call[0] == task_name
-    )
+def _first_named_call_position(manager: Mock, task_name: str) -> int:
+    for position, recorded_call in enumerate(manager.mock_calls):
+        if recorded_call[0] == task_name:
+            return position
+
+    raise AssertionError(f"Task {task_name!r} was never called.")
 
 
-def _assert_before(manager: Mock, *events) -> None:
-    positions = [
-        _first_task_position(manager, event)
-        if isinstance(event, str)
-        else _call_position(manager, event)
-        for event in events
-    ]
-    assert positions == sorted(positions)
+def _assert_call_order(manager: Mock, *events) -> None:
+    previous_event = None
+    previous_position = -1
+
+    for event in events:
+        if isinstance(event, str):
+            position = _first_named_call_position(manager, event)
+        else:
+            position = _call_position(manager, event)
+
+        assert previous_position < position, (
+            f"Expected {previous_event!r} before {event!r}, but their call "
+            f"positions were {previous_position} and {position}."
+        )
+        previous_event = event
+        previous_position = position
 
 
 # Linear, routed, and independently terminating shapes
@@ -73,7 +81,7 @@ async def test_linear_three_stage_chain(spy_tasks):
     _assert_calls(begin, call())
     _assert_calls(transform, call(2))
     _assert_calls(finish, call(6))
-    _assert_before(task_calls, "begin", "transform", "finish")
+    _assert_call_order(task_calls, "begin", "transform", "finish")
     assert run.result == "value=6"
 
 
@@ -114,7 +122,7 @@ async def test_exclusive_paths_reconverge_without_a_barrier(
     _assert_calls(selected, call(value=3))
     skipped.mock.assert_not_called()
     _assert_calls(finish, call(expected))
-    _assert_before(task_calls, "begin", selected_name, "finish")
+    _assert_call_order(task_calls, "begin", selected_name, "finish")
     assert run.result == expected
 
 
@@ -139,9 +147,9 @@ async def test_static_fan_out_ends_in_independent_branches(spy_tasks):
     ).run()
 
     _assert_called_once(begin, left, right, deep_a, deep_b)
-    _assert_before(task_calls, "begin", "left")
-    _assert_before(task_calls, "begin", "right")
-    _assert_before(task_calls, "begin", "deep_a", "deep_b")
+    _assert_call_order(task_calls, "begin", "left")
+    _assert_call_order(task_calls, "begin", "right")
+    _assert_call_order(task_calls, "begin", "deep_a", "deep_b")
     assert run.result is None
 
 
@@ -177,8 +185,8 @@ async def test_conditional_fan_out_runs_only_matching_chains(spy_tasks):
 
     _assert_called_once(begin, left_a, left_b, right_a, right_b)
     middle.mock.assert_not_called()
-    _assert_before(task_calls, "begin", "left_a", "left_b")
-    _assert_before(task_calls, "begin", "right_a", "right_b")
+    _assert_call_order(task_calls, "begin", "left_a", "left_b")
+    _assert_call_order(task_calls, "begin", "right_a", "right_b")
     assert run.result is None
 
 
@@ -209,9 +217,9 @@ async def test_yielded_items_share_a_two_stage_pipeline(spy_tasks):
 
     _assert_calls(increment, call(1), call(2), call(3), any_order=True)
     _assert_calls(scale, call(2), call(3), call(4), any_order=True)
-    _assert_before(task_calls, call.increment(1), call.scale(2))
-    _assert_before(task_calls, call.increment(2), call.scale(3))
-    _assert_before(task_calls, call.increment(3), call.scale(4))
+    _assert_call_order(task_calls, call.increment(1), call.scale(2))
+    _assert_call_order(task_calls, call.increment(2), call.scale(3))
+    _assert_call_order(task_calls, call.increment(3), call.scale(4))
     assert run.result is None
 
 
@@ -243,7 +251,7 @@ async def test_child_workflow_runs_between_parent_stages(spy_tasks):
     ).run()
 
     _assert_called_once(parent_start, child_start, child_result, parent_result)
-    _assert_before(
+    _assert_call_order(
         task_calls,
         "parent_start",
         "child_start",
@@ -282,8 +290,8 @@ async def test_parent_fan_out_runs_distinct_child_workflows(spy_tasks):
     ).run()
 
     _assert_called_once(parent_start, left_a, left_b, right_a, right_b)
-    _assert_before(task_calls, "parent_start", "left_a", "left_b")
-    _assert_before(task_calls, "parent_start", "right_a", "right_b")
+    _assert_call_order(task_calls, "parent_start", "left_a", "left_b")
+    _assert_call_order(task_calls, "parent_start", "right_a", "right_b")
     assert run.result is None
 
 
@@ -335,9 +343,9 @@ async def test_balanced_fork_waits_for_contributors_and_noncontributors(spy_task
     ).run()
 
     _assert_called_once(begin, left, right, side, merge, finish)
-    _assert_before(task_calls, "begin", "left", "merge", "finish")
-    _assert_before(task_calls, "begin", "right", "merge")
-    _assert_before(task_calls, "begin", "side", "merge")
+    _assert_call_order(task_calls, "begin", "left", "merge", "finish")
+    _assert_call_order(task_calls, "begin", "right", "merge")
+    _assert_call_order(task_calls, "begin", "side", "merge")
     assert run.result == [2, 3]
 
 
@@ -364,8 +372,8 @@ async def test_fork_with_unequal_branch_depths(spy_tasks):
     ).run()
 
     _assert_called_once(begin, shallow, deep_a, deep_b, merge, finish)
-    _assert_before(task_calls, "begin", "shallow", "merge", "finish")
-    _assert_before(task_calls, "begin", "deep_a", "deep_b", "merge")
+    _assert_call_order(task_calls, "begin", "shallow", "merge", "finish")
+    _assert_call_order(task_calls, "begin", "deep_a", "deep_b", "merge")
     assert run.result == [11, 20]
 
 
@@ -394,9 +402,9 @@ async def test_nested_fan_out_inside_one_scope(spy_tasks):
     ).run()
 
     _assert_called_once(begin, left, split, middle, right, merge, finish)
-    _assert_before(task_calls, "begin", "left", "merge", "finish")
-    _assert_before(task_calls, "begin", "split", "middle", "merge")
-    _assert_before(task_calls, "split", "right", "merge")
+    _assert_call_order(task_calls, "begin", "left", "merge", "finish")
+    _assert_call_order(task_calls, "begin", "split", "middle", "merge")
+    _assert_call_order(task_calls, "split", "right", "merge")
     assert run.result == [2, 3, 4]
 
 
@@ -424,9 +432,9 @@ async def test_diamond_executes_shared_downstream_node_per_branch(spy_tasks):
 
     _assert_called_once(begin, left, right, merge, finish)
     _assert_calls(shared, call(2), call(3), any_order=True)
-    _assert_before(task_calls, "left", call.shared(2), "merge")
-    _assert_before(task_calls, "right", call.shared(3), "merge")
-    _assert_before(task_calls, "merge", "finish")
+    _assert_call_order(task_calls, "left", call.shared(2), "merge")
+    _assert_call_order(task_calls, "right", call.shared(3), "merge")
+    _assert_call_order(task_calls, "merge", "finish")
     assert run.result == [4, 6]
 
 
@@ -463,8 +471,8 @@ async def test_conditional_fan_out_tracks_only_selected_descendants(spy_tasks):
     _assert_called_once(begin, left, side, merge, finish)
     left.mock.assert_called_once_with(value=2)
     right.mock.assert_not_called()
-    _assert_before(task_calls, "begin", "left", "merge", "finish")
-    _assert_before(task_calls, "begin", "side", "merge")
+    _assert_call_order(task_calls, "begin", "left", "merge", "finish")
+    _assert_call_order(task_calls, "begin", "side", "merge")
     assert run.result == [3]
 
 
@@ -489,8 +497,8 @@ async def test_scope_owner_can_contribute_alongside_child_branches(spy_tasks):
     ).run()
 
     _assert_called_once(begin, left, right, merge, finish)
-    _assert_before(task_calls, "begin", "left", "merge", "finish")
-    _assert_before(task_calls, "begin", "right", "merge")
+    _assert_call_order(task_calls, "begin", "left", "merge", "finish")
+    _assert_call_order(task_calls, "begin", "right", "merge")
     assert run.result == [1, 2, 3]
 
 
@@ -574,9 +582,9 @@ async def test_descendant_generator_keeps_scope_open_until_exhaustion(spy_tasks)
     _assert_called_once(begin, emit, side, merge, finish)
     _assert_calls(double, call(1), call(2), any_order=True)
     _assert_list_call(merge, [2, 4, 10])
-    _assert_before(task_calls, "emit", call.double(1), "merge")
-    _assert_before(task_calls, "emit", call.double(2), "merge")
-    _assert_before(task_calls, "begin", "side", "merge", "finish")
+    _assert_call_order(task_calls, "emit", call.double(1), "merge")
+    _assert_call_order(task_calls, "emit", call.double(2), "merge")
+    _assert_call_order(task_calls, "begin", "side", "merge", "finish")
     assert run.result == [2, 4, 10]
 
 
@@ -674,10 +682,10 @@ async def test_nested_scopes_settle_inner_before_outer(spy_tasks):
     )
     _assert_list_call(merge_inner, [2, 3])
     _assert_list_call(merge_outer, [5, 10])
-    _assert_before(task_calls, "begin", "open_inner", "add_one", "merge_inner")
-    _assert_before(task_calls, "open_inner", "add_two", "merge_inner")
-    _assert_before(task_calls, "begin", "side", "merge_outer", "finish")
-    _assert_before(task_calls, "merge_inner", "merge_outer")
+    _assert_call_order(task_calls, "begin", "open_inner", "add_one", "merge_inner")
+    _assert_call_order(task_calls, "open_inner", "add_two", "merge_inner")
+    _assert_call_order(task_calls, "begin", "side", "merge_outer", "finish")
+    _assert_call_order(task_calls, "merge_inner", "merge_outer")
     assert run.result == 15
     assert reductions == ["inner", "outer"]
 
@@ -743,7 +751,7 @@ async def test_sequential_scopes_open_and_settle_in_order(spy_tasks):
         merge_second,
         finish,
     )
-    _assert_before(
+    _assert_call_order(
         task_calls,
         "begin",
         "add_one",
@@ -753,8 +761,8 @@ async def test_sequential_scopes_open_and_settle_in_order(spy_tasks):
         "merge_second",
         "finish",
     )
-    _assert_before(task_calls, "begin", "add_two", "merge_first")
-    _assert_before(task_calls, "open_second", "triple", "merge_second")
+    _assert_call_order(task_calls, "begin", "add_two", "merge_first")
+    _assert_call_order(task_calls, "open_second", "triple", "merge_second")
     assert run.result == 25
     assert reductions == ["first", "second"]
 
@@ -829,8 +837,8 @@ async def test_join_continuation_can_fan_out_again(spy_tasks):
     ).run()
 
     _assert_called_once(begin, add_one, add_two, total, double, triple)
-    _assert_before(task_calls, "begin", "add_one", "total", "double")
-    _assert_before(task_calls, "begin", "add_two", "total", "triple")
+    _assert_call_order(task_calls, "begin", "add_one", "total", "double")
+    _assert_call_order(task_calls, "begin", "add_two", "total", "triple")
     assert sorted(run.result) == [10, 15]
 
 
@@ -862,8 +870,8 @@ async def test_scoped_join_inside_child_workflow_composes_with_parent(spy_tasks)
     ).run()
 
     _assert_called_once(prepare, child_start, left, right, total, finish)
-    _assert_before(task_calls, "prepare", "child_start", "left", "total", "finish")
-    _assert_before(task_calls, "child_start", "right", "total")
+    _assert_call_order(task_calls, "prepare", "child_start", "left", "total", "finish")
+    _assert_call_order(task_calls, "child_start", "right", "total")
     assert run.result == 10
 
 
@@ -886,8 +894,8 @@ async def test_terminal_scoped_join_reduces_one_scope_activation(spy_tasks):
     ).run()
 
     _assert_called_once(begin, left, right, total)
-    _assert_before(task_calls, "begin", "left", "total")
-    _assert_before(task_calls, "begin", "right", "total")
+    _assert_call_order(task_calls, "begin", "left", "total")
+    _assert_call_order(task_calls, "begin", "right", "total")
     assert run.result == 5
 
 
@@ -916,8 +924,8 @@ async def test_balanced_fork_with_two_steps_per_branch(spy_tasks):
     ).run()
 
     _assert_called_once(begin, left_a, left_b, right_a, right_b, merge, finish)
-    _assert_before(task_calls, call.left_a(1), call.left_b(2), "merge", "finish")
-    _assert_before(task_calls, call.right_a(1), call.right_b(3), "merge")
+    _assert_call_order(task_calls, call.left_a(1), call.left_b(2), "merge", "finish")
+    _assert_call_order(task_calls, call.right_a(1), call.right_b(3), "merge")
     assert run.result == [4, 9]
 
 
@@ -950,13 +958,13 @@ async def test_generated_items_pass_through_two_steps_before_one_join(spy_tasks)
     _assert_calls(item_a, call(1), call(2), call(3), any_order=True)
     _assert_calls(item_b, call(2), call(3), call(4), any_order=True)
     for emitted_value in (1, 2, 3):
-        _assert_before(
+        _assert_call_order(
             task_calls,
             call.item_a(emitted_value),
             call.item_b(emitted_value + 1),
             "merge",
         )
-    _assert_before(task_calls, "merge", "finish")
+    _assert_call_order(task_calls, "merge", "finish")
     assert run.result == [4, 6, 8]
 
 
@@ -1031,20 +1039,20 @@ async def test_generated_local_scopes_feed_global_join_then_parent_continuation(
     _assert_calls(continue_item, call(5), call(23), any_order=True)
     _assert_list_call(merge_all, [50, 230])
 
-    _assert_before(task_calls, call.seed(), call.emit())
+    _assert_call_order(task_calls, call.seed(), call.emit())
     for emitted_value in (1, 10):
-        _assert_before(
+        _assert_call_order(
             task_calls,
             call.open_family(emitted_value),
             call.add_one(emitted_value),
         )
-        _assert_before(
+        _assert_call_order(
             task_calls,
             call.open_family(emitted_value),
             call.add_two(emitted_value),
         )
-    _assert_before(task_calls, call.continue_item(5), "merge_all", call.finish(280))
-    _assert_before(task_calls, call.continue_item(23), "merge_all")
+    _assert_call_order(task_calls, call.continue_item(5), "merge_all", call.finish(280))
+    _assert_call_order(task_calls, call.continue_item(23), "merge_all")
 
     assert sorted(local_reductions) == [[2, 3], [11, 12]]
     assert run.result == 281
@@ -1085,7 +1093,7 @@ async def test_generated_items_expand_reusable_fragments_then_global_join(spy_ta
     _assert_calls(transform, call(2), call(3), call(4), any_order=True)
     _assert_called_once(emit, merge)
     for value in (1, 2, 3):
-        _assert_before(task_calls, call.enter(value), call.transform(value + 1), "merge")
+        _assert_call_order(task_calls, call.enter(value), call.transform(value + 1), "merge")
     assert run.result == [20, 30, 40]
 
 
@@ -1114,8 +1122,8 @@ async def test_scoped_join_expands_its_continuation(spy_tasks):
     ).run()
 
     _assert_called_once(begin, left, right, merge, publish, finish)
-    _assert_before(task_calls, "begin", "left", "merge", "publish", "finish")
-    _assert_before(task_calls, "begin", "right", "merge")
+    _assert_call_order(task_calls, "begin", "left", "merge", "publish", "finish")
+    _assert_call_order(task_calls, "begin", "right", "merge")
     assert run.result == "published=7"
 
 
@@ -1144,6 +1152,6 @@ async def test_expanded_descendant_retains_enclosing_join_membership(spy_tasks):
     ).run()
 
     _assert_called_once(begin, plan, expanded, plain, merge, finish)
-    _assert_before(task_calls, "plan", "expanded", "merge", "finish")
-    _assert_before(task_calls, "plain", "merge")
+    _assert_call_order(task_calls, "plan", "expanded", "merge", "finish")
+    _assert_call_order(task_calls, "plain", "merge")
     assert run.result == [7, 30]

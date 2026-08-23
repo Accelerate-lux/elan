@@ -9,13 +9,14 @@ from .task import Task
 from .when import When
 
 if TYPE_CHECKING:
+    from .expand import Expand
     from .workflow import Workflow
 
 
 @dataclass(slots=True)
 class Node:
     run: Task | str | Workflow
-    next: str | list[str | When] | dict[str, str] | None = None
+    next: str | list[str | When] | dict[str, str] | Expand | None = None
     bind_input: dict[str, Any] | Binder[Any] | None = None
     bind_output: str | list[Any] | None = None
     context: dict[str, Any] | Binder[Any] | None = None

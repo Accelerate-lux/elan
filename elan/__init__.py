@@ -1,4 +1,6 @@
 from .binding import Binder, BindingDict
+from .expand import Expand
+from .fragment import Fragment
 from .join import Join
 from .node import Node
 from ._refs import Context, Input, Policy, Upstream, ref
@@ -14,6 +16,8 @@ __all__ = [
     "Task",
     "Node",
     "Join",
+    "Expand",
+    "Fragment",
     "Binder",
     "BindingDict",
     "WorkflowPolicy",

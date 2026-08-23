@@ -7,6 +7,7 @@ from ._activation import Activation
 from ._binding import bind_output
 from ._branch import Branch
 from ._context import copy_context, prepare_context
+from ._expansion import materialize_expansion
 from ._join_activation import JoinActivation
 from ._join_state import JoinInstance, JoinState
 from ._refs import RefLookup
@@ -18,6 +19,7 @@ from ._routing import (
 )
 from ._run_state import RunState
 from ._scheduler import Scheduler
+from .expand import Expand, _BoundExpand
 from .join import Join
 from .result import WorkflowRun
 
@@ -182,6 +184,13 @@ class Orchestrator:
             return self._retire_branch(branch)
 
         emitted_value = bind_output(settled.node.bind_output, settled.output)
+        if isinstance(settled.node.next, (Expand, _BoundExpand)):
+            return self._create_expansion_activations(
+                branch,
+                emitted_value=emitted_value,
+                site=settled.node.next,
+                yielded=False,
+            )
         if isinstance(settled.node.next, dict) or is_target_producer_list(
             settled.node.next
         ):
@@ -218,6 +227,13 @@ class Orchestrator:
 
         branch = self.run_state.branches[settled.branch_id]
         emitted_value = bind_output(settled.join.bind_output, settled.output)
+        if isinstance(settled.join.next, (Expand, _BoundExpand)):
+            return self._create_expansion_activations(
+                branch,
+                emitted_value=emitted_value,
+                site=settled.join.next,
+                yielded=False,
+            )
         if isinstance(settled.join.next, dict) or is_target_producer_list(
             settled.join.next
         ):
@@ -242,6 +258,14 @@ class Orchestrator:
 
         if activation.node.next is not None:
             self.run_state.mark_branching_used()
+
+        if isinstance(activation.node.next, (Expand, _BoundExpand)):
+            return self._create_expansion_activations(
+                branch,
+                emitted_value=emitted_value,
+                site=activation.node.next,
+                yielded=True,
+            )
 
         if (
             activation.node.next is not None
@@ -285,6 +309,39 @@ class Orchestrator:
                 )
             )
         return activations
+
+    def _create_expansion_activations(
+        self,
+        branch: Branch,
+        *,
+        emitted_value: Any,
+        site: Expand | _BoundExpand,
+        yielded: bool,
+    ) -> list[RunnableActivation]:
+        materialized = materialize_expansion(
+            self.run_state,
+            site,
+            emitted_value,
+        )
+        self.run_state.graph.nodes.update(materialized.nodes)
+        self.run_state.join_states.update(materialized.join_states)
+
+        if yielded:
+            fragment_branch = self._create_branch(
+                current_node_name=materialized.entry_name,
+                is_entry=False,
+                parent_branch_id=branch.id,
+            )
+        else:
+            branch.advance_to(materialized.entry_name)
+            fragment_branch = branch
+
+        return [
+            self._create_activation(
+                fragment_branch,
+                input_value=emitted_value,
+            )
+        ]
 
     def _record_output(
         self,

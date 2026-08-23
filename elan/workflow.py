@@ -6,6 +6,11 @@ from typing import Any
 from pydantic import BaseModel
 
 from ._context import copy_context, prepare_context
+from ._expansion import (
+    graph_contains_expand,
+    has_static_cycle,
+    validate_expand_placement,
+)
 from ._graph_state import GraphState
 from ._join_state import JoinState
 from ._orchestrator import Orchestrator
@@ -13,6 +18,7 @@ from ._policy import prepare_policy
 from ._refs import RefLookup
 from ._resolution import resolve_task_ref
 from .binding import Binder
+from .expand import Expand
 from ._run_state import RunState
 from .join import Join
 from .node import Node
@@ -209,6 +215,12 @@ class Workflow(metaclass=_WorkflowMeta):
             raise TypeError(
                 f"Workflow '{name}' requires start to be an executable task or node, not Join(...)."
             )
+        if isinstance(start, Expand) or any(
+            isinstance(value, Expand) for value in nodes.values()
+        ):
+            raise TypeError(
+                f"Workflow '{name}' only allows Expand as a Node or Join next value."
+            )
         if isinstance(bind_context, Binder) and (
             bind_context.target_kind == "task"
         ):
@@ -260,6 +272,7 @@ class Workflow(metaclass=_WorkflowMeta):
             start=start,
             nodes=normalized_nodes,
         )
+        validate_expand_placement(name, start, normalized_nodes)
 
         self.name = name
         self.start = start
@@ -329,6 +342,7 @@ class Workflow(metaclass=_WorkflowMeta):
             graph=GraphState(
                 start=self.start,
                 nodes=dict(self.nodes),
+                static_node_names=frozenset(self.nodes),
             ),
             workflow_input=dict(workflow_input),
             policy=policy,
@@ -429,7 +443,14 @@ class Workflow(metaclass=_WorkflowMeta):
         return states
 
     def _validate_policy_allows_graph(self, policy: WorkflowPolicy) -> None:
-        if not policy.allow_cycles and _has_static_cycle(self.start, self.nodes):
+        if (
+            graph_contains_expand(self.start, self.nodes)
+            and not policy.allow_runtime_expansion
+        ):
+            raise TypeError(
+                f"Workflow '{self.name}' contains Expand but policy does not allow runtime expansion."
+            )
+        if not policy.allow_cycles and has_static_cycle(self.start, self.nodes):
             raise TypeError(
                 f"Workflow '{self.name}' defines a static cycle but policy does not allow cycles."
             )
@@ -489,12 +510,17 @@ def _validate_join_declarations(
     del start
     joins_by_scope: dict[str, list[str]] = {}
     for node_name, node_value in nodes.items():
+        if node_name == "result" and isinstance(node_value, Node):
+            if node_value.next is not None:
+                raise TypeError(
+                    f"Workflow '{workflow_name}' requires the reserved result node to be terminal."
+                )
         if not isinstance(node_value, Join):
             continue
         if node_name == "result":
             if node_value.next is not None:
                 raise TypeError(
-                    f"Workflow '{workflow_name}' requires the reserved result Join to be terminal."
+                    f"Workflow '{workflow_name}' requires the reserved result node to be terminal."
                 )
         elif node_value.scope is None:
             raise TypeError(
@@ -665,61 +691,6 @@ def _resolve_forward_ref(
             f"'{ref.name}' before assigning it."
         )
     return ref.name
-
-
-def _has_static_cycle(
-    start: Task | str | Node | Workflow,
-    nodes: dict[str, Task | str | Node | Join | Workflow],
-) -> bool:
-    graph = {"start": start, **nodes}
-    visiting: set[str] = set()
-    visited: set[str] = set()
-
-    def visit(node_name: str) -> bool:
-        if node_name in visiting:
-            return True
-        if node_name in visited:
-            return False
-
-        node_value = graph.get(node_name)
-        if node_value is None:
-            return False
-
-        visiting.add(node_name)
-        for next_name in _next_node_names(node_value):
-            if next_name in graph and visit(next_name):
-                return True
-        visiting.remove(node_name)
-        visited.add(node_name)
-        return False
-
-    return any(visit(node_name) for node_name in graph)
-
-
-def _next_node_names(value: Any) -> set[str]:
-    if not isinstance(value, (Node, Join)):
-        return set()
-    return _target_node_names(value.next)
-
-
-def _target_node_names(value: Any) -> set[str]:
-    if value is None:
-        return set()
-    if isinstance(value, str):
-        return {value}
-    if isinstance(value, When):
-        return _target_node_names(value.target)
-    if isinstance(value, list):
-        names: set[str] = set()
-        for item in value:
-            names.update(_target_node_names(item))
-        return names
-    if isinstance(value, dict):
-        names: set[str] = set()
-        for item in value.values():
-            names.update(_target_node_names(item))
-        return names
-    return set()
 
 
 def _workflow_input_from_value(value: Any) -> dict[str, Any]:

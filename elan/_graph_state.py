@@ -15,3 +15,4 @@ if TYPE_CHECKING:
 class GraphState:
     start: Task | str | Node | "Workflow"
     nodes: dict[str, Task | str | Node | Join | "Workflow"] = field(default_factory=dict)
+    static_node_names: frozenset[str] = frozenset()

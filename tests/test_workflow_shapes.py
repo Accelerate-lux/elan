@@ -5,7 +5,7 @@ from unittest.mock import Mock, call
 
 import pytest
 
-from elan import Join, Node, When, Workflow, task
+from elan import Expand, Fragment, Join, Node, When, Workflow, WorkflowPolicy, task
 
 
 def _abstract_task(name, fn):
@@ -1048,3 +1048,102 @@ async def test_generated_local_scopes_feed_global_join_then_parent_continuation(
 
     assert sorted(local_reductions) == [[2, 3], [11, 12]]
     assert run.result == 281
+
+
+# Runtime-expanded shapes
+
+
+@pytest.mark.asyncio
+async def test_generated_items_expand_reusable_fragments_then_global_join(spy_tasks):
+    """generator -> repeated Fragment chains -> workflow Join."""
+    @task
+    async def emit():
+        yield 1
+        yield 2
+        yield 3
+
+    enter = _abstract_task("enter", lambda value: value + 1)
+    transform = _abstract_task("transform", lambda value: value * 10)
+    merge = _abstract_task("merge", lambda values: sorted(values))
+    reusable = Fragment(
+        start=Node(run=enter, next="transform"),
+        transform=Node(run=transform, next="result"),
+    )
+
+    def build(value: int) -> Fragment:
+        return reusable
+
+    task_calls = spy_tasks(emit, enter, transform, merge)
+    run = await Workflow(
+        "generated_expansions",
+        policy=WorkflowPolicy(allow_runtime_expansion=True),
+        start=Node(run=emit, next=Expand(build)),
+        result=Join(run=merge),
+    ).run()
+
+    _assert_calls(enter, call(1), call(2), call(3), any_order=True)
+    _assert_calls(transform, call(2), call(3), call(4), any_order=True)
+    _assert_called_once(emit, merge)
+    for value in (1, 2, 3):
+        _assert_before(task_calls, call.enter(value), call.transform(value + 1), "merge")
+    assert run.result == [20, 30, 40]
+
+
+@pytest.mark.asyncio
+async def test_scoped_join_expands_its_continuation(spy_tasks):
+    """scope -> fork -> Join -> Fragment chain -> result."""
+    begin = _abstract_task("begin", lambda: 2)
+    left = _abstract_task("left", lambda value: value + 1)
+    right = _abstract_task("right", lambda value: value + 2)
+    merge = _abstract_task("merge", lambda values: sum(values))
+    publish = _abstract_task("publish", lambda value: f"published={value}")
+    finish = _abstract_task("finish", lambda value: value)
+
+    def build(value: int) -> Fragment:
+        return Fragment(start=Node(run=publish, next="result"))
+
+    task_calls = spy_tasks(begin, left, right, merge, publish, finish)
+    run = await Workflow(
+        "join_then_expansion",
+        policy=WorkflowPolicy(allow_runtime_expansion=True),
+        start=Node(run=begin, next=["left", "right"]),
+        left=Node(run=left, next="merged"),
+        right=Node(run=right, next="merged"),
+        merged=Join(run=merge, scope="start", next=Expand(build)),
+        result=Node(run=finish),
+    ).run()
+
+    _assert_called_once(begin, left, right, merge, publish, finish)
+    _assert_before(task_calls, "begin", "left", "merge", "publish", "finish")
+    _assert_before(task_calls, "begin", "right", "merge")
+    assert run.result == "published=7"
+
+
+@pytest.mark.asyncio
+async def test_expanded_descendant_retains_enclosing_join_membership(spy_tasks):
+    """scope -> [plan -> Fragment, plain] -> enclosing Join -> result."""
+    begin = _abstract_task("begin", lambda: 2)
+    plan = _abstract_task("plan", lambda value: value + 1)
+    expanded = _abstract_task("expanded", lambda value: value * 10)
+    plain = _abstract_task("plain", lambda value: value + 5)
+    merge = _abstract_task("merge", lambda values: sorted(values))
+    finish = _abstract_task("finish", lambda values: values)
+
+    def build(value: int) -> Fragment:
+        return Fragment(start=Node(run=expanded, next="merged"))
+
+    task_calls = spy_tasks(begin, plan, expanded, plain, merge, finish)
+    run = await Workflow(
+        "expanded_scope_member",
+        policy=WorkflowPolicy(allow_runtime_expansion=True),
+        start=Node(run=begin, next=["plan", "plain"]),
+        plan=Node(run=plan, next=Expand(build)),
+        plain=Node(run=plain, next="merged"),
+        merged=Join(run=merge, scope="start", next="result"),
+        result=Node(run=finish),
+    ).run()
+
+    _assert_called_once(begin, plan, expanded, plain, merge, finish)
+    _assert_before(task_calls, "plan", "expanded", "merge", "finish")
+    _assert_before(task_calls, "plain", "merge")
+    assert run.result == [7, 30]

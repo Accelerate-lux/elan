@@ -129,3 +129,16 @@ def test_context_instance_is_rejected():
     ):
         Workflow("hello_world", start="missing.task", context=RunContext())
 
+
+def test_reserved_result_node_must_be_terminal():
+    @task
+    def work() -> int:
+        return 1
+
+    with pytest.raises(TypeError, match="reserved result node.*terminal"):
+        Workflow(
+            "continuing_result",
+            start=Node(run=work, next="result"),
+            result=Node(run=work, next="after"),
+            after=work,
+        )

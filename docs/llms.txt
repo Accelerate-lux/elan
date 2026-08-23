@@ -14,6 +14,7 @@ separate from Available, Experimental, Planned, or Direction.
 - [API overview](https://accelerate-lux.github.io/elan/reference/api/): handwritten public API contract
 - [Runtime behavior](https://accelerate-lux.github.io/elan/reference/runtime-behavior/): exact execution semantics
 - [Python API](https://accelerate-lux.github.io/elan/reference/python-api/): generated object reference
+- [Documentation boundary](https://accelerate-lux.github.io/elan/publication-policy/): public/private inclusion policy
 
 ## Dynamic workflow guides
 
@@ -34,6 +35,7 @@ separate from Available, Experimental, Planned, or Direction.
 - [AI authoring source](https://raw.githubusercontent.com/Accelerate-lux/elan/main/docs/learn/ai-authoring.md)
 - [API source](https://raw.githubusercontent.com/Accelerate-lux/elan/main/docs/reference/api.md)
 - [Runtime behavior source](https://raw.githubusercontent.com/Accelerate-lux/elan/main/docs/reference/runtime-behavior.md)
+- [Documentation boundary source](https://raw.githubusercontent.com/Accelerate-lux/elan/main/docs/publication-policy.md)
 - [Adaptive research source](https://raw.githubusercontent.com/Accelerate-lux/elan/main/docs/guides/adaptive-research.md)
 - [Document decisioning source](https://raw.githubusercontent.com/Accelerate-lux/elan/main/docs/guides/document-decisioning.md)
 - [ETL recovery source](https://raw.githubusercontent.com/Accelerate-lux/elan/main/docs/guides/etl-recovery.md)

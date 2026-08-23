@@ -6,12 +6,9 @@ repo_name: Accelerate-lux/elan
 exclude_docs: |
   internals/
   test_plan.md
-  demo_ideas_catalog.md
-  design_philosophy.md
   explanations/
-not_in_nav: |
-  api.md
-  basics.md
+  /api.md
+  /basics.md
 
 theme:
   name: material
@@ -96,3 +93,4 @@ nav:
       - API Overview: reference/api.md
       - Runtime Behavior: reference/runtime-behavior.md
       - Python API: reference/python-api.md
+      - Documentation Boundary: publication-policy.md

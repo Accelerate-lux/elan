@@ -33,6 +33,5 @@ deferred beyond the initial expansion contract.
 
 ## Related reading
 
-- [Design Philosophy](../design_philosophy.md)
 - [Comparisons / Dynamic Models](../comparison/dynamic_models.md)
-- [Status](status.md)
+- [Status](../status.md)

@@ -55,4 +55,5 @@ That makes it a useful shared test for both `Capabilities` and `Usage`. It is no
 
 This page is the stable public reference workflow for the comparison docs in `docs/comparison/`.
 
-It is derived from internal working notes, but those internal materials are intentionally not part of the public docs site.
+It is derived from private working notes maintained in `elan-project`; those
+source notes are intentionally not stored in the public Elan repository.

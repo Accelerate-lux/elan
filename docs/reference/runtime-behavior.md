@@ -1,5 +1,11 @@
 # Runtime Behavior
 
+!!! info "Capability status"
+    These are current **Available** semantics, except runtime graph expansion,
+    which is **Experimental**. Persistence, retries/resume, remote workers, and
+    durable external events are **Direction**. See
+    [Capability status](../status.md).
+
 This page captures the exact public runtime semantics that matter when reading Elan workflow results.
 
 ## `WorkflowRun.result`
@@ -141,6 +147,9 @@ Ref-based `route_on` currently applies to exclusive branching only.
 Runtime graph expansion uses `Expand(builder)` as the complete `next` value of
 an ordinary node, a join, or each generator yield.
 
+This behavior is Experimental: it is implemented and tested, but its API and
+guardrails may change.
+
 - the builder is synchronous orchestration code and is not scheduled or added
   to `WorkflowRun.outputs`
 - its one typed parameter receives the value after `bind_output`; named mapped
@@ -193,3 +202,9 @@ Current scheduler behavior:
 - concurrency is unlimited when `max_parallel_tasks` is `None`
 - join contribution order follows runtime arrival order
 - reducers should therefore be order-agnostic unless the workflow explicitly constrains completion order
+
+## Diagnostic behavior
+
+Current failures use ordinary Python exception messages. Their prose is not a
+stable machine-readable interface. A uniform diagnostic context is **Planned**; no
+public diagnostic type or schema exists today.

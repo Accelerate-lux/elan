@@ -1,5 +1,7 @@
 # Metaflow
 
+_Reviewed against primary documentation in August 2026._
+
 Metaflow is the explicit step-and-join baseline in this comparison set. For the shared scenario, see [baseline_workflow.md](./baseline_workflow.md). For the dynamic taxonomy used across these docs, see [dynamic_models.md](./dynamic_models.md).
 
 ## What this tool is best at
@@ -10,7 +12,7 @@ Metaflow is strongest when a workflow should read as an explicit sequence of ste
 
 Metaflow is broader than Airflow or Dagster on dynamic control flow because it combines branching, `foreach`, explicit joins, conditional transitions, and a narrow recursion pattern. On the shared baseline, that makes it one of the clearest comparators for structured dataflow with explicit join behavior.
 
-The important limit is where that dynamism stops. Metaflow's recursion support is still documented as a special case inside a DAG model, not as arbitrary graph cycles, and runtime graph materialization is outside the model. In practice, that makes Metaflow stronger on structured control flow than on open-ended graph evolution.
+The important limit is where that dynamism stops. Since Metaflow 2.18, one step may recurse through a conditional and resume from successful iterations, but the documentation still presents this as a special case inside a DAG model rather than arbitrary graph cycles. Runtime graph materialization remains outside that model.
 
 Composition is possible through the way flows are structured, but reusable sub-workflows are not the center of the programming model in the same way they are in Elan. Metaflow's workload scope is broader than a narrow pipeline tool, but the model still reads most naturally as step-based dataflow orchestration.
 
@@ -30,7 +32,7 @@ Metaflow becomes less natural when the comparison turns toward graph-native comp
 
 ## Elan takeaway
 
-Compared with Metaflow, Elan's added value is cleaner separation of concerns. Metaflow is explicit, which is a real strength. Elan pushes that explicitness further by separating pure task code from routing code, making composition more uniform and keeping dynamic graph behavior closer to the workflow definition instead of the step object's state and transition methods.
+Compared with Metaflow, Elan's added value is cleaner separation of concerns. Metaflow is explicit, which is a real strength. Elan pushes that explicitness further by separating task code from routing code, making composition more uniform and keeping Experimental graph materialization at a typed declaration boundary. Metaflow is more mature in persisted step execution and resume behavior.
 
 ## References
 

@@ -1,48 +1,5 @@
 # Status
 
-This page summarizes the current public implementation status of Elan.
-
-## Implemented today
-
-- linear workflows
-- `Workflow` subclass authoring
-- workflow context and `bind_context`
-- subclass forward node references
-- `bind_output`
-- `bind_input`
-- structured payload binding
-- `@ref` field-reference features
-- exclusive branching
-- fan-out
-- yield-based fan-out
-- `When(...)`
-- workflow-wide and activation-scoped `Join`
-- mid-graph join reduction and continuation
-- workflow composition through `Node(run=child_workflow)`
-- concurrent execution of sibling runnable branches
-- static-cycle detection and the `WorkflowPolicy.allow_cycles` gate
-- per-run concurrency limits through `WorkflowPolicy.max_parallel_tasks`
-- explicit append-only graph expansion through `Expand` and `Fragment`
-- fragment-defined scoped joins and recursively nested expansion
-
-## Not implemented yet
-
-- callable continuation shorthand and expansion lifecycle continuations
-- expansion-depth and total-materialization budgets
-- safe executable cycles
-- arbitrary user-managed barriers outside workflow graph structure
-- post-execution workflow hooks or context update phases
-
-## Current behavioral caveats
-
-- join contribution order follows runtime arrival order
-- reducers should be order-agnostic unless completion timing is intentionally constrained
-- scheduler concurrency is unlimited unless `WorkflowPolicy.max_parallel_tasks` is set
-- enabling runtime expansion permits unbounded recursive materialization; builders must terminate themselves
-
-## How to read the docs today
-
-- use **Learn** for the first mental model
-- use **Guides** for task-oriented workflows
-- use **Reference** for exact behavior
-- use **Comparisons** for product positioning against adjacent tools
+The canonical status ledger moved to [Capability status](../status.md). It keeps
+architectural fit separate from the four maturity labels: **Available**,
+**Experimental**, **Planned**, and **Direction**.

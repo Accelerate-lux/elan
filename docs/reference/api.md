@@ -1,5 +1,10 @@
 # API Overview
 
+!!! info "Capability status"
+    This page documents the **Available** public surface plus the
+    **Experimental** `Expand` / `Fragment` surface. Planned behavior has no
+    runnable syntax. See [Capability status](../status.md).
+
 This page is the compact handwritten reference for the Elan public surface.
 
 For generated object-level API docs, see [Python API](python-api.md).
@@ -11,6 +16,10 @@ Registers a callable as an Elan task and returns a `Task` object.
 Tasks may be ordinary functions, async functions, sync generators, or async generators.
 Generator tasks perform yield-based fan-out: each yielded item is routed through
 the task node's `next` value independently.
+
+Registered `Task` objects are not directly callable in the current API. When
+business logic needs isolated direct tests, retain the raw function and register
+it separately with `task(raw_function)`. Direct Task invocation is **Planned**.
 
 The decorator also supports an explicit alias:
 
@@ -236,6 +245,8 @@ Defines runtime graph materialization as the complete `next` value of a `Node`
 or `Join`. Generator nodes apply the same expansion independently to every
 yielded packet.
 
+`Expand` and `Fragment` are **Experimental**.
+
 The builder must be a raw synchronous, non-generator callable with exactly one
 annotated positional parameter and a declared `-> Fragment` return. It receives
 the emitted packet after `bind_output`; a named mapped packet is presented as a
@@ -272,6 +283,26 @@ Fields:
 - `result: Any`
 - `outputs: dict[str, dict[str, list[Any]]]`
 - `context: BaseModel | None`
+
+## Diagnostics
+
+Current validation errors are Python exception prose, not a stable structured
+diagnostic API. Depending on the failure, messages identify some combination of
+the workflow, task, declaration, field, route, or expected type. Callers should
+not parse those strings as a compatibility contract.
+
+A uniform machine-actionable diagnostic surface is **Planned**. Its intended
+context includes:
+
+- workflow name
+- static or materialized node path
+- validation phase, such as binding, routing, or expansion
+- a safe description of the invalid value or type
+- the expected fields, type, route values, or declaration form
+- the underlying cause when one exists
+
+This list describes required context, not an implemented exception class or
+schema.
 
 ## Reference pages
 

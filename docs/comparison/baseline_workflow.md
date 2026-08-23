@@ -1,5 +1,7 @@
 # Baseline Workflow
 
+_Comparison methodology reviewed in August 2026._
+
 This page defines the shared comparison scenario used throughout the tool assessment set. It is the common reference point for the dedicated tool pages and the summary report.
 
 ## Workflow shape

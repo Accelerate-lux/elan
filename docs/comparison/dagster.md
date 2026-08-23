@@ -1,10 +1,12 @@
 # Dagster
 
+_Reviewed against primary documentation in August 2026._
+
 Dagster is the data-orchestration-heavy baseline in this comparison set. For the shared scenario, see [baseline_workflow.md](./baseline_workflow.md). For the dynamic taxonomy used across these docs, see [dynamic_models.md](./dynamic_models.md).
 
 ## What this tool is best at
 
-Dagster is strongest when the workflow sits inside a broader data platform model. It has a strong point of view around data orchestration, lineage, and structured definitions, and it provides clear patterns for dynamic mapping and collection in that context.
+Dagster is strongest when the workflow sits inside a broader data platform model. It has a strong point of view around data orchestration, lineage, and structured definitions, and it provides clear patterns for dynamic mapping and collection in that context. Current Dagster guidance recommends assets for most new data pipelines; dynamic graphs are documented in the lower-level op/job surface.
 
 ## Capabilities assessment
 
@@ -30,7 +32,7 @@ Dagster becomes less natural when the workflow needs to feel lightweight, worklo
 
 ## Elan takeaway
 
-Compared with Dagster, Elan's added value is a smaller and more uniform workflow model. The claim is not that Elan out-features Dagster as a data platform. It is that Elan keeps the orchestration surface more focused on tasks, routes, joins, and sub-workflows, which makes mixed and dynamic workflows easier to describe without adopting the rest of a larger platform vocabulary.
+Compared with Dagster, Elan's added value is a smaller and more uniform workflow model. The claim is not that Elan out-features Dagster as a data platform. It is that Elan keeps the orchestration surface more focused on tasks, routes, joins, and sub-workflows, which makes mixed and dynamic workflows easier to describe without adopting the rest of a larger platform vocabulary. Elan runtime materialization is **Experimental**, while Dagster's data-platform and operational capabilities are mature.
 
 ## References
 

@@ -1,0 +1,41 @@
+# Elan
+
+> Elan is an alpha, graph-native Python orchestrator for explicit AI-written
+> dynamic workflows. Its product direction is AI-writable, human-reviewable,
+> machine-validatable orchestration.
+
+Use the capability status before relying on a feature. “Native to the model” is
+separate from Available, Experimental, Planned, or Direction.
+
+## Primary documentation
+
+- [Capability status](https://accelerate-lux.github.io/elan/status/): canonical maturity ledger
+- [AI authoring](https://accelerate-lux.github.io/elan/learn/ai-authoring/): current patterns, anti-patterns, and agent instructions
+- [API overview](https://accelerate-lux.github.io/elan/reference/api/): handwritten public API contract
+- [Runtime behavior](https://accelerate-lux.github.io/elan/reference/runtime-behavior/): exact execution semantics
+- [Python API](https://accelerate-lux.github.io/elan/reference/python-api/): generated object reference
+
+## Dynamic workflow guides
+
+- [Dynamic execution](https://accelerate-lux.github.io/elan/guides/dynamic-execution/)
+- [Adaptive research](https://accelerate-lux.github.io/elan/guides/adaptive-research/)
+- [Document decisioning](https://accelerate-lux.github.io/elan/guides/document-decisioning/)
+- [AI-assisted ETL recovery](https://accelerate-lux.github.io/elan/guides/etl-recovery/)
+
+## Comparisons
+
+- [Comparison summary](https://accelerate-lux.github.io/elan/comparison/summary/)
+- [Dynamic model taxonomy](https://accelerate-lux.github.io/elan/comparison/dynamic_models/)
+- [Prefect assessment](https://accelerate-lux.github.io/elan/comparison/prefect/)
+
+## Raw Markdown
+
+- [Status source](https://raw.githubusercontent.com/Accelerate-lux/elan/main/docs/status.md)
+- [AI authoring source](https://raw.githubusercontent.com/Accelerate-lux/elan/main/docs/learn/ai-authoring.md)
+- [API source](https://raw.githubusercontent.com/Accelerate-lux/elan/main/docs/reference/api.md)
+- [Runtime behavior source](https://raw.githubusercontent.com/Accelerate-lux/elan/main/docs/reference/runtime-behavior.md)
+- [Adaptive research source](https://raw.githubusercontent.com/Accelerate-lux/elan/main/docs/guides/adaptive-research.md)
+- [Document decisioning source](https://raw.githubusercontent.com/Accelerate-lux/elan/main/docs/guides/document-decisioning.md)
+- [ETL recovery source](https://raw.githubusercontent.com/Accelerate-lux/elan/main/docs/guides/etl-recovery.md)
+
+Repository: https://github.com/Accelerate-lux/elan

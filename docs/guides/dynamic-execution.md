@@ -1,5 +1,11 @@
 # Dynamic Execution
 
+!!! warning "Capability status"
+    Yield-driven multiplicity is **Available**. Runtime `Expand` / `Fragment`
+    materialization is **Experimental**. Expansion budgets, serialized final
+    graphs, and declaration-only graph inspection are **Planned**. See the
+    [canonical status ledger](../status.md).
+
 This guide covers yield-driven runtime multiplicity and explicit graph growth
 through `Expand` and `Fragment`.
 
@@ -48,6 +54,9 @@ Use `Expand(builder)` as a node's complete `next` value when the emitted packet
 determines which graph structure should run next. The builder is synchronous
 orchestration code, not a `Task`. It receives the packet after `bind_output` and
 returns one self-routed `Fragment`.
+
+Because this surface is Experimental, applications should isolate expansion
+builders and avoid treating generated node identifiers as a stable external API.
 
 ```python
 from pydantic import BaseModel
@@ -133,3 +142,6 @@ See:
 
 - [Branching](branching.md)
 - [Runtime Behavior](../reference/runtime-behavior.md)
+- [Adaptive Research](adaptive-research.md)
+- [Document Decisioning](document-decisioning.md)
+- [AI-assisted ETL Recovery](etl-recovery.md)

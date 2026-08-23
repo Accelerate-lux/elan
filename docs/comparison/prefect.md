@@ -1,38 +1,69 @@
 # Prefect
 
-Prefect is the Python-first orchestration baseline in this comparison set. For the shared scenario, see [baseline_workflow.md](./baseline_workflow.md). For the dynamic taxonomy used across these docs, see [dynamic_models.md](./dynamic_models.md).
+_Reviewed against primary documentation in August 2026._
 
-## What this tool is best at
+Prefect is the Python-first and operational-maturity baseline in this comparison
+set. See the [shared scenario](baseline_workflow.md) and
+[dynamic taxonomy](dynamic_models.md).
 
-Prefect is strongest when a team wants orchestration that stays close to ordinary Python. It is especially appealing when developers want to write flows as regular functions, keep the code compact, and add orchestration features without committing to a more explicit graph DSL.
+## What Prefect is best at
+
+Prefect is strongest when a team wants orchestration to feel like ordinary
+Python while retaining task states, retries, caching, timeouts, concurrency,
+deployments, schedules, workers, and remote interaction. Flows and tasks are
+decorated callables; tasks may be called synchronously, submitted to a task
+runner, mapped, or delayed to task workers.
 
 ## Capabilities assessment
 
-Prefect is dynamic mainly through imperative Python control flow. On the shared baseline, it can map tasks, branch with ordinary `if` statements, and compose nested flows cleanly. That makes it more flexible than DAG tools on runtime control flow, but the flexibility comes from Python execution rather than from an explicit graph-materializing orchestration primitive.
+Prefect's dynamic behavior primarily comes from imperative Python control flow
+inside flows. A flow can use ordinary conditions and loops, call tasks, and
+compose nested flows. This is flexible, but it does not make run-specific graph
+materialization a distinct authoring boundary.
 
-That difference matters for routing. In Prefect, the branch is often just an `if` statement in the flow body. This keeps the code compact, but the graph becomes more implicit. Loops and repeated control flow are possible in Python, yet they are not expressed as first-class graph topology in the same way Elan aims to express them.
+Composition and workload breadth are strong. Deployments expose flows for
+scheduled, event-triggered, or on-demand execution, and task runners cover
+thread, process, and external distributed execution models.
 
-Prefect can compose flows and subflows well, and its workload scope is broad enough for mixed Python workflows. The limit is that runtime graph materialization is not the center of the model, so the dynamism is mostly imperative-programming flexibility rather than graph-native workflow growth.
+## AI-era developer experience
 
-## Usage assessment
+AI makes Prefect's compact syntax easier to produce and gives authoring agents a
+large documentation and example corpus. Prefect publishes an `llms.txt` index
+and dedicated AI guidance. These are material adoption advantages alongside its
+operational maturity.
 
-Prefect is easy to pick up because the syntax is familiar and the boilerplate is low. For many teams, that is the main attraction. The same simplicity can become a tradeoff as the workflow grows more dynamic, because the distinction between business logic and orchestration logic starts to blur inside the flow function.
+Elan's narrower advantage is review structure. Routes, joins, bindings, and the
+Experimental `Expand` boundary live in declarations instead of arbitrary flow
+control. That can make AI-written topology easier to audit, but two complementary
+review features—direct invocation of registered tasks and declaration-only graph
+inspection—remain **Planned** in Elan.
 
-Task-level testability is good, and flow code remains approachable for Python developers. Predictability is decent, but understanding the workflow often means reading imperative control flow rather than scanning an explicit graph. That is convenient for small cases and less clear when the graph shape itself is important.
+| Experience | Prefect | Elan today |
+| --- | --- | --- |
+| Initial authoring | Compact ordinary Python | Small explicit graph vocabulary |
+| Dynamic decisions | Primarily Python control flow | Declared routes plus Experimental fragments |
+| Decorated task calls | Direct instrumented calls, submit, map, delay | Direct registered-task calls are **Planned** |
+| Operations | Deployments, workers, retries, states, schedules | **Direction** |
+| AI documentation | Broad docs and `llms.txt` | Focused product docs and `llms.txt` |
 
-## Where it fits well
+## Where Prefect fits well
 
-Prefect fits well when the team wants pragmatic orchestration in Python without adopting a graph-centric model. It is a good choice for workflows that benefit from tasks, subflows, and runtime features while still feeling like ordinary application code.
+Choose Prefect when operational maturity, integrations, deployment flexibility,
+and familiar imperative Python matter more than making graph topology a separate
+review artifact.
 
-## Where it becomes awkward for Elan-style workflows
+## Where Elan differs
 
-Prefect becomes less sharp as a comparison point when the goal is to make routing itself explicit. On Elan-style workflows, the issue is usually not whether Prefect can do the work. It can. The issue is whether the resulting workflow still reads like a graph with clear transitions, or like imperative Python that happens to orchestrate tasks.
-
-## Elan takeaway
-
-Compared with Prefect, Elan's added value is explicit graph structure without dropping back into heavy framework machinery. It gives up some of Prefect's "just write Python" compactness in exchange for clearer routing, stronger separation between business logic and orchestration, and a more stable mental model as workflows branch, fan out, and loop.
+Elan is not a lighter replacement for Prefect's platform. Its differentiation
+is a workload-neutral, declaration-oriented graph model and a typed boundary for
+Experimental runtime graph growth. Teams should accept Elan's missing durability
+and operations surface before evaluating that programming-model advantage.
 
 ## References
 
-- Prefect flows: https://docs.prefect.io/v3/concepts/flows
-- Prefect tasks: https://docs.prefect.io/v3/concepts/tasks
+- [Prefect concepts](https://docs.prefect.io/v3/concepts)
+- [Prefect flows](https://docs.prefect.io/v3/concepts/flows)
+- [Prefect tasks](https://docs.prefect.io/v3/concepts/tasks)
+- [Prefect task runners](https://docs.prefect.io/v3/concepts/task-runners)
+- [Prefect deployments](https://docs.prefect.io/v3/how-to-guides/deployments/create-deployments)
+- [Prefect AI guidance](https://docs.prefect.io/v3/how-to-guides/ai)

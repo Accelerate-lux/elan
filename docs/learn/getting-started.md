@@ -1,5 +1,10 @@
 # Getting Started
 
+!!! info "Capability status"
+    This guide uses **Available** workflow, task, node, and binding behavior.
+    Check the [canonical status ledger](../status.md) before using advanced
+    features.
+
 This guide will show you how to define a small Elan workflow, pass input into it, follow how data moves from one task to the next, and read the final result and execution outputs.
 
 By the end of this guide, you will understand:
@@ -9,6 +14,16 @@ By the end of this guide, you will understand:
 - How to connect those tasks together into a workflow graph.
 - How to pass inputs into the workflow execution.
 - How to access the final workflow result and inspect the complete execution log.
+
+## Install the current alpha
+
+The package is not published on PyPI yet. Install the current source:
+
+```bash
+pip install "elan-workflow @ git+https://github.com/Accelerate-lux/elan.git"
+```
+
+Elan requires Python 3.11 or newer.
 
 ## Step 1: define tasks
 

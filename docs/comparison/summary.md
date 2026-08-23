@@ -1,12 +1,19 @@
 # Tool Comparison Summary
 
-Elan sits between static scheduler-oriented orchestrators and agent runtimes. The tools in this set can all express meaningful workflow behavior, but they differ sharply in what they mean by `dynamic`, how explicitly they model routing, and how much framework machinery shows up in day-to-day usage.
+_Reviewed against primary documentation in August 2026._
 
-For the precise dynamic taxonomy used here, see [dynamic_models.md](./dynamic_models.md).
+Elan sits between scheduler-oriented orchestrators and agent graph runtimes. The
+tools in this set can all express meaningful dynamic behavior, but they differ
+in what “dynamic” means, where routing lives, and which operational guarantees
+are central to the product.
+
+This is a programming-model assessment, not a benchmark. See the
+[shared baseline](baseline_workflow.md) and
+[dynamic taxonomy](dynamic_models.md).
 
 ## Capabilities
 
-| Tool | Runtime Multiplicity | Runtime Control Flow | Runtime Graph Materialization | Explicit Routing | Composition | Workload Breadth |
+| Tool | Runtime multiplicity | Runtime control flow | Runtime graph materialization | Explicit routing | Composition | Workload breadth |
 | --- | --- | --- | --- | --- | --- | --- |
 | Airflow | Strong | Weak | N/A | Moderate | Moderate | Moderate |
 | Prefect | Moderate | Moderate | Weak | Weak | Strong | Strong |
@@ -14,50 +21,68 @@ For the precise dynamic taxonomy used here, see [dynamic_models.md](./dynamic_mo
 | Metaflow | Strong | Moderate | N/A | Strong | Moderate | Moderate |
 | Temporal | Moderate | Strong | Weak | Weak | Strong | Strong |
 | LangGraph | Strong | Strong | Weak | Strong | Strong | Moderate |
-| Elan | Native | Native | Planned | Native | Native | Strong |
+| Elan | Native | Native | Native (**Experimental**) | Native | Native | Strong |
 
-Legend: `Native` means the capability is a first-class fit for the tool's model.
-`Planned` marks an explicit Elan design direction that is not implemented.
-`Strong`, `Moderate`, and `Weak` describe relative fit within this comparison
-set. `N/A` means the capability is outside the tool's graph model rather than
-merely weaker within it.
+`Native` describes fit with a tool's model. For Elan, the parenthesized label is
+the separate implementation maturity from the
+[canonical status ledger](../status.md). `N/A` means the category falls outside
+the tool's graph model rather than being a weaker implementation of it.
 
 ## Usage
 
-| Tool | Mental Model | Boilerplate | Task / Orchestration Separation | Testability | Predictability |
+| Tool | Mental model | Low boilerplate | Task/orchestration separation | Testability | Operational maturity |
 | --- | --- | --- | --- | --- | --- |
-| Airflow | Moderate | Weak | Moderate | Moderate | Moderate |
-| Prefect | Moderate | Strong | Moderate | Strong | Moderate |
+| Airflow | Moderate | Weak | Moderate | Moderate | Strong |
+| Prefect | Strong | Strong | Moderate | Strong | Strong |
 | Dagster | Moderate | Moderate | Moderate | Strong | Strong |
 | Metaflow | Strong | Moderate | Moderate | Moderate | Strong |
-| Temporal | Moderate | Moderate | Moderate | Moderate | Strong |
-| LangGraph | Moderate | Weak | Weak | Moderate | Moderate |
-| Elan | Strong | Strong | Native | Strong | Strong |
+| Temporal | Moderate | Moderate | Moderate | Strong | Strong |
+| LangGraph | Moderate | Weak | Weak | Moderate | Strong |
+| Elan | Strong | Strong | Native | Moderate | Weak |
 
-Legend: `Native` means the usage quality is part of the tool's core design intent. `Strong`, `Moderate`, and `Weak` describe relative fit within this comparison set.
+These qualitative ratings describe relative fit within this comparison set.
+Elan does not currently provide persistence, retries/resume, remote workers, or
+an operational control plane. Those capabilities are separately classified as
+**Direction**, not as implemented features.
+
+## AI-era interpretation
+
+AI reduces the importance of saving a few lines of authoring syntax. It raises
+the importance of stable concepts, explicit review artifacts, precise
+validation, and documentation that an authoring agent can retrieve.
+
+That shift helps Elan's declaration-oriented model, but it also strengthens
+mature tools: agents have more Prefect, Airflow, Dagster, Temporal, and
+LangGraph examples to learn from, while those products already provide broader
+operational surfaces. Elan's current claim is therefore narrow:
+
+> Explicit orchestration for AI-written dynamic workflows, with one typed
+> Experimental boundary for runtime graph materialization.
+
+Direct registered-task invocation and declaration-only graph inspection would
+strengthen that review loop, but both are **Planned** rather than current.
 
 ## Per-tool takeaway
 
-Airflow remains the clearest scheduler baseline. It is genuinely dynamic in task multiplicity, but that dynamism stays inside an acyclic DAG. Elan's planned graph-expansion model targets workflows whose shape itself needs to emerge at runtime.
-
-Prefect is the most compact "just write Python" comparison. Its dynamic story comes mainly from imperative Python control flow rather than graph materialization. Elan's value is clearer workflow topology without taking on a large platform surface.
-
-Dagster is the strongest data-platform comparator in this set. It handles dynamic mapping and collection well, but that flexibility still lives inside a DAG of compute. Elan is better positioned when the workflow should stay workload-agnostic and graph-first.
-
-Metaflow is one of the most readable explicit control-flow comparators. It is broader than simple mapping because it has joins and narrow recursion, but it still does not treat runtime graph growth as a first-class concept. Elan's additional step is cleaner task-orchestration separation and more uniform graph composition.
-
-Temporal is the durable-execution comparator in this set. It is strong when reliability, replay, timers, and long-running coordination are the main problem. Elan is differentiated when the workflow should be graph-native and routing-centric rather than durability-centric.
-
-LangGraph is the closest comparison on dynamic control-flow power. It is strong exactly where agent workflows need it to be strong, but it is still traversing a compiled state graph rather than materializing new workflow structure into the active graph. Elan's planned graph-growth model aims at that distinction without committing to a shared-state-machine abstraction.
-
-Elan's strongest current position in this set is not raw feature count. It is
-the combination of explicit routing, scoped joins, yield-driven multiplicity,
-and composable sub-workflows in a workflow model that stays small and readable
-across both data and agent-style use cases. Guarded cycles and runtime graph
-materialization remain design directions rather than current capabilities.
+- [Airflow](airflow.md) is the scheduler baseline: mature scheduled DAGs and
+  runtime task mapping, with topology intended to remain relatively stable.
+- [Prefect](prefect.md) is the Python-first baseline: compact imperative flows,
+  directly invoked instrumented tasks, deployments, retries, and broad
+  operations. Elan trades compactness for declared routing.
+- [Dagster](dagster.md) is the data-platform baseline: strong dynamic mapping,
+  collection, lineage, and structured data orchestration.
+- [Metaflow](metaflow.md) is an explicit step/branch/join baseline with foreach
+  and special-case recursive steps.
+- [Temporal](temporal.md) is the durable-execution baseline: replay, timers,
+  messages, child workflows, and Continue-As-New solve a different primary
+  problem from graph materialization.
+- [LangGraph](langgraph.md) is the closest agent-runtime comparator: strong
+  loops, subgraphs, `Send`, and `Command` over a compiled state graph.
 
 ## Overall takeaway
 
-Elan is not trying to out-platform Airflow or Dagster, out-durable-execute Temporal, or act as an LLM-only runtime like many agent frameworks. Its differentiation is narrower and clearer: it gives developers a graph-native orchestration model for dynamic workflows while keeping tasks simple, routing explicit, and composition uniform.
-
-That makes Elan especially compelling for adopters who find scheduler-oriented tools too static and state-machine-oriented agent runtimes too mechanical. The added value is the shape of the programming model itself.
+Elan should not be selected today for operational breadth. It is most relevant
+when a team values explicit task/orchestration separation and needs a runtime
+plan to materialize validated workflow structure. The Experimental label is
+important: the primitive exists, but budgets, final graph serialization,
+durability, and remote execution do not.

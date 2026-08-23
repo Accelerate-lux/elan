@@ -1,5 +1,7 @@
 # Temporal
 
+_Reviewed against primary documentation in August 2026._
+
 Temporal is the durable-execution baseline in this comparison set. For the shared scenario, see [baseline_workflow.md](./baseline_workflow.md). For the dynamic taxonomy used across these docs, see [dynamic_models.md](./dynamic_models.md).
 
 ## What this tool is best at
@@ -30,12 +32,12 @@ Temporal becomes less natural when the comparison turns toward graph shape, expl
 
 ## Elan takeaway
 
-Compared with Temporal, Elan's added value is not stronger durability semantics. The value is a clearer orchestration model for graph-shaped dynamic workflows. Temporal is the right comparator when the buyer asks about durable execution and reliability guarantees. Elan is the stronger fit when the buyer asks for explicit routing, composable graph growth, and a workflow model that stays close to the graph itself instead of centering replay and workflow history.
+Compared with Temporal, Elan's added value is not stronger durability semantics. The value is a clearer orchestration model for graph-shaped dynamic workflows. Temporal is the right comparator when the buyer asks about durable execution and reliability guarantees. Elan is relevant when the buyer prioritizes explicit routing and Experimental graph materialization and accepts that persistence, retries/resume, timers, and remote workers are only **Direction** in Elan.
 
 ## References
 
 - Temporal docs home: https://docs.temporal.io/
 - Temporal developer guide: https://docs.temporal.io/develop
 - Temporal Python SDK guide: https://docs.temporal.io/develop/python
-- Temporal child workflows: https://docs.temporal.io/develop/python/child-workflows
-- Temporal Continue-As-New: https://docs.temporal.io/develop/python/continue-as-new
+- Temporal child workflows: https://docs.temporal.io/develop/python/workflows/child-workflows
+- Temporal Continue-As-New: https://docs.temporal.io/develop/python/workflows/continue-as-new

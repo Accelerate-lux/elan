@@ -1,8 +1,43 @@
 # Recommended Patterns
 
+!!! info "Capability status"
+    These recommendations use the current **Available** API. Runtime expansion
+    is **Experimental**; future authoring conveniences are listed separately on
+    the [status page](../status.md).
+
 This page answers a practical onboarding question: when Elan gives you more than one valid form, which one should you choose first?
 
 The goal is not to hide alternatives. The goal is to give you a strong default path.
+
+## Testable business logic today
+
+### Recommended
+
+When business logic must be invoked directly in unit tests, keep the raw typed
+function and register it separately:
+
+```python
+from elan import task
+
+
+def normalize_name(value: str) -> str:
+    return value.strip().title()
+
+
+normalize_name_task = task(normalize_name)
+
+# Direct unit test of business logic; no workflow run is created.
+assert normalize_name("  elan ") == "Elan"
+```
+
+Use `normalize_name_task` in workflow declarations and `normalize_name` in
+ordinary unit tests. Direct invocation of the registered `Task` object itself
+is **Planned**, not currently available.
+
+### Why this is the default
+
+It preserves a normal callable for isolated tests without reaching through
+framework internals or misrepresenting a `Task` as directly callable.
 
 ## Task vs `Node`
 

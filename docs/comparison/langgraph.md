@@ -1,5 +1,7 @@
 # LangGraph
 
+_Reviewed against primary documentation in August 2026._
+
 LangGraph is the graph-native agent-runtime baseline in this comparison set. For the shared scenario, see [baseline_workflow.md](./baseline_workflow.md). For the dynamic taxonomy used across these docs, see [dynamic_models.md](./dynamic_models.md).
 
 ## What this tool is best at
@@ -30,7 +32,7 @@ LangGraph becomes less attractive when the workflow does not need a state-machin
 
 ## Elan takeaway
 
-Compared with LangGraph, Elan's added value is a higher-level orchestration surface for the same general class of dynamic graph problems. It keeps routing explicit without forcing the workflow to be expressed as a shared-state machine, which makes many mixed and non-agent workflows read more like task orchestration and less like graph runtime programming.
+Compared with LangGraph, Elan's added value is a higher-level orchestration surface for the same general class of dynamic graph problems. It keeps routing explicit without forcing the workflow to be expressed as a shared-state machine, which makes many mixed and non-agent workflows read more like task orchestration and less like graph runtime programming. Elan's runtime materialization is **Experimental**; LangGraph has the more mature agent-state, interrupt, checkpoint, and operational ecosystem.
 
 ## References
 

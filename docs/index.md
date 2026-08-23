@@ -1,112 +1,54 @@
 # Elan
 
-Elan is a workflow orchestration engine for AI agents, data orchestration, and mixed workloads. It gives teams a unified tool to build complex multi-step systems, from data pipelines to agent-driven applications, that stay explicit, composable, and predictable as they grow.
+**Explicit orchestration for AI-written dynamic workflows.**
 
-Elan separates tasks from orchestration. Tasks stay plain Python, while routing, branching, joins, and workflow structure are defined explicitly in the workflow layer.
+Elan is a graph-native Python orchestrator for AI and data workflows whose
+shape may emerge while they run. Business work stays in typed tasks; routing,
+fan-out, joins, context, policy, and runtime graph growth stay visible in the
+workflow declaration.
 
-It supports fine-grained routing, branching, synchronization, composition,
-yield-driven runtime multiplicity, and explicit runtime graph expansion within
-the same programming model.
+Elan's product direction is orchestration that is **AI-writable,
+human-reviewable, and machine-validatable**.
 
-## Highlights
+!!! warning "Alpha software"
+    APIs may change. Use the [capability status](status.md) as the canonical
+    source for what is Available, Experimental, Planned, or Direction.
 
-- **One Tool for Data and Agents:** Build data workflows, AI agents, and mixed systems in one orchestration model.
-- **Plain Python, Reusable Tasks:** Keep business logic in plain Python functions that stay easy to reuse, test, and compose across workflows.
-- **Fine-Grained Workflow Control:** Express fan-out, conditional routing, value-based branching, joins, and yield-driven runtime multiplicity directly in the workflow.
-- **Simple Mental Model:** Keep tasks and orchestration separate so workflow structure stays readable.
-- **One Model, Growing Surface:** Author workflows in Python today, with config and HTTP representations planned around the same semantics.
-- **Built for Mixed Workloads:** Use the same model for data workflows, AI agents, service orchestration, and human review steps.
-- **First-Class Composability:** Smaller workflows compose cleanly into larger ones with explicit `result` boundaries.
-- **Predictable Results:** Keep workflow outputs, result boundaries, and synchronization explicit.
-- **DAG Opt-In:** Use DAG-shaped workflows when they fit, without making DAG constraints the center of the model.
-- **Cycle-Aware Foundation:** Detect static cycles and govern them through policy while safe recurrence controls remain planned.
-- **Type-Safe Data Flow:** Use Python type hints and Pydantic models for predictable data movement between steps.
-- **Testable by Design:** Keep business logic easy to test in isolation.
+## The product thesis
 
-## Implementation Status
+AI makes producing plausible orchestration code inexpensive. It does not make
+generated control flow easier to review. Elan treats the workflow declaration
+as a durable review artifact:
 
+- tasks describe work;
+- nodes and joins describe topology;
+- typed bindings describe data movement;
+- policy describes execution-shape permissions;
+- `Expand` marks the one place where runtime values may grow the graph.
 
-| Feature area                 | Status       |
-| ---------------------------- | ------------ |
-| Basic workflows              | ✅ Available |
-| Data binding                 | ✅ Available |
-| Structured payloads          | ✅ Available |
-| Branching and routing        | ✅ Available |
-| Workflow synchronization     | ✅ Available |
-| Concurrent execution         | ✅ Available |
-| Workflow subclass authoring  | ✅ Available |
-| Yield fan-out                | ✅ Available |
-| Shared workflow context      | ✅ Available |
-| Workflow composition         | ✅ Available |
-| Dynamic graph expansion      | ✅ Available |
+## Current surface
 
+| Capability | Model fit | Implementation status |
+| --- | --- | --- |
+| Workflows, binding, routing, joins, context, and composition | Native | **Available** |
+| Yield-driven multiplicity and sibling concurrency | Native | **Available** |
+| Runtime graph materialization | Native | **Experimental** |
+| Direct registered-task invocation | Native | **Planned** |
+| Declaration-only graph inspection | Native | **Planned** |
+| Durable and remote execution | Compatible direction | **Direction** |
 
-## Installation
-
-```bash
-pip install elan-workflow
-```
-
-## Example
-
-```python
-import asyncio
-from elan import Node, Workflow, task
-
-
-@task
-def prepare():
-    return "World"
-
-
-@task
-async def greet(name: str):
-    return f"Hello, {name}!"
-
-
-workflow = Workflow(
-    "greet_world",
-    start=Node(run=prepare, next="greet"),
-    greet=greet,
-)
-
-run = asyncio.run(workflow.run())
-```
-
-The constructor form keeps short examples compact. For application workflows,
-prefer a dedicated `Workflow` subclass so the graph has a stable Python home.
-
-If you run that workflow:
-
-```pycon
->>> run.result
-'Hello, World!'
->>> run.outputs
-{
-    "branch-<uuid>": {
-        "prepare": ["World"],
-        "greet": ["Hello, World!"],
-    }
-}
-```
-
-What happens in this example:
-
-- The plain Python functions `prepare` and `greet` are decorated with `@task` to make them discoverable by Elan
-- The `start=` keyword defines the workflow entrypoint, so Elan begins execution at `prepare`
-- The `Workflow` object defines the execution graph and names the downstream `greet` node
-- The `Node(run=prepare, next="greet")` declaration tells Elan to run `prepare` first and then route its output to `greet`
-- For linear workflows with only one terminal step, the return value of the terminal node is automatically mapped into `run.result` 
-- The `run.outputs` mapping records emitted values by branch id first and then by task name
-
-!!! note "Terminal tasks"
-    For terminal nodes, if you don't need to configure anything, passing the task directly is fine. Elan will automatically wrap it into a node.
+“Native” describes fit with Elan's model. It does not override implementation
+status.
 
 ## Start here
 
-- [Getting Started](learn/getting-started.md) for a line-by-line walkthrough of the first two-step workflow
-- [Core Concepts](learn/core-concepts.md) for the Task / Node / Workflow model
-- [Recommended Patterns](learn/recommended-patterns.md) for the preferred first-use forms
-- [Linear Workflows](guides/linear-workflows.md) and [Data Binding](guides/data-binding.md) for the first practical steps
-- [Runtime Behavior](reference/runtime-behavior.md) for exact result, outputs, branching, and join semantics
-- [Python Reference](reference/python-api.md) for generated API docs
+- [Getting Started](learn/getting-started.md) for the first workflow
+- [Core Concepts](learn/core-concepts.md) for Task / Node / Workflow
+- [AI Authoring](learn/ai-authoring.md) for coding-agent instructions,
+  canonical patterns, and anti-patterns
+- [Dynamic Execution](guides/dynamic-execution.md) for `Expand` and `Fragment`
+- [Adaptive Research](guides/adaptive-research.md),
+  [Document Decisioning](guides/document-decisioning.md), and
+  [ETL Recovery](guides/etl-recovery.md) for complete dynamic scenarios
+- [Runtime Behavior](reference/runtime-behavior.md) for exact semantics
+- [Comparison Summary](comparison/summary.md) for the adjacent-tool assessment

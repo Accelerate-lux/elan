@@ -1,5 +1,5 @@
 site_name: Elan
-site_description: Graph-native orchestration for dynamic agent and data workflows.
+site_description: Explicit orchestration for AI-written dynamic workflows.
 site_url: https://accelerate-lux.github.io/elan/
 repo_url: https://github.com/Accelerate-lux/elan
 repo_name: Accelerate-lux/elan
@@ -9,9 +9,7 @@ exclude_docs: |
   demo_ideas_catalog.md
   design_philosophy.md
   explanations/
-  comparison/
 not_in_nav: |
-  comparison/baseline_workflow.md
   api.md
   basics.md
 
@@ -52,7 +50,11 @@ markdown_extensions:
       use_pygments: true
       pygments_style: github-dark
       pygments_lang_class: true
-  - pymdownx.superfences
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
   - pymdownx.inlinehilite
 
 extra_css:
@@ -61,10 +63,12 @@ extra_css:
 
 nav:
   - Home: index.md
+  - Capability Status: status.md
   - Learn:
       - Getting Started: learn/getting-started.md
       - Core Concepts: learn/core-concepts.md
       - Recommended Patterns: learn/recommended-patterns.md
+      - AI Authoring: learn/ai-authoring.md
       - Next Steps: learn/next-steps.md
   - Guides:
       - Linear Workflows: guides/linear-workflows.md
@@ -74,6 +78,20 @@ nav:
       - Context: guides/context.md
       - Composition: guides/composition.md
       - Dynamic Execution: guides/dynamic-execution.md
+      - Dynamic Scenarios:
+          - Adaptive Research: guides/adaptive-research.md
+          - Document Decisioning: guides/document-decisioning.md
+          - AI-assisted ETL Recovery: guides/etl-recovery.md
+  - Comparisons:
+      - Summary: comparison/summary.md
+      - Dynamic Models: comparison/dynamic_models.md
+      - Shared Baseline: comparison/baseline_workflow.md
+      - Airflow: comparison/airflow.md
+      - Prefect: comparison/prefect.md
+      - Dagster: comparison/dagster.md
+      - Metaflow: comparison/metaflow.md
+      - Temporal: comparison/temporal.md
+      - LangGraph: comparison/langgraph.md
   - Reference:
       - API Overview: reference/api.md
       - Runtime Behavior: reference/runtime-behavior.md

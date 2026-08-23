@@ -2,120 +2,108 @@
 
 ![Elan](elan-pic.webp)
 
-Elan is a graph-native orchestration engine for dynamic agent and data workflows.
+**Explicit orchestration for AI-written dynamic workflows.**
 
-While traditional DAG-based orchestrators excel at static scheduling, they struggle when a workflow's structure isn't fully known ahead of time. Conversely, many agent frameworks offer dynamic execution but introduce heavy boilerplate, rigid patterns, and unpredictable behaviors.
+Elan is a graph-native Python orchestrator for AI and data workflows whose
+shape may emerge while they run. It keeps business work in typed tasks and puts
+routing, fan-out, joins, context, policy, and runtime graph growth in explicit
+workflow declarations.
 
-Designed with developer experience in mind, Elan bridges this gap by offering a simple, predictable orchestration model:
+The goal is orchestration that is **AI-writable, human-reviewable, and
+machine-validatable**. Code generation makes syntax cheaper; Elan focuses on
+leaving behind control flow that people and tools can inspect and reason about.
 
-- **One Tool for Data and Agents:** Build data workflows, AI agents, and mixed systems in one orchestration model.
-- **Plain Python, Reusable Tasks:** Keep business logic in plain Python functions that stay easy to reuse, test, and compose across workflows.
-- **Fine-Grained Workflow Control:** Express fan-out, conditional routing, value-based branching, joins, and yield-driven runtime multiplicity directly in the workflow.
-- **Simple Mental Model:** Keep tasks and orchestration separate so workflow structure stays readable.
-- **One Model, Growing Surface:** Author workflows in Python today, with config and HTTP representations planned around the same semantics.
-- **Built for Mixed Workloads:** Use the same model for data workflows, AI agents, service orchestration, and human review steps.
-- **First-Class Composability:** Compose smaller workflows into larger systems with explicit `result` boundaries.
-- **Predictable Results:** Keep workflow outputs, result boundaries, and synchronization explicit.
-- **DAG Opt-In:** Use DAG-shaped workflows when they fit, without making DAG constraints the center of the model.
-- **Cycle-Aware Foundation:** Detect static cycles and govern them through policy while safe recurrence controls remain planned.
-- **Type-Safe Data Flow:** Use Python type hints and Pydantic models for predictable data movement between steps.
-- **Testable by Design:** Keep business logic easy to test in isolation.
+> Elan is alpha software. APIs may change. Check the
+> [capability status](https://accelerate-lux.github.io/elan/status/) before
+> relying on a feature.
 
-## Implementation Status
+## Why Elan
 
-| Feature area | Status |
-| :--- | :--- |
-| Basic workflows | ✅ Available |
-| Data binding | ✅ Available |
-| Structured payloads | ✅ Available |
-| Branching and routing | ✅ Available |
-| Workflow synchronization | ✅ Available |
-| Concurrent execution | ✅ Available |
-| Workflow subclass authoring | ✅ Available |
-| Yield fan-out | ✅ Available |
-| Shared workflow context | ✅ Available |
-| Workflow composition | ✅ Available |
-| Dynamic graph expansion | ✅ Available |
+- **Explicit topology:** Routing decisions live in `Node`, `When`, `Join`, and
+  `Workflow` declarations instead of disappearing inside task bodies.
+- **Typed boundaries:** Pydantic payloads and `Binder[...]` make important data
+  movement visible and validate it early.
+- **One dynamic boundary:** A typed `Expand` builder can materialize a validated,
+  namespaced `Fragment` when a runtime plan determines graph structure.
+- **Mixed workloads:** The same model covers deterministic data processing,
+  agent planning, service coordination, and human-review boundaries.
+- **Composition:** Child workflows remain ordinary graph nodes with explicit
+  result boundaries.
+
+## Maturity at a glance
+
+| Capability | Model fit | Implementation status |
+| --- | --- | --- |
+| Workflows, binding, routing, joins, context, and composition | Native | **Available** |
+| Yield-driven multiplicity and sibling concurrency | Native | **Available** |
+| Runtime `Expand` / `Fragment` materialization | Native | **Experimental** |
+| Direct invocation of registered tasks | Native | **Planned** |
+| Declaration-only graph inspection | Native | **Planned** |
+| Persistence, retries/resume, and remote workers | Compatible direction | **Direction** |
+
+“Native” describes architectural fit; it never means a capability is
+implemented. The canonical definitions of **Available**, **Experimental**,
+**Planned**, and **Direction** are on the
+[status page](https://accelerate-lux.github.io/elan/status/).
 
 ## Installation
 
+The `elan-workflow` package is not published on PyPI yet. Install the current
+source explicitly:
+
 ```bash
-pip install elan-workflow
+pip install "elan-workflow @ git+https://github.com/Accelerate-lux/elan.git"
 ```
 
-The name, pronounced "ay-lan", comes from the French word "elan", which means both momentum and moose.
-
-## Why Elan?
-
-Building data pipelines and AI agents usually means stitching together different tools: static DAGs for data, and specialized state-machine runtimes for agents. This leads to a patchwork of frameworks and disjointed developer experiences.
-
-Elan is a multi-purpose orchestrator designed to handle both. Built with developer experience and flexibility at its core, it is easy to get started with for simple tasks, yet powerful enough for complex dynamic use cases without introducing heavy boilerplate. This means you no longer need to learn and maintain entirely different tools for your data pipelines and your AI agents.
-
-- **One Tool for Data and Agents:** Whether you are orchestrating standard data workflows or branching agent processes, Elan provides the same predictable, graph-native interface.
-- **Runtime Graph Expansion:** `Expand(builder)` can append validated, self-routed `Fragment` graphs to the current run without mutating the workflow definition.
-- **Strict Task/Orchestration Separation:** Tasks are pure Python functions. Routing is declared explicitly at the workflow level, making it easy to test your business logic and compose smaller workflows together.
-
-| Capability | Traditional DAGs | Agent Runtimes | Elan |
-| :--- | :--- | :--- | :--- |
-| **Runtime Multiplicity** | Strong | Strong | **Native** |
-| **Runtime Control Flow** | Weak / Moderate | Strong | **Native** |
-| **Runtime Graph Materialization** | N/A | Weak | **Native** |
-| **Explicit Routing** | Moderate | Strong | **Native** |
-| **Composition** | Moderate | Moderate | **Native** |
+Elan requires Python 3.11 or newer.
 
 ## Quickstart
 
-Elan separates the work you want to do (Tasks) from how that work is routed (Nodes) and orchestrated (Workflows).
-
-Here is how you define a simple linear workflow where the output of one task automatically flows into the next:
-
 ```python
 import asyncio
+
 from elan import Node, Workflow, task
 
-# 1. Define your pure business logic as tasks
-@task
-def prepare():
-    return "World"
 
 @task
-async def greet(name: str):
+def prepare(name: str) -> str:
+    return name.strip().title()
+
+
+@task
+async def greet(name: str) -> str:
     return f"Hello, {name}!"
 
-# 2. Orchestrate them into a workflow graph
+
 workflow = Workflow(
-    "greet_world",
-    # Wrap tasks in Nodes to define routing edges
+    "greeting",
     start=Node(run=prepare, next="greet"),
     greet=greet,
 )
 
-# 3. Execute the graph
-run = asyncio.run(workflow.run())
+run = asyncio.run(workflow.run(name="world"))
+assert run.result == "Hello, World!"
 ```
 
-The constructor form above is compact for small examples and generated graphs.
-For application workflows, prefer a dedicated `Workflow` subclass so the graph
-has a stable Python home.
+The constructor form is compact for examples and generated declarations. For
+application workflows, prefer a dedicated `Workflow` subclass.
 
-If you run that workflow:
+## Dynamic examples
 
-```pycon
->>> run.result
-'Hello, World!'
->>> run.outputs
-{
-    "branch-<uuid>": {
-        "prepare": ["World"],
-        "greet": ["Hello, World!"],
-    }
-}
-```
+Three credential-free guides use the same Experimental primitive in different
+domains:
+
+- [Adaptive research](https://accelerate-lux.github.io/elan/guides/adaptive-research/)
+- [Document decisioning](https://accelerate-lux.github.io/elan/guides/document-decisioning/)
+- [AI-assisted ETL recovery](https://accelerate-lux.github.io/elan/guides/etl-recovery/)
 
 ## Documentation
 
-For a complete introduction to Elan's mental model, graph topology, and data binding rules, read the [Basics Guide](docs/basics.md).
+- [Hosted documentation](https://accelerate-lux.github.io/elan/)
+- [AI authoring guide](https://accelerate-lux.github.io/elan/learn/ai-authoring/)
+- [Runtime behavior](https://accelerate-lux.github.io/elan/reference/runtime-behavior/)
+- [Python API](https://accelerate-lux.github.io/elan/reference/python-api/)
+- [Tool comparisons](https://accelerate-lux.github.io/elan/comparison/summary/)
 
-For side-by-side assessments of tools adjacent to Elan, read the [Comparison Summary](docs/comparison/summary.md) and the focused note on [what "dynamic" means across workflow tools](docs/comparison/dynamic_models.md).
-
-For rough candidate demos and later-planning notes, read the [Demo Ideas Catalog](docs/demo_ideas_catalog.md).
+The name, pronounced “ay-lan,” comes from the French *élan*: both momentum and
+moose.

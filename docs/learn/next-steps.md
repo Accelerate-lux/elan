@@ -1,5 +1,9 @@
 # Next Steps
 
+Before choosing an advanced feature, check the
+[capability status](../status.md). Runtime expansion is **Experimental**;
+durability and remote execution remain **Direction**.
+
 You now have the basic onboarding model:
 
 - tasks hold business logic
@@ -8,6 +12,13 @@ You now have the basic onboarding model:
 - workflow runs expose `result` and `outputs`
 
 The next step depends on what you want to learn next.
+
+## If a coding agent is authoring the workflow
+
+Read [AI Authoring](ai-authoring.md).
+
+It provides current-API patterns, anti-patterns, and a reusable `AGENTS.md`
+instruction block without presenting Planned syntax as executable.
 
 ## If you want more linear examples
 
@@ -52,3 +63,12 @@ This is the next step if you need precise rules for:
 - branch-aware `outputs`
 - join ordering
 - concurrent sibling execution
+
+## If a runtime plan determines graph structure
+
+Read [Dynamic Execution](../guides/dynamic-execution.md), then choose one of the
+complete scenarios:
+
+- [Adaptive Research](../guides/adaptive-research.md)
+- [Document Decisioning](../guides/document-decisioning.md)
+- [AI-assisted ETL Recovery](../guides/etl-recovery.md)

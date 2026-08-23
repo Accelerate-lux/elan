@@ -1,5 +1,7 @@
 # Airflow
 
+_Reviewed against primary documentation in August 2026._
+
 Airflow is the scheduler-oriented baseline in this comparison set. For the shared scenario, see [baseline_workflow.md](./baseline_workflow.md). For the dynamic taxonomy used across these docs, see [dynamic_models.md](./dynamic_models.md).
 
 ## What this tool is best at
@@ -8,7 +10,7 @@ Airflow is strongest when the workflow is fundamentally a scheduled DAG with exp
 
 ## Capabilities assessment
 
-Airflow is dynamic mainly in the sense of runtime multiplicity. On the shared baseline, it can fan out with dynamic task mapping and can choose among predefined downstream tasks with branching, but both behaviors still live inside a scheduler-managed DAG.
+Airflow is dynamic mainly in the sense of runtime multiplicity. On the shared baseline, it can fan out with dynamic task mapping and can choose among predefined downstream tasks with branching, but both behaviors still live inside a scheduler-managed DAG. Airflow's documentation advises keeping topology relatively stable and using dynamic task mapping when upstream results determine task-instance counts.
 
 That means Airflow is not dynamic in the stronger Elan sense of runtime graph materialization. The scheduler can create runtime task instances from known task definitions, but the workflow is still an acyclic DAG rather than an append-only graph that can materialize new nodes or fragments as execution proceeds.
 
@@ -34,7 +36,7 @@ Airflow becomes less natural when the workflow shape is part of the problem itse
 
 ## Elan takeaway
 
-Compared with Airflow, Elan is easier to position as a workflow-first rather than scheduler-first system. The added value is not that Elan can "also branch" or "also fan out," but that routing, dynamic execution, and result boundaries stay closer to the workflow definition instead of being mediated by scheduler conventions such as task IDs, skipped paths, and trigger rules.
+Compared with Airflow, Elan is easier to position as a workflow-first rather than scheduler-first system. The added value is not that Elan can "also branch" or "also fan out," but that routing, dynamic execution, and result boundaries stay closer to the workflow definition instead of being mediated by scheduler conventions such as task IDs, skipped paths, and trigger rules. Elan's graph materialization is **Experimental**; Airflow has the substantially more mature scheduler and operational surface.
 
 ## References
 

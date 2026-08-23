@@ -187,6 +187,8 @@ Acceptance:
 ### 9. Dynamic expansion and cycles
 Eighth slice.
 
+Expansion status: implemented. Guarded recurrence remains open.
+
 Implementation goal:
 - `Expand(...)`
 - one `Fragment` return contract with fragment-owned entry and routing

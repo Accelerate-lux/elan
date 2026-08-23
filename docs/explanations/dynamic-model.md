@@ -8,7 +8,7 @@ Elan treats dynamic workflow behavior more broadly than tools that only support:
 - imperative runtime control flow
 - traversal of a precompiled graph
 
-The intended direction is runtime graph materialization as part of the orchestration model itself.
+Runtime graph materialization is now part of the orchestration model itself.
 
 ## Current state
 
@@ -20,14 +20,13 @@ Today, the runtime already supports:
 - workflow-wide terminal joins
 - activation-scoped mid-graph joins
 - concurrent execution of sibling runnable branches
+- append-only `Expand(...)` materialization of self-routed `Fragment` graphs
+- nested and recursive expansion with lexical target resolution
 
-## Planned direction
+## Remaining direction
 
-The broader dynamic model still points toward:
-
-- explicit `Expand(...)` returning a fragment-owned valid graph addition
-- atomic, append-only validation and materialization
-- cycles with guardrails
+The broader dynamic model still points toward safe executable cycles, expansion
+budgets, richer observability, and config/API parity.
 
 Callable continuation shorthand and expansion lifecycle continuations are
 deferred beyond the initial expansion contract.

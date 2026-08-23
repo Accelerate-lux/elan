@@ -35,7 +35,7 @@ Designed with developer experience in mind, Elan bridges this gap by offering a 
 | Yield fan-out | ✅ Available |
 | Shared workflow context | ✅ Available |
 | Workflow composition | ✅ Available |
-| Dynamic graph expansion | ☐ Planned |
+| Dynamic graph expansion | ✅ Available |
 
 ## Installation
 
@@ -52,14 +52,14 @@ Building data pipelines and AI agents usually means stitching together different
 Elan is a multi-purpose orchestrator designed to handle both. Built with developer experience and flexibility at its core, it is easy to get started with for simple tasks, yet powerful enough for complex dynamic use cases without introducing heavy boilerplate. This means you no longer need to learn and maintain entirely different tools for your data pipelines and your AI agents.
 
 - **One Tool for Data and Agents:** Whether you are orchestrating standard data workflows or branching agent processes, Elan provides the same predictable, graph-native interface.
-- **Runtime Graph Foundation:** Elan executes against a run-local graph designed to support future append-only graph materialization; general runtime expansion is not implemented yet.
+- **Runtime Graph Expansion:** `Expand(builder)` can append validated, self-routed `Fragment` graphs to the current run without mutating the workflow definition.
 - **Strict Task/Orchestration Separation:** Tasks are pure Python functions. Routing is declared explicitly at the workflow level, making it easy to test your business logic and compose smaller workflows together.
 
 | Capability | Traditional DAGs | Agent Runtimes | Elan |
 | :--- | :--- | :--- | :--- |
 | **Runtime Multiplicity** | Strong | Strong | **Native** |
 | **Runtime Control Flow** | Weak / Moderate | Strong | **Native** |
-| **Runtime Graph Materialization** | N/A | Weak | **Planned** |
+| **Runtime Graph Materialization** | N/A | Weak | **Native** |
 | **Explicit Routing** | Moderate | Strong | **Native** |
 | **Composition** | Moderate | Moderate | **Native** |
 

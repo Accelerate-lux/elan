@@ -191,7 +191,7 @@ Defines a configured task node.
 Supported fields:
 
 - `run: Task | str | Workflow`
-- `next` as `str | list[str | When] | dict[str, str]`
+- `next` as `str | list[str | When] | dict[str, str] | Expand`
 - `bind_input: Binder[task] | dict[str, Any] | None`
 - `bind_output`
 - `context: Binder[ContextModel] | dict[str, Any] | None`
@@ -229,6 +229,37 @@ Sibling branch contexts remain isolated and are not merged automatically.
 
 `result=Join(...)` remains terminal. Without `scope`, it waits for the whole
 workflow. With `scope`, that scope must activate exactly once.
+
+## `Expand(builder)`
+
+Defines runtime graph materialization as the complete `next` value of a `Node`
+or `Join`. Generator nodes apply the same expansion independently to every
+yielded packet.
+
+The builder must be a raw synchronous, non-generator callable with exactly one
+annotated positional parameter and a declared `-> Fragment` return. It receives
+the emitted packet after `bind_output`; a named mapped packet is presented as a
+plain dictionary. Builders run in the orchestrator and are not recorded in
+`WorkflowRun.outputs`.
+
+Workflows containing an expansion site require
+`WorkflowPolicy(allow_runtime_expansion=True)`.
+
+## `Fragment(start, **nodes)`
+
+Declares one executable entry and a reusable, self-routed graph addition.
+Fragment declarations accept tasks, registered task names, `Node`, child
+`Workflow`, and activation-scoped `Join` values. `start` cannot be a `Join`, and
+a fragment cannot declare a local `result`.
+
+Each invocation is namespaced independently. Route names resolve from the
+current fragment outward through enclosing fragments and then the original
+static workflow. Local names may shadow outer names. Fragment joins require an
+explicit scope declared in the same fragment.
+
+Materialization is append-only and atomic: the combined run graph is validated
+before nodes and join definitions are installed or the fragment entry is
+scheduled.
 
 ## `WorkflowRun`
 

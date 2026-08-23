@@ -6,20 +6,20 @@ implementation in August 2026.
 
 ## Document Status
 
-The sections through structured payloads and branching describe the current
-Python API unless they explicitly say otherwise. Dynamic expansion,
-post-execution hooks, config/API authoring, and the production runtime are design
-only.
+The Python API sections describe the current implementation unless they
+explicitly say otherwise. Post-execution hooks, config/API authoring, and the
+production runtime remain design only.
 
 Current implementation status:
 
 - **implemented:** tasks and registration, workflow construction and subclass
   authoring, binding, refs, context preparation, structured payloads, routing,
   fan-out, yield fan-out, composition, workflow-wide joins, activation-scoped
-  joins, concurrent scheduling, and basic workflow policy;
+  joins, concurrent scheduling, explicit `Expand`/`Fragment` graph growth, and
+  basic workflow policy;
 - **partial:** graph/type validation and static-cycle governance;
-- **planned:** post-execution hooks, explicit runtime graph expansion, safe
-  executable cycles, config/API parity, remote execution, persistence,
+- **planned:** post-execution hooks, safe executable cycles, expansion budgets,
+  config/API parity, remote execution, persistence,
   reliability controls, and observability. Callable `next` and expansion
   lifecycle continuations are deferred beyond the initial expansion contract.
 
@@ -798,9 +798,9 @@ the same join scope on one branch is rejected.
 
 ## Dynamic Execution
 
-**Status: accepted initial design, not implemented. `Expand` and `Fragment` do
-not exist in the current runtime. `GraphState` and
-`WorkflowPolicy.allow_runtime_expansion` are scaffolding for this work.**
+**Status: implemented for explicit `Expand(builder)` and self-routed
+`Fragment` materialization. Callable `next`, lifecycle continuations, graph
+introspection, and expansion budgets remain deferred.**
 
 Dynamic execution extends the graph at runtime.
 
@@ -812,7 +812,7 @@ Expansion is also controlled at the workflow level.
 
 A workflow may explicitly allow or forbid dynamic expansion inside its own scope.
 
-Proposed policy shape:
+Policy shape:
 
 ```python
 from elan import Workflow, WorkflowPolicy
@@ -836,7 +836,7 @@ Dynamic expansion belongs to `next`.
 The initial contract uses the explicit `Expand(...)` form only:
 
 ```python
-from elan import Expand, Fragment, Node, Workflow
+from elan import Expand, Fragment, Node, Workflow, WorkflowPolicy
 
 
 def build_dependencies(plan: Plan) -> Fragment:
@@ -845,6 +845,7 @@ def build_dependencies(plan: Plan) -> Fragment:
 
 workflow = Workflow(
     "dynamic_example",
+    policy=WorkflowPolicy(allow_runtime_expansion=True),
     start=Node(
         run=create_plan,
         next=Expand(build_dependencies),
@@ -887,10 +888,25 @@ Bare callable `next` and a `then`/`finally`-style expansion continuation are
 explicitly deferred. The initial `Expand` contract does not reserve their
 syntax or imply their eventual semantics.
 
-Still open: the concrete `Fragment` authoring surface, builder binding details,
-generated node naming, declaration-time treatment of static nodes reachable
-only through future fragments, joins and nested expansion inside fragments,
-type validation, and output/introspection behavior.
+The implemented decisions are:
+
+- `Fragment(start=..., **nodes)` uses Workflow-like declarations but has no
+  workflow name, context, policy, or local result boundary;
+- builders are synchronous raw callables with one typed positional parameter
+  and a declared `-> Fragment` return;
+- builders receive the emitted packet after `bind_output`, while the original
+  packet enters the fragment;
+- every invocation is namespaced independently without mutating the returned
+  `Fragment`;
+- targets resolve lexically from current fragment to enclosing fragments to the
+  original static workflow;
+- fragments may contain local scoped joins and nested `Expand` sites;
+- the candidate graph and join definitions commit atomically before entry
+  scheduling;
+- materialized tasks and reducers use normal output recording, while builders
+  and graph topology are not added to `WorkflowRun`;
+- no declaration-time reachability analysis, cross-edge type analysis,
+  recursion-depth limit, or total-materialization budget is included.
 
 ## Cycles
 
@@ -1640,7 +1656,7 @@ Requirements to satisfy:
 - branch and activation structure should be visible
 - inputs and outputs should be traceable at node level when safe to record
 - failures should point to the workflow node and execution attempt that failed
-- dynamic routing and future graph growth should remain understandable after the run
+- dynamic routing and materialized graph growth should remain understandable after the run
 - observability should support both debugging and production operation
 - sensitive values should not be exposed accidentally
 
@@ -1659,7 +1675,7 @@ Questions to refine:
 - what the canonical runtime event model should be
 - what should be visible by default versus opt-in
 - whether lineage and artifacts are first-class concepts or derived records
-- how observability should represent branches, joins, retries, and future dynamic expansion
+- how observability should represent branches, joins, retries, and runtime expansion
 
 ### Production Runtime Refinements
 

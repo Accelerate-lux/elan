@@ -20,6 +20,7 @@ The current public vocabulary is:
 - `Task` / `task`: a registered executable callable and decorator
 - `Node`: the configured use of a task or workflow inside a graph
 - `Join`: workflow-wide or activation-scoped synchronization
+- `Expand` / `Fragment`: explicit runtime graph materialization
 - `WorkflowRun`: the result, outputs, and final context of one run
 - `WorkflowPolicy`: per-run concurrency and graph-policy controls
 
@@ -89,10 +90,10 @@ Implemented dynamic-cardinality behavior includes:
 - fan-out
 - yield-based fan-out
 
-Planned graph-evolution behavior includes:
+Implemented graph-evolution behavior includes append-only, atomically validated
+`Fragment` materialization through `Expand`.
 
-- graph expansion during execution
-- cycles and recurrence
+Planned graph-evolution behavior includes guarded cycles and recurrence.
 
 Static-cycle detection and a policy opt-in exist today. Safe executable
 recurrence still requires runtime safeguards and budgets; loops are not yet a
@@ -118,6 +119,6 @@ This means:
 The design stays centered on a small number of consistent primitives.
 
 The intent is to let simple workflows stay simple, while allowing implemented
-behavior such as branching, fan-out, scoped barriers, and composition to share
-the same model. Runtime graph expansion and guarded recurrence remain future
-directions.
+behavior such as branching, fan-out, scoped barriers, composition, and runtime
+graph expansion to share the same model. Guarded recurrence remains a future
+direction.

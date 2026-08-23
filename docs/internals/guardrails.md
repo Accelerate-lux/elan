@@ -2,12 +2,10 @@
 
 This document captures the guardrails that constrain workflow execution in Elan.
 
-**Status: design-only for runtime graph expansion and recurrence.** The current
-runtime implements static-cycle detection plus the
-`WorkflowPolicy.allow_cycles` and `allow_runtime_expansion` declaration flags,
-but it does not execute graph expansion or provide recurrence budgets. Current
-join behavior is documented separately because activation-scoped joins were
-implemented after the original guardrails proposal.
+**Status: structural expansion guardrails are implemented; recurrence and
+runtime budgets remain design-only.** The runtime implements static-cycle
+detection, policy-gated expansion, atomic append validation, and scoped-join
+inheritance, but does not provide recurrence or materialization budgets.
 
 It separates:
 
@@ -70,11 +68,9 @@ structural forms is outside the initial contract.
 `Join` is not restricted to `result`. The current graph language supports
 workflow-wide result joins and activation-scoped mid-graph joins.
 
-If runtime expansion is implemented, dynamically added descendants must inherit
-active scope membership just like statically routed and yielded descendants.
-
-Whether dynamically returned fragments may declare new joins is still an open
-design question and must be resolved before expansion is implemented.
+Dynamically added descendants inherit active scope membership just like
+statically routed and yielded descendants. Fragments may declare new scoped
+joins whose explicit scope belongs to the same fragment.
 
 ### 6. Dynamic Fragments May Reference Existing Static Nodes, But May Not Mutate Them
 
@@ -205,6 +201,10 @@ Core profiles:
 - `strict`
 - `permissive`
 
+These profiles and validation-policy fields remain proposed. The current
+expansion slice always validates candidate graph structure and the builder input
+annotation; it does not perform full cross-edge type or reachability analysis.
+
 Static graph validation and static type validation apply to the known workflow definition.
 
 Dynamic graph validation and dynamic type validation apply when an expansion materializes at runtime.
@@ -258,9 +258,9 @@ Workflow(
 )
 ```
 
-`max_parallel_tasks` is enforced today. The two `allow_*` fields are declaration
-gates: static cycles are rejected unless allowed, while runtime expansion has no
-execution mechanism yet.
+`max_parallel_tasks` and both declaration gates are enforced today. Static
+cycles are rejected unless allowed, and workflows containing `Expand` are
+rejected before execution unless runtime expansion is allowed.
 
 Future guardrail work may add graph budgets, time budgets, validation
 strictness, and finer boundary rules. The previous nested `Policy`,
@@ -283,13 +283,8 @@ There are no default graph, recurrence, or time budgets yet.
 
 ### Enforcement Model
 
-Elan checks an expansion before materializing it:
-
-- whether it exceeds the current live graph budgets
-- whether it exceeds the total graph budgets
-- whether it violates a time budget or policy toggle
-
-If any answer is yes, the expansion is rejected before it is appended to the graph.
+Elan checks the expansion policy and candidate graph before materializing it.
+There are currently no live-graph, total-graph, or time budgets.
 
 The handling behavior is part of policy.
 
@@ -310,8 +305,7 @@ In practice:
 
 ## Current Status
 
-The following rules are design requirements for future expansion, not current
-runtime behavior:
+The following rules are current runtime behavior:
 
 - append-only materialization
 - no rewriting of already materialized nodes or routes
@@ -321,10 +315,9 @@ runtime behavior:
 - expanded descendants inherit active join-scope membership
 - dynamic fragments may reference existing static nodes, but may not mutate them
 
-The current policy surface records whether future runtime expansion would be
-allowed, rejects static cycles unless opted into, and lets the scheduler enforce
-`max_parallel_tasks`. Expansion itself and safe cycle execution are not
-implemented.
+The current policy surface gates runtime expansion and static cycles and lets
+the scheduler enforce `max_parallel_tasks`. Safe cycle execution and expansion
+budgets are not implemented.
 
 The runtime guardrail policy surface still needs a detailed design. Its categories are:
 

@@ -141,7 +141,9 @@ The accepted relation is:
 
 This avoids two competing run representations.
 
-`RunState` also owns the run-local graph state. The workflow definition stays immutable; the run progresses against a mutable graph working copy that can later absorb expansion and other run-local graph changes.
+`RunState` also owns the run-local graph state. The workflow definition stays
+immutable; expansion appends namespaced fragment nodes and join definitions to
+this mutable graph working copy only after candidate validation succeeds.
 
 ## GraphState
 
@@ -152,17 +154,19 @@ It separates:
 - the immutable `Workflow` definition
 - the mutable graph that the engine actually progresses against
 
-This distinction is required before dynamic execution is added. Expansion cannot mutate the workflow definition directly; it must append to a run-local graph.
+Expansion cannot mutate the workflow definition directly; it appends to a
+run-local graph.
 
-At minimum, `GraphState` is expected to own:
+`GraphState` currently owns:
 
 - the effective `start` reference for the run
 - the current node registry for the run
+- the original static node-name set used as the outer lexical scope for
+  fragments
 
 Open points:
 
 - whether `result` also lives directly on graph state
-- how appended nodes are namespaced
 - whether graph state also tracks edges explicitly or only node-local continuation
 - how graph state exposes append-only updates
 - whether sub-workflows use nested graph state objects or separate run states

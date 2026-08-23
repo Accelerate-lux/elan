@@ -8,12 +8,8 @@ This page captures the exact public runtime semantics that matter when reading E
 - if the workflow defines `result=Join(...)`, `WorkflowRun.result` is the finalized join value
 - if no reserved `result` is defined and the workflow is linear, `WorkflowRun.result` falls back to the last terminal output
 - if the workflow uses branching forms and does not define reserved `result`, `WorkflowRun.result` is `None`
-- a reserved result join is enforced as terminal
-
-Known specification gap: an ordinary reserved result node may currently declare
-`next`; execution continues while the recorded result remains unchanged. The
-accepted contract requires every reserved result form to be terminal and the
-workflow constructor to reject this declaration.
+- every reserved result form is terminal; construction rejects `next` on an
+  ordinary result node or result join
 
 ## `WorkflowRun.outputs`
 
@@ -75,7 +71,10 @@ Current policy semantics:
 - child workflows may refine policy if `parent_policy.allows(child_policy)` returns `True`
 - `max_parallel_tasks` limits concurrently running activations in one workflow run
 - `allow_cycles=False` rejects static cycles in the declared graph
-- `allow_runtime_expansion` is a governance flag for future runtime expansion features
+- `allow_runtime_expansion=False` rejects a workflow containing `Expand` before
+  its first task starts
+- `allow_runtime_expansion=True` permits fragment materialization without a
+  built-in depth or total-materialization budget
 
 ## Context behavior
 
@@ -136,6 +135,35 @@ For yield-based fan-out, every yielded item is treated like one node output pack
 - yielding into reserved `result=Node(...)` is unsupported; use `result=Join(...)`
 
 Ref-based `route_on` currently applies to exclusive branching only.
+
+## Expansion behavior
+
+Runtime graph expansion uses `Expand(builder)` as the complete `next` value of
+an ordinary node, a join, or each generator yield.
+
+- the builder is synchronous orchestration code and is not scheduled or added
+  to `WorkflowRun.outputs`
+- its one typed parameter receives the value after `bind_output`; named mapped
+  output is exposed to the builder as a plain dictionary
+- the original emitted packet remains the upstream input of the materialized
+  fragment entry
+- each invocation receives an isolated run-local namespace, including repeated
+  use of the same `Fragment` object
+- fragment target lookup is lexical: current fragment, enclosing fragments,
+  then original static workflow nodes
+- materialization validates and commits graph nodes plus join definitions as
+  one synchronous operation before the entry activation is created
+- fragment tasks and join reducers use ordinary scheduling, output recording,
+  context injection, policy, and active-scope inheritance
+- fragment-defined joins require an explicit scope inside the same fragment;
+  routes may also target enclosing or static joins
+- nested and recursive expansion is supported without a built-in depth or
+  total-materialization limit
+
+Candidate validation covers declaration and task resolution, routing targets
+and forms, nested builder contracts, namespaces, join structure, result
+terminality, and cycle policy. It does not yet perform full cross-edge type or
+reachability analysis.
 
 ## Join behavior
 

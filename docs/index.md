@@ -4,8 +4,9 @@ Elan is a workflow orchestration engine for AI agents, data orchestration, and m
 
 Elan separates tasks from orchestration. Tasks stay plain Python, while routing, branching, joins, and workflow structure are defined explicitly in the workflow layer.
 
-It supports fine-grained routing, branching, synchronization, composition, and
-yield-driven runtime multiplicity within the same programming model.
+It supports fine-grained routing, branching, synchronization, composition,
+yield-driven runtime multiplicity, and explicit runtime graph expansion within
+the same programming model.
 
 ## Highlights
 
@@ -37,7 +38,7 @@ yield-driven runtime multiplicity within the same programming model.
 | Yield fan-out                | ✅ Available |
 | Shared workflow context      | ✅ Available |
 | Workflow composition         | ✅ Available |
-| Dynamic graph expansion      | ☐ Planned    |
+| Dynamic graph expansion      | ✅ Available |
 
 
 ## Installation

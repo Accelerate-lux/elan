@@ -1,7 +1,5 @@
 # Elan
 
-![Elan](elan-pic.webp)
-
 **Explicit orchestration for AI-written dynamic workflows.**
 
 Elan is a graph-native Python orchestrator for AI and data workflows whose
@@ -107,3 +105,5 @@ domains:
 
 The name, pronounced “ay-lan,” comes from the French *élan*: both momentum and
 moose.
+
+![Elan](elan-pic.webp)

@@ -1,5 +1,5 @@
 site_name: Elan
-site_description: Explicit orchestration for AI-written dynamic workflows.
+site_description: Python workflows with branching, concurrency, and runtime expansion.
 site_url: https://accelerate-lux.github.io/elan/
 repo_url: https://github.com/Accelerate-lux/elan
 repo_name: Accelerate-lux/elan

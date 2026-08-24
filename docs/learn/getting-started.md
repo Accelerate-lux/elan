@@ -86,38 +86,26 @@ This allows upstream tasks to return meaningful models once, while downstream ta
 
 ## Step 3: define the workflow graph
 
-Workflows can be defined as `Workflow` subclasses or by constructing a
-`Workflow` object directly. For this first guide, the constructor form keeps the
-example compact. For application workflows, prefer a dedicated `Workflow`
-subclass once the graph grows beyond a small inline example.
-
-In constructor form, the keyword arguments passed to the workflow define the
-node names, and Elan uses those names to resolve the graph edges. Some keywords,
-like `start` are reserved for specific Nodes in the workflow.
+Declare application workflows as `Workflow` subclasses. Class attributes name
+the nodes, and `start` is the entrypoint.
 
 ```python
 from elan import Node, Workflow
 
-workflow = Workflow(
-    "publish_article",
-    start=Node(run=prepare_article, next="publish"),
-    publish=Node(run=publish_article, next="notify"),
-    notify=build_notification,
-)
+
+class PublishArticleWorkflow(Workflow):
+    start = Node(run=prepare_article, next="publish")
+    publish = Node(run=publish_article, next="notify")
+    notify = build_notification
+
+
+workflow = PublishArticleWorkflow()
 ```
 
-A workflow instance represents an execution graph definition and can be run multiple times. 
-
-We use the `start=` keyword to define the workflow entrypoint, so Elan begins execution at `prepare_article`.
-
-We then pass the `publish` and `notify` keyword arguments to define the downstream nodes.
-
-And we route each Node's output to the next using the `next` attribute of the `Node` class:
-
-- `Node(run=prepare_article, next="publish")` tells Elan to run `prepare_article` and then route its output to `publish`.
-- `Node(run=publish_article, next="notify")` tells Elan to run `publish_article` and then route its output to `notify`.
-
-For terminal nodes, if you don't need to configure anything, passing the task directly is fine. Elan will automatically wrap it into a node.
+`PublishArticleWorkflow()` creates a workflow that can be run more than once.
+It starts with `prepare_article`, continues to `publish`, and then runs
+`notify`. The terminal `notify` node uses a bare task because it does not need
+any routing or binding options.
 
 ## Step 4: pass input into the workflow
 
@@ -215,12 +203,13 @@ def build_notification(url: str):
     return f"Article ready at {url}"
 
 
-workflow = Workflow(
-    "publish_article",
-    start=Node(run=prepare_article, next="publish"),
-    publish=Node(run=publish_article, next="notify"),
-    notify=build_notification,
-)
+class PublishArticleWorkflow(Workflow):
+    start = Node(run=prepare_article, next="publish")
+    publish = Node(run=publish_article, next="notify")
+    notify = build_notification
+
+
+workflow = PublishArticleWorkflow()
 
 if __name__ == "__main__":
     run = asyncio.run(

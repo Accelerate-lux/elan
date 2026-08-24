@@ -56,8 +56,8 @@ mature tools: agents have more Prefect, Airflow, Dagster, Temporal, and
 LangGraph examples to learn from, while those products already provide broader
 operational surfaces. Elan's current claim is therefore narrow:
 
-> Explicit orchestration for AI-written dynamic workflows, with one typed
-> Experimental boundary for runtime graph materialization.
+> Elan uses declared routing and has Experimental support for adding graph
+> fragments at runtime.
 
 Direct registered-task invocation and declaration-only graph inspection would
 strengthen that review loop, but both are **Planned** rather than current.

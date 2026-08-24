@@ -1,11 +1,10 @@
 # Elan
 
-> Elan is an alpha, graph-native Python orchestrator for explicit AI-written
-> dynamic workflows. Its product direction is AI-writable, human-reviewable,
-> machine-validatable orchestration.
+> Elan is an alpha Python workflow orchestrator for AI agents, data pipelines,
+> and applications that require complex, multi-stage workflows. It supports
+> binding, routing, joins, composition, and Experimental runtime expansion.
 
-Use the capability status before relying on a feature. “Native to the model” is
-separate from Available, Experimental, Planned, or Direction.
+Check the capability status before relying on a feature.
 
 ## Primary documentation
 

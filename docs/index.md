@@ -1,16 +1,20 @@
 # Elan
 
-Elan is a Python workflow orchestrator for AI agents, data pipelines, and
-applications that require complex, multi-stage workflows. A workflow can
-branch, run tasks in parallel, join them again, call another workflow, or add
-steps while it runs.
+Elan is a graph-native orchestrator for data and agent workflows, built for
+AI-era systems that need to adapt without giving up control. It is meant for
+agent harnesses, multi-agent systems, data pipelines, and other applications in
+which uncertain tasks must participate in a predictable execution process.
 
-Routes, bindings, fan-out, and joins are defined on the workflow, not inside
-task functions. The graph stays visible and tasks only deal with their inputs
-and outputs.
+Elan provides deterministic coordination around nondeterministic work. A
+model, agent, tool, or data source can influence what happens next, but it does
+not improvise the execution loop. The workflow defines the permitted routes,
+parallel branches, joins, composition boundaries, and controlled runtime
+expansion, keeping adaptive behavior bounded and inspectable.
 
-Tasks are typed, and Elan validates the graph before running it. Runtime
-expansion is Experimental.
+Elan's ambition is to run complex, large-scale workflows with many steps
+across distributed workers. The current alpha provides local graph execution;
+distributed execution, persistence, and operational infrastructure remain
+longer-term direction.
 
 !!! warning "Alpha software"
     APIs may change. See [Capability status](status.md) for current feature
@@ -151,9 +155,14 @@ The [Dynamic Execution guide](guides/dynamic-execution.md) shows the complete
 
 ## Status
 
-The static workflow features shown above are Available. `Expand` and `Fragment`
-are Experimental. Elan does not currently provide persistence, retries and
-resume, remote workers, or a control plane. See
+Today, Elan provides local execution of typed workflow graphs with validation,
+routing, concurrent branches, joins, and workflow composition. The static
+workflow features shown above are Available; `Expand` and `Fragment` are
+Experimental.
+
+Elan is being built toward durable execution of large, complex workflows
+across distributed workers. Persistence, retries and resume, remote workers,
+scheduling, and a control plane are Direction, not current capabilities. See
 [Capability status](status.md) for the full list.
 
 ## Start here

@@ -17,6 +17,10 @@ authors = [
 ]
 
 [project.optional-dependencies]
+openai = [
+  "openai>=2.0",
+  "typer>=0.12",
+]
 dev = [
   "pytest>=8.3",
   "pytest-asyncio>=0.24",

@@ -1,3 +1,4 @@
+# ruff: noqa: PIE794
 """Prospective Elan API for a provider-agnostic agent/tool loop.
 
 This is intentionally a design sketch, not a runnable example against the
@@ -8,6 +9,7 @@ the same graph.
 
 import asyncio
 import os
+from collections.abc import AsyncIterator
 
 import typer
 
@@ -16,10 +18,8 @@ from elan import (
     Answer,
     Calls,
     Conversation,
-    Emit,
     ModelCall,
     Node,
-    Receive,
     ToolCall,
     ToolSet,
     UserMessage,
@@ -55,69 +55,93 @@ async def multiply(left: float, right: float) -> float:
 
 
 @task
-async def initialize() -> Conversation:
-    """Create the durable, provider-neutral state for one conversation."""
-    return Conversation()
+async def initialize(conversation: Conversation) -> None:
+    """Initialize the durable, provider-neutral conversation context."""
+
+
+@task
+async def receive_user_message(
+    inputs: AsyncIterator[UserMessage],
+) -> UserMessage:
+    """Consume exactly one packet from the workflow's open input."""
+    return await anext(inputs)
 
 
 arithmetic_tools = ToolSet(add, multiply)
 
 # The adapter translates canonical Elan requests, tool definitions, calls,
 # and results to one provider protocol. It never schedules or executes tools.
-model = OpenAIResponses(model=DEFAULT_MODEL)
+openai_model = OpenAIResponses(model=DEFAULT_MODEL)
 
 
 # Low-level form. The workflow is a long-lived interaction loop:
 #
-#   initialize -> receive_user -> model -> emit_answer -> receive_user
-#                                  ^  |
-#                                  |  v
-#                                call_tools
+#   initialize -> receive_user -> model_step
+#   model_step -- Answer --> Workflow.output + receive_user
+#   model_step -- Calls  --> call_tools --> model_step
 #
-# Receive suspends the workflow until its handle is sent a UserMessage. Emit
-# publishes an Answer without terminating the workflow. ModelCall returns
-# Answer | Calls; ToolCall expands Calls into normal task activations, joins
-# their correlated results, and resumes the model node.
-explicit_tool_loop = Workflow(
-    "arithmetic_tool_loop",
-    policy=WorkflowPolicy(max_concurrency=4),
-    start=Node(run=initialize, next="receive_user"),
-    receive_user=Receive(UserMessage, next="model"),
-    model=Node(
+# receive_user is an ordinary activation consuming one item from the open
+# Workflow.input. It suspends without occupying an executor. ModelCall returns
+# Answer | Calls. Answer is published through Workflow.output while control
+# schedules the next receive activation; ToolCall expands Calls into ordinary
+# task activations and resumes the model node.
+class ArithmeticToolLoop(Workflow):
+    receive_user: Node
+    model_step: Node
+    call_tools: ToolCall
+
+    name = "arithmetic_tool_loop"
+    input = UserMessage
+    output = Answer
+    context = Conversation
+    policy = WorkflowPolicy(max_parallel_tasks=4)
+
+    start = Node(run=initialize, next=receive_user)
+    receive_user = Node(
+        run=receive_user_message,
+        input=Workflow.input,
+        next=model_step,
+    )
+    model_step = Node(
         run=ModelCall(
-            model=model,
+            model=openai_model,
             instructions=INSTRUCTIONS,
             tools=arithmetic_tools,
             parallel_tool_calls=True,
         ),
-        route_on=Answer | Calls,
+        output={Answer: Workflow.output},
         next={
-            Answer: "emit_answer",
-            Calls: "call_tools",
+            Answer: receive_user,
+            Calls: call_tools,
         },
-    ),
-    call_tools=ToolCall(
+    )
+    call_tools = ToolCall(
         tools=arithmetic_tools,
-        next="model",
-    ),
-    emit_answer=Emit(Answer, next="receive_user"),
-)
+        next=model_step,
+    )
 
 
-# High-level form. AgentLoop owns no new execution semantics: it compiles to
-# the explicit workflow above and exposes its graph, events, and run state.
-arithmetic_agent = AgentLoop(
-    "arithmetic_agent",
-    start=initialize,
-    input=UserMessage,
-    output=Answer,
-    model=model,
-    instructions=INSTRUCTIONS,
-    tools=arithmetic_tools,
-    parallel_tool_calls=True,
-    max_model_steps=8,
-    policy=WorkflowPolicy(max_concurrency=4),
-)
+explicit_tool_loop = ArithmeticToolLoop()
+
+
+# High-level form. AgentLoop owns no new execution semantics: its subclass
+# declaration compiles to the explicit workflow above and exposes the same
+# graph, open input/output boundary, events, and run state.
+class ArithmeticAgent(AgentLoop):
+    name = "arithmetic_agent"
+    start = initialize
+    input = UserMessage
+    output = Answer
+    context = Conversation
+    model = openai_model
+    instructions = INSTRUCTIONS
+    tools = arithmetic_tools
+    parallel_tool_calls = True
+    max_model_steps = 8
+    policy = WorkflowPolicy(max_parallel_tasks=4)
+
+
+arithmetic_agent = ArithmeticAgent()
 
 
 async def run_cli(message: str | None) -> None:
@@ -125,13 +149,13 @@ async def run_cli(message: str | None) -> None:
         typer.echo("Set OPENAI_API_KEY before running this example.", err=True)
         raise typer.Exit(code=2)
 
-    # Starting the workflow runs initialization and suspends at Receive. The
-    # application only transports inputs and outputs through the live handle;
-    # both the user interaction and model/tool cycles belong to the workflow.
+    # Starting the workflow runs initialization and suspends the receive_user
+    # activation on Workflow.input. The application only supplies and consumes
+    # boundary values; both interaction cycles belong to the workflow.
     async with arithmetic_agent.start() as run:
         if message is not None and message.strip():
-            await run.send(UserMessage(text=message.strip()))
-            answer = await run.receive(Answer)
+            await run.input(UserMessage(text=message.strip()))
+            answer = await run.output(Answer)
             typer.echo(answer.text)
             return
 
@@ -147,8 +171,8 @@ async def run_cli(message: str | None) -> None:
             if not user_message:
                 continue
 
-            await run.send(UserMessage(text=user_message))
-            answer = await run.receive(Answer)
+            await run.input(UserMessage(text=user_message))
+            answer = await run.output(Answer)
             typer.echo(f"agent> {answer.text}")
 
 

@@ -17,6 +17,9 @@ authors = [
 ]
 
 [project.optional-dependencies]
+examples = [
+  "typer>=0.12",
+]
 dev = [
   "pytest>=8.3",
   "pytest-asyncio>=0.24",
